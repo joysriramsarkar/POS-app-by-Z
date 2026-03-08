@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useCustomersStore } from '@/stores/pos-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,6 +78,7 @@ export function PartiesManagement() {
   const addCustomer = useCustomersStore((state) => state.addCustomer);
   const updateCustomer = useCustomersStore((state) => state.updateCustomer);
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -90,6 +91,26 @@ export function PartiesManagement() {
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
+
+  // Load suppliers from local storage on mount
+  useEffect(() => {
+    const savedSuppliers = localStorage.getItem('pos_suppliers');
+    if (savedSuppliers) {
+      try {
+        setSuppliers(JSON.parse(savedSuppliers));
+      } catch (e) {
+        console.error('Failed to load suppliers', e);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Save suppliers to local storage whenever they change
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('pos_suppliers', JSON.stringify(suppliers));
+    }
+  }, [suppliers, isLoaded]);
 
   // Filter customers
   const filteredCustomers = useMemo(() => {

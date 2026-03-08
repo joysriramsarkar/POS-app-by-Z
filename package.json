@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
+    "build": "next build && powershell -c \"Copy-Item -Recurse -Path .next/static -Destination .next/standalone/.next\" && powershell -c \"Copy-Item -Recurse -Path public -Destination .next/standalone\"",
+    "start": "powershell -c \"$env:NODE_ENV='production'; node .next/standalone/server.js | Tee-Object -FilePath server.log\"",
     "lint": "eslint .",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
