@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useRef } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,7 @@ import {
   Printer,
   Receipt,
 } from 'lucide-react';
-import type { PaymentMethod } from '@/types/pos';
+import type { PaymentMethod, Sale, SaleItem, Customer } from '@/types/pos';
 import { useCartStore, useUIStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
 
@@ -57,6 +58,7 @@ export function CheckoutDialog({
 }: CheckoutDialogProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
 
   // Track previous open state to detect when dialog opens
   const prevOpenRef = useRef(false);
@@ -75,6 +77,8 @@ export function CheckoutDialog({
   // UI store
   const isCheckoutOpen = useUIStore((state) => state.isCheckoutOpen);
   const setCheckoutOpen = useUIStore((state) => state.setCheckoutOpen);
+  const setPrintDialogOpen = useUIStore((state) => state.setPrintDialogOpen);
+  const setCurrentSale = useUIStore((state) => state.setCurrentSale);
 
   // Use controlled or internal state
   const isOpen = controlledOpen !== undefined ? controlledOpen : isCheckoutOpen;
@@ -172,6 +176,46 @@ export function CheckoutDialog({
       return;
     }
 
+    const saleItems: SaleItem[] = items.map((item) => ({
+      id: uuidv4(),
+      saleId: '', // To be filled by backend/process
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      totalPrice: item.totalPrice,
+      createdAt: new Date(),
+    }));
+
+    const customer: Customer | undefined = customerId ? {
+      id: customerId,
+      name: customerName || 'Walk-in',
+      totalDue: 0,
+      totalPaid: 0,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } : undefined;
+
+    const sale: Sale = {
+      id: uuidv4(),
+      invoiceNumber: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+      customerId,
+      customer,
+      items: saleItems,
+      subtotal,
+      discount,
+      tax,
+      totalAmount: total,
+      paymentMethod,
+      paymentStatus: paymentMethod === 'Due' ? 'Due' : 'Paid',
+      status: 'Completed',
+      offlineSynced: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    setLastSale(sale);
     setShowSuccess(true);
 
     const paymentData: PaymentData = {
@@ -190,18 +234,22 @@ export function CheckoutDialog({
     paymentMethod,
     parsedAmount,
     total,
-    change,
+    items,
     customerId,
+    customerName,
     subtotal,
     discount,
     tax,
     onComplete,
+    change,
   ]);
 
   const handlePrint = useCallback(() => {
-    // TODO: Implement print functionality
-    window.print();
-  }, []);
+    if (lastSale) {
+      setCurrentSale(lastSale);
+      setPrintDialogOpen(true);
+    }
+  }, [lastSale, setCurrentSale, setPrintDialogOpen]);
 
   const paymentMethodIcon = useMemo(() => {
     switch (paymentMethod) {
