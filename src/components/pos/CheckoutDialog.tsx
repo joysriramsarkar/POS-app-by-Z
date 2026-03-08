@@ -33,6 +33,7 @@ interface CheckoutDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onComplete: (paymentData: PaymentData) => void;
+  onPrint?: (paymentData: PaymentData) => void;
   isProcessing?: boolean;
 }
 
@@ -53,6 +54,7 @@ export function CheckoutDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   onComplete,
+  onPrint,
   isProcessing = false,
 }: CheckoutDialogProps) {
   const [showSuccess, setShowSuccess] = useState(false);
@@ -133,18 +135,20 @@ export function CheckoutDialog({
       }
       prevOpenRef.current = open;
       setOpen(open);
+
+      // Sync back to store if closing
+      if (!open) {
+         setCheckoutOpen(false);
+      }
     },
-    [getInitialAmount, setOpen]
+    [getInitialAmount, setOpen, setCheckoutOpen]
   );
 
   // Close handler that also clears cart on success
   const handleClose = useCallback(() => {
     handleOpenChange(false);
-    if (showSuccess) {
-      clearCart();
-    }
     setShowSuccess(false);
-  }, [handleOpenChange, showSuccess, clearCart]);
+  }, [handleOpenChange]);
 
   const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -199,9 +203,35 @@ export function CheckoutDialog({
   ]);
 
   const handlePrint = useCallback(() => {
-    // TODO: Implement print functionality
-    window.print();
-  }, []);
+    if (onPrint) {
+      const paymentData: PaymentData = {
+        amountReceived: paymentMethod === 'Due' ? 0 : parsedAmount,
+        change: paymentMethod === 'Due' ? 0 : Math.max(0, change),
+        paymentMethod,
+        customerId,
+        subtotal,
+        discount,
+        tax,
+        total,
+      };
+      handleOpenChange(false);
+      setShowSuccess(false);
+      onPrint(paymentData);
+    } else {
+      window.print();
+    }
+  }, [
+    onPrint,
+    paymentMethod,
+    parsedAmount,
+    total,
+    change,
+    customerId,
+    subtotal,
+    discount,
+    tax,
+    handleOpenChange,
+  ]);
 
   const paymentMethodIcon = useMemo(() => {
     switch (paymentMethod) {

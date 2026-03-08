@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { CartItem, PaymentMethod, Product, Customer } from '@/types/pos';
+import type { CartItem, PaymentMethod, Product, Customer, Sale } from '@/types/pos';
 import { v4 as uuidv4 } from 'uuid';
 
 // ============================================================================
@@ -419,3 +419,62 @@ export const useSyncStore = create<SyncState & SyncActions>((set) => ({
   addSyncError: (error) => set((state) => ({ syncErrors: [...state.syncErrors, error] })),
   clearSyncErrors: () => set({ syncErrors: [] }),
 }));
+
+// ============================================================================
+// SALES STORE
+// ============================================================================
+
+interface SalesState {
+  sales: Sale[];
+  isLoading: boolean;
+}
+
+interface SalesActions {
+  setSales: (sales: Sale[]) => void;
+  addSale: (sale: Sale) => void;
+  updateSaleStatus: (id: string, status: Sale['status']) => void;
+  getSaleById: (id: string) => Sale | undefined;
+  getSalesByCustomerId: (customerId: string) => Sale[];
+}
+
+export const useSalesStore = create<SalesState & SalesActions>()(
+  persist(
+    (set, get) => ({
+      sales: [],
+      isLoading: false,
+
+      setSales: (sales) => {
+        set({ sales, isLoading: false });
+      },
+
+      addSale: (sale) => {
+        set((state) => ({
+          sales: [sale, ...state.sales],
+        }));
+      },
+
+      updateSaleStatus: (id, status) => {
+        set((state) => ({
+          sales: state.sales.map((s) =>
+            s.id === id ? { ...s, status } : s
+          ),
+        }));
+      },
+
+      getSaleById: (id) => {
+        return get().sales.find((s) => s.id === id);
+      },
+
+      getSalesByCustomerId: (customerId) => {
+        return get().sales.filter((s) => s.customerId === customerId);
+      },
+    }),
+    {
+      name: 'lakhan-bhandar-sales',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        sales: state.sales,
+      }),
+    }
+  )
+);
