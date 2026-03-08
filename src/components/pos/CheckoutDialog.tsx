@@ -34,6 +34,7 @@ interface CheckoutDialogProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   onComplete: (paymentData: PaymentData) => void;
+  onPrint?: (paymentData: PaymentData) => void;
   isProcessing?: boolean;
 }
 
@@ -54,6 +55,7 @@ export function CheckoutDialog({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   onComplete,
+  onPrint,
   isProcessing = false,
 }: CheckoutDialogProps) {
   const [showSuccess, setShowSuccess] = useState(false);
@@ -137,18 +139,20 @@ export function CheckoutDialog({
       }
       prevOpenRef.current = open;
       setOpen(open);
+
+      // Sync back to store if closing
+      if (!open) {
+         setCheckoutOpen(false);
+      }
     },
-    [getInitialAmount, setOpen]
+    [getInitialAmount, setOpen, setCheckoutOpen]
   );
 
   // Close handler that also clears cart on success
   const handleClose = useCallback(() => {
     handleOpenChange(false);
-    if (showSuccess) {
-      clearCart();
-    }
     setShowSuccess(false);
-  }, [handleOpenChange, showSuccess, clearCart]);
+  }, [handleOpenChange]);
 
   const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
