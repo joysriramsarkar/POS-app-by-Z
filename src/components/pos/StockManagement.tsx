@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { BulkStockUpdateDialog } from './BulkStockUpdateDialog';
 import {
   Package,
   Plus,
@@ -41,6 +42,7 @@ import {
   ArrowUpDown,
   History,
   X,
+  Upload,
 } from 'lucide-react';
 import type { Product } from '@/types/pos';
 import { useProductsStore } from '@/stores/pos-store';
@@ -63,6 +65,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
 
   const products = useProductsStore((state) => state.products);
   const categories = useProductsStore((state) => state.categories);
@@ -147,6 +150,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
   const outOfStockCount = products.filter(p => p.currentStock === 0).length;
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="shrink-0 border-b bg-background p-4">
@@ -160,10 +164,16 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
               {products.length} items • {lowStockCount} low stock • {outOfStockCount} out of stock
             </p>
           </div>
-          <Button onClick={onAddProduct}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Item
-          </Button>
+          <div className='flex gap-2'>
+            <Button variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Bulk Update
+            </Button>
+            <Button onClick={onAddProduct}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Item
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -347,6 +357,8 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
         </div>
       </div>
     </div>
+    <BulkStockUpdateDialog open={isBulkUpdateOpen} onOpenChange={setIsBulkUpdateOpen} />
+    </>
   );
 }
 

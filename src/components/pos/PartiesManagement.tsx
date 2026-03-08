@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { useCustomersStore } from '@/stores/pos-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -43,14 +45,6 @@ import type { Customer, Supplier, LedgerEntry } from '@/types/pos';
 import { cn } from '@/lib/utils';
 
 // Mock data for demo
-const mockCustomers: Customer[] = [
-  { id: '1', name: 'Rahul Sharma', phone: '9876543210', address: 'Shivmandir, Military Road', totalDue: 1500, totalPaid: 5000, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '2', name: 'Anita Devi', phone: '9876543211', address: '3 No Gate', totalDue: 0, totalPaid: 3200, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '3', name: 'Mohan Das', phone: '9876543212', totalDue: 2000, totalPaid: 8000, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '4', name: 'Priya Kumari', phone: '9876543213', address: 'NBU More', totalDue: 500, totalPaid: 1200, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '5', name: 'Sunil Gupta', phone: '9876543214', totalDue: 0, totalPaid: 15000, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-];
-
 const mockSuppliers: Supplier[] = [
   { id: '1', name: 'ABC Distributors', phone: '9876543220', address: 'Siliguri', isActive: true, createdAt: new Date(), updatedAt: new Date() },
   { id: '2', name: 'XYZ Wholesalers', phone: '9876543221', address: 'Jalpaiguri', isActive: true, createdAt: new Date(), updatedAt: new Date() },
@@ -65,12 +59,7 @@ const mockLedgerEntries: LedgerEntry[] = [
 
 type PartyType = 'customer' | 'supplier';
 
-interface PartiesManagementProps {
-  onAddCustomer?: () => void;
-  onAddSupplier?: () => void;
-}
-
-export function PartiesManagement({ onAddCustomer, onAddSupplier }: PartiesManagementProps) {
+export function PartiesManagement() {
   const [activeTab, setActiveTab] = useState<PartyType>('customer');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -85,7 +74,9 @@ export function PartiesManagement({ onAddCustomer, onAddSupplier }: PartiesManag
     notes: '',
   });
 
-  const [customers, setCustomers] = useState<Customer[]>(mockCustomers);
+  const customers = useCustomersStore((state) => state.customers);
+  const addCustomer = useCustomersStore((state) => state.addCustomer);
+  const updateCustomer = useCustomersStore((state) => state.updateCustomer);
   const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
 
   const formatPrice = (price: number) => {
@@ -141,12 +132,11 @@ export function PartiesManagement({ onAddCustomer, onAddSupplier }: PartiesManag
   const handlePaymentSubmit = () => {
     if (!selectedCustomer || !paymentAmount) return;
 
-    // Update customer due
-    setCustomers(prev => prev.map(c =>
-      c.id === selectedCustomer.id
-        ? { ...c, totalDue: Math.max(0, c.totalDue - parseFloat(paymentAmount)), totalPaid: c.totalPaid + parseFloat(paymentAmount) }
-        : c
-    ));
+    const paidAmount = parseFloat(paymentAmount);
+    updateCustomer(selectedCustomer.id, {
+        totalDue: Math.max(0, selectedCustomer.totalDue - paidAmount),
+        totalPaid: selectedCustomer.totalPaid + paidAmount,
+    });
 
     setShowPaymentDialog(false);
   };
@@ -156,7 +146,7 @@ export function PartiesManagement({ onAddCustomer, onAddSupplier }: PartiesManag
 
     if (activeTab === 'customer') {
       const customer: Customer = {
-        id: Date.now().toString(),
+        id: uuidv4(),
         name: newParty.name,
         phone: newParty.phone || undefined,
         address: newParty.address || undefined,
@@ -167,10 +157,10 @@ export function PartiesManagement({ onAddCustomer, onAddSupplier }: PartiesManag
         createdAt: new Date(),
         updatedAt: new Date(),
       };
-      setCustomers(prev => [...prev, customer]);
+      addCustomer(customer);
     } else {
       const supplier: Supplier = {
-        id: Date.now().toString(),
+        id: uuidv4(),
         name: newParty.name,
         phone: newParty.phone || undefined,
         address: newParty.address || undefined,

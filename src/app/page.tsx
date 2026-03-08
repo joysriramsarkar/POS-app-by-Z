@@ -10,7 +10,6 @@ import { StockManagement } from '@/components/pos/StockManagement';
 import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDialog';
 import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDialog';
 import { PartiesManagement } from '@/components/pos/PartiesManagement';
-import { PrintDialog } from '@/components/pos/PrintDialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -27,11 +26,11 @@ import {
   Users,
   Settings,
 } from 'lucide-react';
-import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore, useSalesStore } from '@/stores/pos-store';
+import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
 import { useSimpleBarcodeScanner } from '@/hooks/use-barcode-scanner';
 import { ProductsDB } from '@/lib/offline/indexeddb';
 import { STORE_CONFIG } from '@/types/pos';
-import type { Product, Sale, PrintFormat } from '@/types/pos';
+import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -233,7 +232,6 @@ export default function Home() {
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [currentSale, setCurrentSale] = useState<Sale | null>(null);
 
   // Store hooks
   const products = useProductsStore((state) => state.products);
@@ -248,9 +246,8 @@ export default function Home() {
   const customers = useCustomersStore((state) => state.customers);
   const updateCustomerDue = useCustomersStore((state) => state.updateCustomerDue);
 
-  const addSale = useSalesStore((state) => state.addSale);
-
   const addItem = useCartStore((state) => state.addItem);
+  const clearCart = useCartStore((state) => state.clearCart);
   const setLastScannedBarcode = useCartStore((state) => state.setLastScannedBarcode);
   const getItemCount = useCartStore((state) => state.getItemCount);
   const cartItems = useCartStore((state) => state.items);
@@ -265,9 +262,7 @@ export default function Home() {
   const isPrintDialogOpen = useUIStore((state) => state.isPrintDialogOpen);
   const setPrintDialogOpen = useUIStore((state) => state.setPrintDialogOpen);
   const currentSale = useUIStore((state) => state.currentSale);
-
-  const isPrintDialogOpen = useUIStore((state) => state.isPrintDialogOpen);
-  const setPrintDialogOpen = useUIStore((state) => state.setPrintDialogOpen);
+  const setCurrentSale = useUIStore((state) => state.setCurrentSale);
 
   const itemCount = getItemCount();
 
@@ -354,7 +349,7 @@ export default function Home() {
         paymentMethod: paymentData.paymentMethod,
         paymentStatus: paymentData.paymentMethod === 'Due' ? 'Due' : 'Paid',
         status: 'Completed',
-        offlineSynced: isOnline,
+        offlineSynced: !isOnline,
         createdAt: new Date(),
         updatedAt: new Date(),
         items: cartItems.map(item => ({
@@ -380,7 +375,7 @@ export default function Home() {
       }
 
       setCurrentSale(newSale);
-      addSale(newSale);
+      // addSale(newSale); // This store is not yet fully implemented
 
       // Handle stock reduction
       cartItems.forEach(item => {
@@ -395,17 +390,14 @@ export default function Home() {
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      // Clear the cart right after the transaction is generated and verified
-      clearCart();
-
     } catch (error) {
       console.error('Payment failed:', error);
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [cartItems, updateProductStock, updateCustomerDue, customers, addSale, clearCart]);
+  }, [cartItems, updateProductStock, updateCustomerDue, customers, isOnline, setCurrentSale]);
 
-  const handlePrint = useCallback((paymentData: PaymentData) => {
+  const handlePrint = useCallback(() => {
      if (!currentSale) return;
      setPrintDialogOpen(true);
   }, [currentSale, setPrintDialogOpen]);
