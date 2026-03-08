@@ -161,26 +161,26 @@ export async function POST(request: NextRequest) {
       });
 
       // Update stock for each item
-      for (const item of items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            currentStock: { decrement: item.quantity },
-            updatedAt: new Date(),
-          },
-        });
-
-        // Create stock history entry
-        await tx.stockHistory.create({
-          data: {
-            productId: item.productId,
-            changeType: 'sale',
-            quantity: -item.quantity,
-            reason: `Sale: ${newSale.invoiceNumber}`,
-            referenceId: newSale.id,
-          },
-        });
-      }
+      await Promise.all(
+        items.flatMap((item: { productId: string; quantity: number }) => [
+          tx.product.update({
+            where: { id: item.productId },
+            data: {
+              currentStock: { decrement: item.quantity },
+              updatedAt: new Date(),
+            },
+          }),
+          tx.stockHistory.create({
+            data: {
+              productId: item.productId,
+              changeType: 'sale',
+              quantity: -item.quantity,
+              reason: `Sale: ${newSale.invoiceNumber}`,
+              referenceId: newSale.id,
+            },
+          }),
+        ])
+      );
 
       // If payment is Due, update customer's totalDue
       if (customerId && paymentMethod === 'Due') {
@@ -275,26 +275,26 @@ export async function PUT(request: NextRequest) {
       });
 
       // Restore stock for cancelled/refunded items
-      for (const item of existingSale.items) {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            currentStock: { increment: item.quantity },
-            updatedAt: new Date(),
-          },
-        });
-
-        // Create stock history entry
-        await tx.stockHistory.create({
-          data: {
-            productId: item.productId,
-            changeType: 'return',
-            quantity: item.quantity,
-            reason: `${status}: ${existingSale.invoiceNumber}`,
-            referenceId: existingSale.id,
-          },
-        });
-      }
+      await Promise.all(
+        existingSale.items.flatMap((item) => [
+          tx.product.update({
+            where: { id: item.productId },
+            data: {
+              currentStock: { increment: item.quantity },
+              updatedAt: new Date(),
+            },
+          }),
+          tx.stockHistory.create({
+            data: {
+              productId: item.productId,
+              changeType: 'return',
+              quantity: item.quantity,
+              reason: `${status}: ${existingSale.invoiceNumber}`,
+              referenceId: existingSale.id,
+            },
+          }),
+        ])
+      );
 
       // If sale was on Due, update customer's totalDue
       if (existingSale.customerId && existingSale.paymentMethod === 'Due') {
