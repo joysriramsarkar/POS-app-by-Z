@@ -1,0 +1,390 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Package, Barcode, RefreshCw, Languages } from 'lucide-react';
+import type { Product } from '@/types/pos';
+import { useProductsStore } from '@/stores/pos-store';
+import { cn } from '@/lib/utils';
+import { v4 as uuidv4 } from 'uuid';
+
+interface ProductDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  product?: Product | null;
+  onSubmit?: (data: ProductFormData) => void;
+}
+
+export interface ProductFormData {
+  id?: string;
+  name: string;
+  nameBn?: string;
+  barcode?: string;
+  category: string;
+  buyingPrice: number;
+  sellingPrice: number;
+  unit: string;
+  currentStock: number;
+  minStockLevel: number;
+  isActive: boolean;
+}
+
+const UNITS = [
+  { value: 'piece', label: 'Piece (পিস)' },
+  { value: 'kg', label: 'Kilogram (কেজি)' },
+  { value: 'gram', label: 'Gram (গ্রাম)' },
+  { value: 'liter', label: 'Liter (লিটার)' },
+  { value: 'ml', label: 'Milliliter (মিলি)' },
+  { value: 'packet', label: 'Packet (প্যাকেট)' },
+  { value: 'bottle', label: 'Bottle (বোতল)' },
+  { value: 'dozen', label: 'Dozen (ডজন)' },
+  { value: 'box', label: 'Box (বাক্স)' },
+];
+
+const DEFAULT_CATEGORIES = [
+  'Groceries',
+  'Dairy',
+  'Vegetables',
+  'Fruits',
+  'Pulses',
+  'Oils',
+  'Snacks',
+  'Beverages',
+  'Household',
+  'Personal Care',
+  'Other',
+];
+
+// Helper to generate barcode
+const generateBarcode = (): string => {
+  // Generate a 13-digit EAN-like barcode
+  const prefix = '890'; // India prefix
+  const random = Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+  const base = prefix + random;
+  
+  // Calculate check digit (Luhn algorithm for EAN)
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(base[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  
+  return base + checkDigit;
+};
+
+export function ProductDialog({
+  open,
+  onOpenChange,
+  product,
+  onSubmit,
+}: ProductDialogProps) {
+  const [name, setName] = useState('');
+  const [nameBn, setNameBn] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [category, setCategory] = useState('');
+  const [newCategory, setNewCategory] = useState('');
+  const [buyingPrice, setBuyingPrice] = useState('');
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [unit, setUnit] = useState('piece');
+  const [currentStock, setCurrentStock] = useState('');
+  const [minStockLevel, setMinStockLevel] = useState('');
+  const [isActive, setIsActive] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const categories = useProductsStore((state) => state.categories);
+  const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...categories])].sort();
+
+  const isEditing = !!product;
+
+  // Populate form when editing
+  useEffect(() => {
+    if (open) {
+      if (product) {
+        setName(product.name);
+        setNameBn(product.nameBn || '');
+        setBarcode(product.barcode || '');
+        setCategory(product.category);
+        setBuyingPrice(product.buyingPrice.toString());
+        setSellingPrice(product.sellingPrice.toString());
+        setUnit(product.unit);
+        setCurrentStock(product.currentStock.toString());
+        setMinStockLevel(product.minStockLevel.toString());
+        setIsActive(product.isActive);
+      } else {
+        // Reset for new product
+        setName('');
+        setNameBn('');
+        setBarcode('');
+        setCategory('');
+        setNewCategory('');
+        setBuyingPrice('');
+        setSellingPrice('');
+        setUnit('piece');
+        setCurrentStock('0');
+        setMinStockLevel('5');
+        setIsActive(true);
+      }
+    }
+  }, [open, product]);
+
+  const handleGenerateBarcode = () => {
+    setBarcode(generateBarcode());
+  };
+
+  const handleSubmit = async () => {
+    if (!name || !category || !buyingPrice || !sellingPrice) return;
+
+    setIsSubmitting(true);
+    try {
+      const data: ProductFormData = {
+        id: product?.id,
+        name,
+        nameBn: nameBn || undefined,
+        barcode: barcode || undefined,
+        category: newCategory || category,
+        buyingPrice: parseFloat(buyingPrice),
+        sellingPrice: parseFloat(sellingPrice),
+        unit,
+        currentStock: parseFloat(currentStock) || 0,
+        minStockLevel: parseFloat(minStockLevel) || 5,
+        isActive,
+      };
+
+      onSubmit?.(data);
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const isValid = name && (category || newCategory) && buyingPrice && sellingPrice;
+
+  // Calculate profit margin
+  const profitMargin = buyingPrice && sellingPrice && parseFloat(buyingPrice) > 0
+    ? (((parseFloat(sellingPrice) - parseFloat(buyingPrice)) / parseFloat(buyingPrice)) * 100).toFixed(1)
+    : null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            {isEditing ? 'Edit Product' : 'Add New Product'}
+          </DialogTitle>
+          <DialogDescription>
+            {isEditing ? 'Update product details' : 'Add a new product to your inventory'}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {/* Product Name */}
+          <div className="space-y-2">
+            <Label htmlFor="name">Product Name *</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Tata Salt"
+            />
+          </div>
+
+          {/* Bengali Name */}
+          <div className="space-y-2">
+            <Label htmlFor="nameBn" className="flex items-center gap-2">
+              <Languages className="w-4 h-4" />
+              Bengali Name (বাংলা)
+            </Label>
+            <Input
+              id="nameBn"
+              value={nameBn}
+              onChange={(e) => setNameBn(e.target.value)}
+              placeholder="e.g., টাটা লবণ"
+            />
+          </div>
+
+          {/* Barcode */}
+          <div className="space-y-2">
+            <Label htmlFor="barcode" className="flex items-center gap-2">
+              <Barcode className="w-4 h-4" />
+              Barcode
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="barcode"
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                placeholder="Scan or enter barcode"
+                className="flex-1 font-mono"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleGenerateBarcode}
+                title="Generate barcode"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Category */}
+          <div className="space-y-2">
+            <Label htmlFor="category">Category *</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger id="category">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {allCategories.map((cat) => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Or add new:</span>
+              <Input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="New category"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Unit */}
+          <div className="space-y-2">
+            <Label htmlFor="unit">Unit</Label>
+            <Select value={unit} onValueChange={setUnit}>
+              <SelectTrigger id="unit">
+                <SelectValue placeholder="Select unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {UNITS.map((u) => (
+                  <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          {/* Prices */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="buyingPrice">Buying Price (₹) *</Label>
+              <Input
+                id="buyingPrice"
+                type="number"
+                value={buyingPrice}
+                onChange={(e) => setBuyingPrice(e.target.value)}
+                placeholder="0"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sellingPrice">Selling Price (₹) *</Label>
+              <Input
+                id="sellingPrice"
+                type="number"
+                value={sellingPrice}
+                onChange={(e) => setSellingPrice(e.target.value)}
+                placeholder="0"
+                min="0"
+                step="0.01"
+              />
+            </div>
+          </div>
+
+          {/* Profit Margin */}
+          {profitMargin && (
+            <div className="flex items-center gap-2 text-sm">
+              <Badge variant={parseFloat(profitMargin) >= 10 ? 'default' : 'secondary'}>
+                {profitMargin}% margin
+              </Badge>
+              <span className="text-muted-foreground">
+                Profit: ₹{(parseFloat(sellingPrice) - parseFloat(buyingPrice)).toFixed(2)} per {unit}
+              </span>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Stock */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="currentStock">Current Stock</Label>
+              <Input
+                id="currentStock"
+                type="number"
+                value={currentStock}
+                onChange={(e) => setCurrentStock(e.target.value)}
+                placeholder="0"
+                min="0"
+                step={unit === 'piece' ? '1' : '0.1'}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="minStockLevel">Min Stock Level</Label>
+              <Input
+                id="minStockLevel"
+                type="number"
+                value={minStockLevel}
+                onChange={(e) => setMinStockLevel(e.target.value)}
+                placeholder="5"
+                min="0"
+                step="1"
+              />
+            </div>
+          </div>
+
+          {/* Active Status */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="isActive">Active</Label>
+              <p className="text-xs text-muted-foreground">Inactive products won't appear in POS</p>
+            </div>
+            <Switch
+              id="isActive"
+              checked={isActive}
+              onCheckedChange={setIsActive}
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={!isValid || isSubmitting}>
+            {isSubmitting ? 'Saving...' : isEditing ? 'Update Product' : 'Add Product'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default ProductDialog;
