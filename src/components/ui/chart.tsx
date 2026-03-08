@@ -53,7 +53,7 @@ function ChartContainer({
     <ChartContext.Provider value={{ config }}>
       <div
         data-slot="chart"
-        data-chart={chartId}
+        data-chart={chartId.replace(/[^\w-]/g, "")}
         className={cn(
           "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border flex aspect-video justify-center text-xs [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
           className
@@ -79,26 +79,30 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
   }
 
   return (
-    <style
-      dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
+    <style>
+      {Object.entries(THEMES)
+        .map(([theme, prefix]) => {
+          const safeId = id.replace(/[^\w-]/g, "")
+          return `
+${prefix} [data-chart="${safeId}"] {
 ${colorConfig
   .map(([key, itemConfig]) => {
     const color =
       itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
       itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
+    if (!color) return null
+
+    const safeKey = key.replace(/[^\w-]/g, "")
+    const safeColor = color.replace(/[;}]/g, "")
+    return `  --color-${safeKey}: ${safeColor};`
   })
   .join("\n")}
 }
 `
-          )
-          .join("\n"),
-      }}
-    />
+        })
+        .join("\n")
+        .replace(/<\/style>/gi, "")}
+    </style>
   )
 }
 

@@ -196,6 +196,7 @@ interface UIState {
   searchQuery: string;
   selectedCategoryId: string | null;
   printFormat: 'thermal-58' | 'thermal-80' | 'a4' | 'a5';
+  currentSale: Sale | null;
 }
 
 interface UIActions {
@@ -206,6 +207,7 @@ interface UIActions {
   setSearchQuery: (query: string) => void;
   setSelectedCategoryId: (id: string | null) => void;
   setPrintFormat: (format: 'thermal-58' | 'thermal-80' | 'a4' | 'a5') => void;
+  setCurrentSale: (sale: Sale | null) => void;
 }
 
 export const useUIStore = create<UIState & UIActions>((set) => ({
@@ -216,6 +218,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   searchQuery: '',
   selectedCategoryId: null,
   printFormat: 'thermal-80',
+  currentSale: null,
 
   setSearchOpen: (open) => set({ isSearchOpen: open }),
   setCheckoutOpen: (open) => set({ isCheckoutOpen: open }),
@@ -224,6 +227,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSelectedCategoryId: (id) => set({ selectedCategoryId: id }),
   setPrintFormat: (format) => set({ printFormat: format }),
+  setCurrentSale: (sale) => set({ currentSale: sale }),
 }));
 
 // ============================================================================
