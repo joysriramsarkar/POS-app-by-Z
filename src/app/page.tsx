@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
 import { CheckoutDialog, type PaymentData } from '@/components/pos/CheckoutDialog';
+import { PrintDialog } from '@/components/pos/PrintDialog';
 import { Dashboard } from '@/components/pos/Dashboard';
 import { StockManagement } from '@/components/pos/StockManagement';
 import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDialog';
@@ -255,6 +256,9 @@ export default function Home() {
 
   const isCheckoutOpen = useUIStore((state) => state.isCheckoutOpen);
   const setCheckoutOpen = useUIStore((state) => state.setCheckoutOpen);
+  const isPrintDialogOpen = useUIStore((state) => state.isPrintDialogOpen);
+  const setPrintDialogOpen = useUIStore((state) => state.setPrintDialogOpen);
+  const currentSale = useUIStore((state) => state.currentSale);
 
   const itemCount = getItemCount();
 
@@ -648,6 +652,13 @@ export default function Home() {
         onOpenChange={setIsProductDialogOpen}
         product={selectedProduct}
         onSubmit={handleProductSave}
+      />
+
+      {/* Print Dialog */}
+      <PrintDialog
+        open={isPrintDialogOpen}
+        onOpenChange={setPrintDialogOpen}
+        sale={currentSale}
       />
     </div>
   );

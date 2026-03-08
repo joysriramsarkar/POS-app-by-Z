@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { InvoicePreview } from "./PrintInvoice";
+import { InvoicePreview, PrintInvoice } from "./PrintInvoice";
 import type { Sale, PrintFormat } from "@/types/pos";
 
 // ============================================================================
@@ -323,6 +323,17 @@ export function PrintDialog({
                 </div>
               </div>
             )}
+
+            {/* Hidden printable invoice - always in DOM for browser print */}
+            <div className="sr-only print:not-sr-only">
+              <PrintInvoice
+                sale={sale}
+                format={selectedFormat}
+                showLogo={showLogo}
+                showGst={showGst}
+                footerMessage={footerMessage}
+              />
+            </div>
           </div>
         </div>
 
