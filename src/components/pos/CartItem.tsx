@@ -1,6 +1,4 @@
-'use client';
-
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -19,12 +17,21 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
   const removeItem = useCartStore((state) => state.removeItem);
   const itemRef = useRef<HTMLDivElement>(null);
 
+  // Local state for the input to allow for smoother editing
+  const [inputValue, setInputValue] = useState(item.quantity.toString());
+
   // Scroll into view and highlight when newly added
   useEffect(() => {
     if (isHighlighted && itemRef.current) {
       itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [isHighlighted]);
+
+  // Sync local state when the item quantity changes from the store (e.g., via +/- buttons)
+  useEffect(() => {
+    setInputValue(item.quantity.toString());
+  }, [item.quantity]);
+
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -37,39 +44,51 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
 
   const handleQuantityChange = useCallback(
     (newQuantity: number) => {
-      updateQuantity(item.id, newQuantity);
+      // Ensure we don't go below 0 or above stock
+      const validatedQuantity = Math.max(0, Math.min(newQuantity, item.availableStock));
+      if (validatedQuantity === 0) {
+        // If quantity becomes 0, remove the item
+        removeItem(item.id);
+      } else {
+        updateQuantity(item.id, validatedQuantity);
+      }
     },
-    [item.id, updateQuantity]
+    [item.id, item.availableStock, updateQuantity, removeItem]
   );
 
   const handleIncrement = useCallback(() => {
     const newQty = item.quantity + 1;
-    // Check stock limit
     if (newQty <= item.availableStock) {
-      handleQuantityChange(newQty);
+      updateQuantity(item.id, newQty);
     }
-  }, [item.quantity, item.availableStock, handleQuantityChange]);
+  }, [item.quantity, item.availableStock, updateQuantity]);
 
   const handleDecrement = useCallback(() => {
     const newQty = item.quantity - 1;
     if (newQty > 0) {
-      handleQuantityChange(newQty);
+      updateQuantity(item.id, newQty);
     }
-  }, [item.quantity, handleQuantityChange]);
+  }, [item.quantity, updateQuantity]);
 
   const handleRemove = useCallback(() => {
     removeItem(item.id);
   }, [item.id, removeItem]);
 
-  const handleDirectInput = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = parseFloat(e.target.value);
-      if (!isNaN(value) && value >= 0 && value <= item.availableStock) {
-        handleQuantityChange(value);
-      }
-    },
-    [item.availableStock, handleQuantityChange]
-  );
+  // Update local state as user types
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+  
+  // Update global store on blur or Enter
+  const handleInputBlur = () => {
+    const value = parseFloat(inputValue);
+    if (!isNaN(value) && value > 0) {
+      handleQuantityChange(value);
+    } else {
+      // If input is empty or invalid, revert to original quantity
+      setInputValue(item.quantity.toString());
+    }
+  };
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -80,13 +99,17 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
       } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
         e.preventDefault();
         handleDecrement();
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        handleRemove();
       }
     },
-    [handleIncrement, handleDecrement, handleRemove]
+    [handleIncrement, handleDecrement]
   );
+  
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleInputBlur();
+      (e.target as HTMLInputElement).blur(); // Lose focus
+    }
+  };
 
   const isOverStock = item.quantity > item.availableStock;
   const isAtStockLimit = item.quantity >= item.availableStock;
@@ -153,13 +176,13 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
 
             {/* Quantity Input */}
             <Input
-              type="number"
-              value={item.quantity}
-              onChange={handleDirectInput}
+              type="text" // Use text to allow empty state
+              inputMode="decimal" // Hint for mobile keyboards
+              value={inputValue}
+              onChange={handleInputChange}
+              onBlur={handleInputBlur}
+              onKeyDown={handleInputKeyDown}
               className="w-16 h-8 text-center px-1 touch-manipulation"
-              min={0}
-              max={item.availableStock}
-              step={item.unit === 'piece' ? 1 : 0.1}
               aria-label="Quantity"
             />
 

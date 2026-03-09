@@ -197,7 +197,7 @@ export default function Home() {
 
       // Set the completed sale for the print dialog
       setCurrentSale(completedSale);
-
+      
       // Clear the cart for the next transaction
       clearCart();
 
@@ -212,12 +212,7 @@ export default function Home() {
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [cartItems, isOnline, setCurrentSale, clearCart]);
-
-  const handlePrint = useCallback(() => {
-     if (!currentSale) return;
-     setPrintDialogOpen(true);
-  }, [currentSale, setPrintDialogOpen]);
+  }, [cartItems, isOnline, setCurrentSale, setPrintDialogOpen, clearCart]);
 
   const handleOpenCheckout = useCallback(() => {
     setCheckoutOpen(true);
@@ -445,14 +440,14 @@ export default function Home() {
   return (
     <div className="h-screen flex bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-64 border-r bg-card shrink-0">
+      <aside className="hidden lg:block w-64 border-r bg-card shrink-0 no-print">
         {renderSidebar()}
       </aside>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile Header */}
-        <header className="lg:hidden shrink-0 border-b bg-card px-4 py-3">
+        <header className="lg:hidden shrink-0 border-b bg-card px-4 py-3 no-print">
           <div className="flex items-center justify-between gap-4">
             {/* Mobile Menu */}
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
@@ -513,7 +508,6 @@ export default function Home() {
       {/* Checkout Dialog */}
       <CheckoutDialog
         onComplete={handleCheckoutComplete}
-        onPrint={handlePrint}
         isProcessing={isProcessingPayment}
       />
 

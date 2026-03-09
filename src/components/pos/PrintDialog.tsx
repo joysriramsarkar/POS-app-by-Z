@@ -134,14 +134,16 @@ export function PrintDialog({
   const [selectedFormat, setSelectedFormat] = React.useState<PrintFormat>("thermal-80");
   const [showLogo, setShowLogo] = React.useState(true);
   const [showGst, setShowGst] = React.useState(false);
-  const [showPreview, setShowPreview] = React.useState(false);
+  const [showPreview, setShowPreview] = React.useState(true);
   const [footerMessage, setFooterMessage] = React.useState(
     "This is a computer generated invoice."
   );
 
-  // Reset preview when dialog closes
+  // Reset preview when dialog closes and show on open
   React.useEffect(() => {
-    if (!open) {
+    if (open) {
+      setShowPreview(true);
+    } else {
       setShowPreview(false);
     }
   }, [open]);
@@ -156,18 +158,14 @@ export function PrintDialog({
     onOpenChange(false);
   };
 
-  const handlePreview = () => {
-    setShowPreview(true);
-  };
-
   if (!sale) {
     return null;
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col print-dialog-content">
+        <DialogHeader className="no-print">
           <DialogTitle>Print Invoice</DialogTitle>
           <DialogDescription>
             Select print format and options for invoice #{sale.invoiceNumber}
@@ -176,7 +174,7 @@ export function PrintDialog({
 
         <div className="flex-1 overflow-hidden flex gap-6">
           {/* Left Side - Options */}
-          <div className="w-80 shrink-0 space-y-4">
+          <div className="w-80 shrink-0 space-y-4 no-print">
             {/* Format Selection */}
             <div className="space-y-3">
               <Label className="text-base font-semibold">Print Format</Label>
@@ -260,40 +258,12 @@ export function PrintDialog({
                 placeholder="Custom footer message..."
               />
             </div>
-
-            {/* Preview Button */}
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={handlePreview}
-            >
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                />
-              </svg>
-              Preview Invoice
-            </Button>
           </div>
 
           {/* Right Side - Preview */}
           <div className="flex-1 min-w-0">
             {showPreview ? (
-              <ScrollArea className="h-[60vh]">
+              <ScrollArea className="h-[60vh] print-scroll-area">
                 <InvoicePreview
                   sale={sale}
                   format={selectedFormat}
@@ -303,7 +273,7 @@ export function PrintDialog({
                 />
               </ScrollArea>
             ) : (
-              <div className="h-[60vh] flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+              <div className="h-[60vh] flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 no-print">
                 <div className="text-center text-gray-500">
                   <svg
                     className="w-12 h-12 mx-auto mb-3 text-gray-400"
@@ -323,23 +293,12 @@ export function PrintDialog({
                 </div>
               </div>
             )}
-
-            {/* Hidden printable invoice - always in DOM for browser print */}
-            <div className="sr-only print:not-sr-only">
-              <PrintInvoice
-                sale={sale}
-                format={selectedFormat}
-                showLogo={showLogo}
-                showGst={showGst}
-                footerMessage={footerMessage}
-              />
-            </div>
           </div>
         </div>
 
-        <Separator />
+        <Separator className="no-print" />
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 no-print">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

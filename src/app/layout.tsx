@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   title: "Lakhan Bhandar POS - লক্ষ্মণ ভাণ্ডার",
   description: "Point of Sale system for Lakhan Bhandar grocery store. Fast billing, inventory management, and customer credit tracking.",
   keywords: ["POS", "Point of Sale", "Grocery Store", "Billing", "Inventory", "Lakhan Bhandar"],
-  authors: [{ name: "Lakhan Bhandar" }],
+  authors: [{ name: "জয়শ্রীরাম সরকার" }],
   icons: {
     icon: "/logo.svg",
   },

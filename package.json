@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && shx cp -r .next/static .next/standalone/.next/ && shx cp -r public .next/standalone/ && shx mkdir -p .next/standalone/prisma && shx cp prisma/dev.db .next/standalone/prisma/",
-    "start": "cross-env DATABASE_URL=file:./prisma/dev.db NODE_ENV=production node .next/standalone/server.js",
+    "build": "next build && shx cp -r .next/static .next/standalone/.next/ && shx cp -r public .next/standalone/ && shx mkdir -p .next/standalone/prisma && shx cp prisma/dev.db .next/standalone/prisma/ && shx cp prisma/schema.prisma .next/standalone/prisma/",
+    "start": "cd .next/standalone && cross-env DATABASE_URL=file:./prisma/dev.db NODE_ENV=production node server.js",
     "lint": "eslint .",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",

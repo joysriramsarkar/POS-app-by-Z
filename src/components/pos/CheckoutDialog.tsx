@@ -269,7 +269,10 @@ export function CheckoutDialog({
   if (showSuccess) {
     return (
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md no-print">
+          <DialogHeader>
+            <DialogTitle className="sr-only">Payment Success</DialogTitle>
+          </DialogHeader>
           <div className="flex flex-col items-center py-6">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
