@@ -34,185 +34,7 @@ import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 
-// Sample products for demo
-const SAMPLE_PRODUCTS: Product[] = [
-  {
-    id: '1',
-    barcode: '8901234567890',
-    name: 'Tata Salt',
-    nameBn: 'টাটা লবণ',
-    category: 'Groceries',
-    buyingPrice: 20,
-    sellingPrice: 25,
-    unit: 'packet',
-    currentStock: 50,
-    minStockLevel: 10,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '2',
-    barcode: '8901234567891',
-    name: 'Aashirvaad Atta 5kg',
-    nameBn: 'আশির্বাদ আটা ৫ কেজি',
-    category: 'Groceries',
-    buyingPrice: 250,
-    sellingPrice: 280,
-    unit: 'packet',
-    currentStock: 30,
-    minStockLevel: 5,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '3',
-    barcode: '8901234567892',
-    name: 'Fortune Rice Bran Oil 1L',
-    category: 'Oils',
-    buyingPrice: 150,
-    sellingPrice: 175,
-    unit: 'liter',
-    currentStock: 20,
-    minStockLevel: 5,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '4',
-    barcode: '8901234567893',
-    name: 'Amul Butter 500g',
-    category: 'Dairy',
-    buyingPrice: 250,
-    sellingPrice: 280,
-    unit: 'packet',
-    currentStock: 15,
-    minStockLevel: 5,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '5',
-    barcode: '8901234567894',
-    name: 'Sugar 1kg',
-    nameBn: 'চিনি ১ কেজি',
-    category: 'Groceries',
-    buyingPrice: 40,
-    sellingPrice: 48,
-    unit: 'kg',
-    currentStock: 100,
-    minStockLevel: 20,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '6',
-    barcode: '8901234567895',
-    name: 'Toor Dal 1kg',
-    nameBn: 'তুঁড় ডাল ১ কেজি',
-    category: 'Pulses',
-    buyingPrice: 120,
-    sellingPrice: 140,
-    unit: 'kg',
-    currentStock: 25,
-    minStockLevel: 10,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '7',
-    barcode: '8901234567896',
-    name: 'Surf Excel 1kg',
-    category: 'Household',
-    buyingPrice: 140,
-    sellingPrice: 160,
-    unit: 'packet',
-    currentStock: 18,
-    minStockLevel: 5,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '8',
-    barcode: '8901234567897',
-    name: 'Maggi 2-Min Noodles',
-    nameBn: 'ম্যাগি নুডলস',
-    category: 'Snacks',
-    buyingPrice: 12,
-    sellingPrice: 14,
-    unit: 'packet',
-    currentStock: 3,
-    minStockLevel: 20,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '9',
-    barcode: '8901234567898',
-    name: 'Parle-G Biscuits',
-    category: 'Snacks',
-    buyingPrice: 10,
-    sellingPrice: 12,
-    unit: 'packet',
-    currentStock: 0,
-    minStockLevel: 15,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '10',
-    barcode: '8901234567899',
-    name: 'Tomato (Local)',
-    nameBn: 'টমেটো',
-    category: 'Vegetables',
-    buyingPrice: 30,
-    sellingPrice: 40,
-    unit: 'kg',
-    currentStock: 50,
-    minStockLevel: 10,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '11',
-    barcode: '8901234567900',
-    name: 'Onion (Local)',
-    nameBn: 'পেঁয়াজ',
-    category: 'Vegetables',
-    buyingPrice: 25,
-    sellingPrice: 35,
-    unit: 'kg',
-    currentStock: 80,
-    minStockLevel: 20,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-  {
-    id: '12',
-    barcode: '8901234567901',
-    name: 'Potato (Local)',
-    nameBn: 'আলু',
-    category: 'Vegetables',
-    buyingPrice: 20,
-    sellingPrice: 28,
-    unit: 'kg',
-    currentStock: 100,
-    minStockLevel: 30,
-    isActive: true,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  },
-];
+// Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
 type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'settings';
 
@@ -271,20 +93,27 @@ export default function Home() {
     const loadProducts = async () => {
       setLoading(true);
       try {
-        // Try to load from IndexedDB first
-        const cachedProducts = await ProductsDB.getAll();
-        if (cachedProducts.length > 0) {
-          setProducts(cachedProducts);
+        // Fetch from API to get actual DB data
+        const res = await fetch('/api/products');
+        if (res.ok) {
+          const data = await res.json();
+          setProducts(data);
+          // Update cache
+          await ProductsDB.upsertMany(data);
         } else {
-          // Use sample products for demo
-          setProducts(SAMPLE_PRODUCTS);
-          // Cache them
-          await ProductsDB.upsertMany(SAMPLE_PRODUCTS);
+          // If API fails, try IndexedDB
+          const cachedProducts = await ProductsDB.getAll();
+          setProducts(cachedProducts);
         }
       } catch (error) {
-        console.error('Failed to load products:', error);
-        // Fallback to sample products
-        setProducts(SAMPLE_PRODUCTS);
+        console.error('Failed to load products from API:', error);
+        try {
+          // Fallback to IndexedDB
+          const cachedProducts = await ProductsDB.getAll();
+          setProducts(cachedProducts);
+        } catch (dbError) {
+          console.error('Failed to load products from cache:', dbError);
+        }
       } finally {
         setLoading(false);
       }

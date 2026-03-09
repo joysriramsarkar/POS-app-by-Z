@@ -97,12 +97,19 @@ export function PartiesManagement() {
     const savedSuppliers = localStorage.getItem('pos_suppliers');
     if (savedSuppliers) {
       try {
-        setSuppliers(JSON.parse(savedSuppliers));
+        const parsed = JSON.parse(savedSuppliers);
+        // Defer state update slightly to prevent synchronous set-state-in-effect warning
+        setTimeout(() => {
+          setSuppliers(parsed);
+          setIsLoaded(true);
+        }, 0);
       } catch (e) {
         console.error('Failed to load suppliers', e);
+        setTimeout(() => setIsLoaded(true), 0);
       }
+    } else {
+      setTimeout(() => setIsLoaded(true), 0);
     }
-    setIsLoaded(true);
   }, []);
 
   // Save suppliers to local storage whenever they change
