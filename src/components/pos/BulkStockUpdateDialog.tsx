@@ -63,7 +63,7 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
           return;
         }
 
-        const requiredHeaders = ['barcode', 'quantity'];
+        const requiredHeaders = ['barcode', 'quantity_to_add'];
         const headers = results.meta.fields;
         if (!headers || !requiredHeaders.every(h => headers.includes(h))) {
             setError(`Invalid CSV format. Required headers are: ${requiredHeaders.join(', ')}`);
@@ -71,14 +71,21 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
         }
 
         const data = results.data as any[];
-        const stockUpdateData: StockUpdateData[] = data.map(row => {
+        const stockUpdateData: StockUpdateData[] = data
+          .filter(row => row.quantity_to_add && !isNaN(parseInt(row.quantity_to_add, 10)) && parseInt(row.quantity_to_add, 10) !== 0)
+          .map(row => {
             const product = products.find(p => p.barcode === row.barcode);
             return {
                 barcode: row.barcode,
                 name: product?.name || 'Unknown Product',
-                quantity: parseInt(row.quantity, 10) || 0
+                quantity: parseInt(row.quantity_to_add, 10)
             }
         });
+
+        if (stockUpdateData.length === 0) {
+            setError("No valid stock updates found in the file. Please fill the 'quantity_to_add' column.");
+            return;
+        }
 
         setParsedData(stockUpdateData);
       },
@@ -89,18 +96,32 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
   };
 
   const handleDownloadTemplate = () => {
-    const templateData = [
-        { barcode: '123456789', quantity: 10 },
-        { barcode: '987654321', quantity: 5 },
-      ];
-      const csv = Papa.unparse(templateData);
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.setAttribute('download', 'stock_update_template.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    // We'll add name and current_stock for user reference
+    const templateData = products.map(p => ({
+      barcode: p.barcode,
+      name: p.name,
+      current_stock: p.currentStock,
+      quantity_to_add: 0 // User will fill this
+    }));
+
+    if (templateData.length === 0) {
+        // Add a dummy row if there are no products, so the user knows the format
+        templateData.push({
+            barcode: '1234567890',
+            name: 'Sample Product Name',
+            current_stock: 15,
+            quantity_to_add: 10
+        });
+    }
+
+    const csv = Papa.unparse(templateData);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', 'stock_update_template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleSave = () => {

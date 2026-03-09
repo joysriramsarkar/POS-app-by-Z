@@ -44,18 +44,7 @@ import {
 import type { Customer, Supplier, LedgerEntry } from '@/types/pos';
 import { cn } from '@/lib/utils';
 
-// Mock data for demo
-const mockSuppliers: Supplier[] = [
-  { id: '1', name: 'ABC Distributors', phone: '9876543220', address: 'Siliguri', isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '2', name: 'XYZ Wholesalers', phone: '9876543221', address: 'Jalpaiguri', isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '3', name: 'Direct Supply Co', phone: '9876543222', address: 'Kolkata', isActive: true, createdAt: new Date(), updatedAt: new Date() },
-];
 
-const mockLedgerEntries: LedgerEntry[] = [
-  { id: '1', customerId: '1', entryType: 'credit', amount: 500, balanceAfter: 1500, description: 'Purchase on credit', referenceId: 'INV-001', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24) },
-  { id: '2', customerId: '1', entryType: 'debit', amount: 300, balanceAfter: 1000, description: 'Payment received', referenceId: 'PAY-001', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48) },
-  { id: '3', customerId: '1', entryType: 'credit', amount: 500, balanceAfter: 1500, description: 'Purchase on credit', referenceId: 'INV-002', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72) },
-];
 
 type PartyType = 'customer' | 'supplier';
 
@@ -77,8 +66,9 @@ export function PartiesManagement() {
   const customers = useCustomersStore((state) => state.customers);
   const addCustomer = useCustomersStore((state) => state.addCustomer);
   const updateCustomer = useCustomersStore((state) => state.updateCustomer);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const setCustomers = useCustomersStore((state) => state.setCustomers);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -92,32 +82,36 @@ export function PartiesManagement() {
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  // Load suppliers from local storage on mount
+  // Fetch customers and suppliers on component mount
   useEffect(() => {
-    const savedSuppliers = localStorage.getItem('pos_suppliers');
-    if (savedSuppliers) {
+    const fetchData = async () => {
       try {
-        const parsed = JSON.parse(savedSuppliers);
-        // Defer state update slightly to prevent synchronous set-state-in-effect warning
-        setTimeout(() => {
-          setSuppliers(parsed);
-          setIsLoaded(true);
-        }, 0);
-      } catch (e) {
-        console.error('Failed to load suppliers', e);
-        setTimeout(() => setIsLoaded(true), 0);
-      }
-    } else {
-      setTimeout(() => setIsLoaded(true), 0);
-    }
-  }, []);
+        const [customersRes, suppliersRes] = await Promise.all([
+          fetch('/api/customers'),
+          fetch('/api/suppliers'),
+        ]);
 
-  // Save suppliers to local storage whenever they change
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('pos_suppliers', JSON.stringify(suppliers));
-    }
-  }, [suppliers, isLoaded]);
+        if (customersRes.ok) {
+          const { data } = await customersRes.json();
+          setCustomers(data);
+        } else {
+          console.error('Failed to fetch customers');
+        }
+
+        if (suppliersRes.ok) {
+          const { data } = await suppliersRes.json();
+          setSuppliers(data);
+        } else {
+          console.error('Failed to fetch suppliers');
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+    fetchData();
+  }, [setCustomers]);
+
+
 
   // Filter customers
   const filteredCustomers = useMemo(() => {
@@ -148,6 +142,7 @@ export function PartiesManagement() {
 
   const handleViewLedger = (customer: Customer) => {
     setSelectedCustomer(customer);
+    // TODO: Fetch ledger entries for the customer
     setShowLedger(true);
   };
 
@@ -157,47 +152,82 @@ export function PartiesManagement() {
     setShowPaymentDialog(true);
   };
 
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
     if (!selectedCustomer || !paymentAmount) return;
 
     const paidAmount = parseFloat(paymentAmount);
-    updateCustomer(selectedCustomer.id, {
-        totalDue: Math.max(0, selectedCustomer.totalDue - paidAmount),
-        totalPaid: selectedCustomer.totalPaid + paidAmount,
-    });
+    const updatedCustomerData = {
+      id: selectedCustomer.id,
+      totalDue: Math.max(0, selectedCustomer.totalDue - paidAmount),
+      totalPaid: selectedCustomer.totalPaid + paidAmount,
+    };
 
-    setShowPaymentDialog(false);
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedCustomerData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update payment.');
+      }
+
+      const { data: updatedFromServer } = await response.json();
+      updateCustomer(selectedCustomer.id, updatedFromServer);
+      setShowPaymentDialog(false);
+
+    } catch (error) {
+      console.error("Failed to record payment:", error);
+    }
   };
 
-  const handleAddParty = () => {
+  const handleAddParty = async () => {
     if (!newParty.name) return;
 
     if (activeTab === 'customer') {
-      const customer: Customer = {
-        id: uuidv4(),
-        name: newParty.name,
-        phone: newParty.phone || undefined,
-        address: newParty.address || undefined,
-        totalDue: 0,
-        totalPaid: 0,
-        notes: newParty.notes || undefined,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      addCustomer(customer);
+      try {
+        const response = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newParty),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create customer');
+        }
+
+        const { data: newCustomer } = await response.json();
+        addCustomer(newCustomer);
+
+      } catch (error) {
+        console.error("Failed to add customer:", error);
+        // Optionally: show a toast to the user
+        return; // prevent clearing form on error
+      }
+
     } else {
-      const supplier: Supplier = {
-        id: uuidv4(),
-        name: newParty.name,
-        phone: newParty.phone || undefined,
-        address: newParty.address || undefined,
-        notes: newParty.notes || undefined,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setSuppliers(prev => [...prev, supplier]);
+      // Add new supplier
+      try {
+        const response = await fetch('/api/suppliers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newParty),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create supplier');
+        }
+
+        const { data: newSupplier } = await response.json();
+        setSuppliers(prev => [...prev, newSupplier]);
+
+      } catch (error) {
+        console.error("Failed to add supplier:", error);
+        return; // prevent clearing form on error
+      }
     }
 
     setNewParty({ name: '', phone: '', address: '', notes: '' });
@@ -436,7 +466,7 @@ export function PartiesManagement() {
             {/* Ledger Entries */}
             <ScrollArea className="h-[300px]">
               <div className="space-y-2 pr-2">
-                {mockLedgerEntries.map((entry) => (
+                {ledgerEntries.map((entry) => (
                   <div
                     key={entry.id}
                     className={cn(

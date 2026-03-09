@@ -96,10 +96,10 @@ export default function Home() {
         // Fetch from API to get actual DB data
         const res = await fetch('/api/products');
         if (res.ok) {
-          const data = await res.json();
-          setProducts(data);
+          const { data: products } = await res.json();
+          setProducts(products);
           // Update cache
-          await ProductsDB.upsertMany(data);
+          await ProductsDB.upsertMany(products);
         } else {
           // If API fails, try IndexedDB
           const cachedProducts = await ProductsDB.getAll();
@@ -164,67 +164,55 @@ export default function Home() {
   const handleCheckoutComplete = useCallback(async (paymentData: PaymentData) => {
     setIsProcessingPayment(true);
     try {
-      console.log('Payment completed:', paymentData);
-
-      // Construct Sale object
-      const newSale: Sale = {
-        id: uuidv4(),
-        invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
-        customerId: paymentData.customerId,
-        subtotal: paymentData.subtotal,
-        discount: paymentData.discount,
-        tax: paymentData.tax,
-        totalAmount: paymentData.total,
-        paymentMethod: paymentData.paymentMethod,
-        paymentStatus: paymentData.paymentMethod === 'Due' ? 'Due' : 'Paid',
-        status: 'Completed',
-        offlineSynced: !isOnline,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+      // The backend will handle all the logic of creating the sale,
+      // updating stock, and handling dues. We just need to send the
+      // essential information.
+      const salePayload = {
         items: cartItems.map(item => ({
-          id: uuidv4(),
-          saleId: '', // Set below
           productId: item.productId,
-          productName: item.productName,
+          productName: item.productName, // Send a snapshot of the name
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
-          createdAt: new Date(),
-        }))
+        })),
+        customerId: paymentData.customerId,
+        paymentMethod: paymentData.paymentMethod,
+        discount: paymentData.discount,
+        tax: paymentData.tax,
+        notes: paymentData.notes,
       };
 
-      // Update the items with the newly generated sale ID
-      newSale.items = newSale.items.map(item => ({...item, saleId: newSale.id}));
-
-      if (paymentData.customerId) {
-        const customer = customers.find(c => c.id === paymentData.customerId);
-        if (customer) {
-          newSale.customer = customer;
-        }
-      }
-
-      setCurrentSale(newSale);
-      // addSale(newSale); // This store is not yet fully implemented
-
-      // Handle stock reduction
-      cartItems.forEach(item => {
-        updateProductStock(item.productId, -item.quantity);
+      const response = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(salePayload),
       });
 
-      // Handle Customer Due
-      if (paymentData.paymentMethod === 'Due' && paymentData.customerId) {
-         updateCustomerDue(paymentData.customerId, paymentData.total);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create sale');
       }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { data: completedSale } = await response.json();
+
+      // Set the completed sale for the print dialog
+      setCurrentSale(completedSale);
+
+      // Clear the cart for the next transaction
+      clearCart();
+
+      // The backend now updates product stock and customer dues,
+      // so we no longer need to call `updateProductStock` or `updateCustomerDue` here.
+      // We might want to trigger a refresh of products/customers data though.
+      // For now, let's rely on the data being consistent until the next full load.
 
     } catch (error) {
-      console.error('Payment failed:', error);
+      console.error('Checkout failed:', error);
+      // TODO: Show an error toast to the user
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [cartItems, updateProductStock, updateCustomerDue, customers, isOnline, setCurrentSale]);
+  }, [cartItems, isOnline, setCurrentSale, clearCart]);
 
   const handlePrint = useCallback(() => {
      if (!currentSale) return;
@@ -242,39 +230,41 @@ export default function Home() {
   }, [updateProductStock]);
 
   // Handle product save
-  const handleProductSave = useCallback((data: ProductFormData) => {
-    if (data.id) {
-      // Update existing product
-      updateProduct(data.id, {
-        name: data.name,
-        nameBn: data.nameBn,
-        barcode: data.barcode,
-        category: data.category,
-        buyingPrice: data.buyingPrice,
-        sellingPrice: data.sellingPrice,
-        unit: data.unit,
-        currentStock: data.currentStock,
-        minStockLevel: data.minStockLevel,
-        isActive: data.isActive,
-      });
-    } else {
-      // Add new product
-      const newProduct: Product = {
-        id: uuidv4(),
-        barcode: data.barcode || null,
-        name: data.name,
-        nameBn: data.nameBn,
-        category: data.category,
-        buyingPrice: data.buyingPrice,
-        sellingPrice: data.sellingPrice,
-        unit: data.unit,
-        currentStock: data.currentStock,
-        minStockLevel: data.minStockLevel,
-        isActive: data.isActive,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      addProduct(newProduct);
+  const handleProductSave = useCallback(async (data: ProductFormData) => {
+    try {
+      if (data.id) {
+        // Update existing product
+        const response = await fetch('/api/products', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update product');
+        }
+        
+        const { data: updatedProduct } = await response.json();
+        updateProduct(updatedProduct.id, updatedProduct);
+
+      } else {
+        // Add new product
+        const response = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create product');
+        }
+
+        const { data: newProduct } = await response.json();
+        addProduct(newProduct);
+      }
+    } catch (error) {
+      console.error("Failed to save product:", error);
+      // Here you could add a user-facing notification, e.g., using a toast library
     }
   }, [updateProduct, addProduct]);
 

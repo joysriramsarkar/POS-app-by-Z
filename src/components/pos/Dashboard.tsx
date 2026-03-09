@@ -37,32 +37,68 @@ interface RecentTransaction {
   createdAt: Date;
 }
 
-// Mock data for demo
-const mockStats: DashboardStats = {
-  todaySales: 15420,
-  todayOrders: 23,
-  lowStockCount: 5,
-  duePayments: 3500,
-};
 
-const mockTransactions: RecentTransaction[] = [
-  { id: '1', invoiceNumber: 'INV-001', customerName: 'Rahul Sharma', totalAmount: 450, paymentMethod: 'Cash', createdAt: new Date(Date.now() - 1000 * 60 * 5) },
-  { id: '2', invoiceNumber: 'INV-002', customerName: 'Anita Devi', totalAmount: 1250, paymentMethod: 'UPI', createdAt: new Date(Date.now() - 1000 * 60 * 15) },
-  { id: '3', invoiceNumber: 'INV-003', totalAmount: 320, paymentMethod: 'Cash', createdAt: new Date(Date.now() - 1000 * 60 * 30) },
-  { id: '4', invoiceNumber: 'INV-004', customerName: 'Mohan Das', totalAmount: 2100, paymentMethod: 'Due', createdAt: new Date(Date.now() - 1000 * 60 * 60) },
-  { id: '5', invoiceNumber: 'INV-005', totalAmount: 180, paymentMethod: 'Cash', createdAt: new Date(Date.now() - 1000 * 60 * 90) },
-];
 
 interface DashboardProps {
   onNavigate?: (page: string) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const [stats] = useState<DashboardStats>(mockStats);
-  const [transactions] = useState<RecentTransaction[]>(mockTransactions);
+  const [stats, setStats] = useState<DashboardStats>({
+    todaySales: 0,
+    todayOrders: 0,
+    lowStockCount: 0,
+    duePayments: 0,
+  });
+  const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   
   const products = useProductsStore((state) => state.products);
   const lowStockProducts = products.filter(p => p.currentStock <= p.minStockLevel && p.isActive);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const [salesRes, statsRes] = await Promise.all([
+          fetch('/api/sales?limit=5'),
+          fetch('/api/stats'),
+        ]);
+
+        if (salesRes.ok) {
+          const { data: sales } = await salesRes.json();
+          if (sales) {
+            const recentTransactions = sales.map((sale: any) => ({
+              id: sale.id,
+              invoiceNumber: sale.invoiceNumber,
+              customerName: sale.customer?.name,
+              totalAmount: sale.totalAmount,
+              paymentMethod: sale.paymentMethod,
+              createdAt: new Date(sale.createdAt),
+            }));
+            setTransactions(recentTransactions);
+          }
+        }
+
+        if (statsRes.ok) {
+          const { data: apiStats } = await statsRes.json();
+          setStats(prevStats => ({
+            ...prevStats,
+            ...apiStats,
+          }));
+        }
+
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  useEffect(() => {
+    setStats(prevStats => ({
+      ...prevStats,
+      lowStockCount: lowStockProducts.length
+    }));
+  }, [lowStockProducts.length]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {

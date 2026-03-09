@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && cp -r .next/static .next/standalone/.next/ || true && cp -r public .next/standalone/ || true",
-    "start": "NODE_ENV=production node .next/standalone/server.js 2>&1 | tee server.log",
+    "build": "next build && shx cp -r .next/static .next/standalone/.next/ && shx cp -r public .next/standalone/ && shx mkdir -p .next/standalone/prisma && shx cp prisma/dev.db .next/standalone/prisma/",
+    "start": "cross-env DATABASE_URL=file:./prisma/dev.db NODE_ENV=production node .next/standalone/server.js",
     "lint": "eslint .",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
@@ -87,8 +87,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "bun-types": "^1.3.4",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "^16.1.6",
+    "shx": "^0.4.0",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"

@@ -333,17 +333,8 @@ interface CustomersActions {
   searchCustomers: (query: string) => Customer[];
 }
 
-// Sample customers for demo
-const SAMPLE_CUSTOMERS: Customer[] = [
-  { id: '1', name: 'Rahul Sharma', phone: '9876543210', address: 'Shivmandir, Military Road', totalDue: 1500, totalPaid: 5000, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '2', name: 'Anita Devi', phone: '9876543211', address: '3 No Gate', totalDue: 0, totalPaid: 3200, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '3', name: 'Mohan Das', phone: '9876543212', totalDue: 2000, totalPaid: 8000, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '4', name: 'Priya Kumari', phone: '9876543213', address: 'NBU More', totalDue: 500, totalPaid: 1200, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-  { id: '5', name: 'Sunil Gupta', phone: '9876543214', totalDue: 0, totalPaid: 15000, isActive: true, createdAt: new Date(), updatedAt: new Date() },
-];
-
 export const useCustomersStore = create<CustomersState & CustomersActions>((set, get) => ({
-  customers: SAMPLE_CUSTOMERS,
+  customers: [],
   isLoading: false,
 
   setCustomers: (customers) => {

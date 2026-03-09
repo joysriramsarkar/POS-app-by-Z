@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
         },
         include: {
           items: true,
+          customer: true,
         },
       });
 
