@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build && powershell -c \"Copy-Item -Recurse -Path .next/static -Destination .next/standalone/.next\" && powershell -c \"Copy-Item -Recurse -Path public -Destination .next/standalone\"",
-    "start": "powershell -c \"$env:NODE_ENV='production'; node .next/standalone/server.js | Tee-Object -FilePath server.log\"",
+    "build": "next build && cp -r .next/static .next/standalone/.next/ || true && cp -r public .next/standalone/ || true",
+    "start": "NODE_ENV=production node .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
@@ -88,7 +88,7 @@
     "@types/react-dom": "^19",
     "bun-types": "^1.3.4",
     "eslint": "^9",
-    "eslint-config-next": "^16.1.1",
+    "eslint-config-next": "^16.1.6",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
     "typescript": "^5"
