@@ -6,7 +6,7 @@
 // ============================================================================
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 
 interface CameraBarcodeScannerConfig {
   /** Callback when barcode/QR is successfully scanned */
@@ -49,10 +49,18 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
         SCANNER_ID,
         {
           fps: 10,
-          qrbox: { width: 280, height: 280 },
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const minEdgePercentage = 0.7; // 70% of the smallest edge
+            const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+            return {
+              width: Math.floor(minEdgeSize * minEdgePercentage),
+              height: Math.floor(minEdgeSize * minEdgePercentage),
+            };
+          },
           rememberLastUsedCamera: true,
           showTorchButtonIfSupported: true,
           facingMode,
+          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
         },
         false
       );
