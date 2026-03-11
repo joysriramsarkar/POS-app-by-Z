@@ -136,6 +136,7 @@ async function syncSale(saleData: Record<string, unknown>, action: string) {
           discount: saleData.discount as number,
           tax: saleData.tax as number,
           totalAmount: saleData.totalAmount as number,
+          amountPaid: (saleData.amountPaid as number) || 0,
           paymentMethod: saleData.paymentMethod as string,
           paymentStatus: saleData.paymentStatus as string,
           status: saleData.status as string,
@@ -166,14 +167,51 @@ async function syncSale(saleData: Record<string, unknown>, action: string) {
       }
 
       // Update customer due if applicable
-      if (saleData.customerId && saleData.paymentMethod === 'Due') {
+      const amountPaid = (saleData.amountPaid as number) || 0;
+      const totalAmount = saleData.totalAmount as number;
+
+      if (saleData.customerId && amountPaid < totalAmount) {
+        const dueAmount = totalAmount - amountPaid;
         await tx.customer.update({
           where: { id: saleData.customerId as string },
           data: {
-            totalDue: { increment: saleData.totalAmount as number },
+            totalDue: { increment: dueAmount },
             updatedAt: new Date(),
           },
         });
+
+        // Add ledger entries for double-entry bookkeeping tracking
+        const customer = await tx.customer.findUnique({
+          where: { id: saleData.customerId as string },
+        });
+
+        if (customer) {
+          // Add credit for the total amount
+          await tx.ledgerEntry.create({
+            data: {
+              customerId: saleData.customerId as string,
+              entryType: 'credit',
+              amount: totalAmount,
+              balanceAfter: customer.totalDue + totalAmount,
+              description: `Credit purchase: ${saleData.invoiceNumber}`,
+              referenceId: sale.id,
+            },
+          });
+
+          // Add debit for the amount paid if partial payment
+          if (amountPaid > 0) {
+            await tx.ledgerEntry.create({
+              data: {
+                customerId: saleData.customerId as string,
+                entryType: 'debit',
+                amount: amountPaid,
+                balanceAfter: customer.totalDue + totalAmount - amountPaid,
+                description: `Payment for purchase: ${saleData.invoiceNumber}`,
+                referenceId: sale.id,
+              },
+            });
+          }
+        }
       }
 
       return sale;

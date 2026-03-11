@@ -98,8 +98,12 @@
   },
   "trustedDependencies": [
     "@parcel/watcher",
+    "@prisma/client",
+    "@prisma/engines",
     "@swc/core",
     "es5-ext",
+    "prisma",
+    "sharp",
     "unrs-resolver"
   ]
 }

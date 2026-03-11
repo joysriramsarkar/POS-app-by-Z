@@ -243,6 +243,7 @@ export default function Home() {
         })),
         customerId: paymentData.customerId,
         paymentMethod: paymentData.paymentMethod,
+        amountPaid: paymentData.amountPaid,
         discount: paymentData.discount,
         tax: paymentData.tax,
       };
@@ -276,13 +277,20 @@ export default function Home() {
           setProducts(updatedProducts);
         }
 
-        if (customersRes.ok && paymentData.paymentMethod === 'Due' && paymentData.customerId) {
+        if (customersRes.ok && paymentData.customerId) {
           // we know how much due to add
-          updateCustomerDue(paymentData.customerId, paymentData.total);
+          const dueAmount = paymentData.total - paymentData.amountPaid;
+          if (dueAmount > 0) {
+            updateCustomerDue(paymentData.customerId, dueAmount);
+          }
         }
       } else {
         // --- OFFLINE FALLBACK ------------------------------------------------
         // create a local sale object and queue for sync
+        let paymentStatus = 'Paid';
+        if (paymentData.amountPaid === 0) paymentStatus = 'Due';
+        else if (paymentData.amountPaid > 0 && paymentData.amountPaid < paymentData.total) paymentStatus = 'Partial';
+
         const sale: Sale = {
           id: uuidv4(),
           invoiceNumber: generateInvoiceNumber(),
@@ -291,8 +299,9 @@ export default function Home() {
           discount: paymentData.discount,
           tax: paymentData.tax,
           totalAmount: paymentData.total,
+          amountPaid: paymentData.amountPaid,
           paymentMethod: paymentData.paymentMethod,
-          paymentStatus: paymentData.paymentMethod === 'Due' ? 'Due' : 'Paid',
+          paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
           status: 'Completed',
           notes: undefined,
           offlineSynced: false,
@@ -328,9 +337,12 @@ export default function Home() {
           ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
         });
 
-        if (paymentData.paymentMethod === 'Due' && paymentData.customerId) {
-          updateCustomerDue(paymentData.customerId, paymentData.total);
-          CustomersDB.updateDue(paymentData.customerId, paymentData.total).catch(console.error);
+        if (paymentData.customerId) {
+          const dueAmount = paymentData.total - paymentData.amountPaid;
+          if (dueAmount > 0) {
+            updateCustomerDue(paymentData.customerId, dueAmount);
+            CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
+          }
         }
 
         setCurrentSale(sale);
