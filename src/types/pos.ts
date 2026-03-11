@@ -74,6 +74,7 @@ export interface Sale {
   discount: number;
   tax: number;
   totalAmount: number;
+  amountPaid: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   status: SaleStatus;

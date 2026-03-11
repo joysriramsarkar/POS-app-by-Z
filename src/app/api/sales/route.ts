@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { items, customerId, paymentMethod, discount, tax, notes } = body;
+    const { items, customerId, paymentMethod, amountPaid, discount, tax, notes } = body;
 
     // Validate items
     if (!items || items.length === 0) {
@@ -118,8 +118,10 @@ export async function POST(request: NextRequest) {
 
     // Determine payment status
     let paymentStatus = 'Paid';
-    if (paymentMethod === 'Due') {
+    if (amountPaid === 0) {
       paymentStatus = 'Due';
+    } else if (amountPaid > 0 && amountPaid < totalAmount) {
+      paymentStatus = 'Partial';
     }
 
     // Create sale with items in transaction
@@ -133,6 +135,7 @@ export async function POST(request: NextRequest) {
           discount: discount || 0,
           tax: tax || 0,
           totalAmount,
+          amountPaid: amountPaid || 0,
           paymentMethod: paymentMethod || 'Cash',
           paymentStatus,
           status: 'Completed',
@@ -188,12 +191,13 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // If payment is Due, update customer's totalDue
-      if (customerId && paymentMethod === 'Due') {
+      // If payment is partially or fully due, update customer's totalDue
+      if (customerId && amountPaid < totalAmount) {
+        const dueAmount = totalAmount - amountPaid;
         await tx.customer.update({
           where: { id: customerId },
           data: {
-            totalDue: { increment: totalAmount },
+            totalDue: { increment: dueAmount },
             updatedAt: new Date(),
           },
         });
@@ -204,6 +208,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (customer) {
+          // Add credit for the total amount
           await tx.ledgerEntry.create({
             data: {
               customerId,
@@ -214,6 +219,20 @@ export async function POST(request: NextRequest) {
               referenceId: newSale.id,
             },
           });
+
+          // Add debit for the amount paid if partial payment
+          if (amountPaid > 0) {
+            await tx.ledgerEntry.create({
+              data: {
+                customerId,
+                entryType: 'debit',
+                amount: amountPaid,
+                balanceAfter: customer.totalDue + totalAmount - amountPaid,
+                description: `Payment for purchase: ${newSale.invoiceNumber}`,
+                referenceId: newSale.id,
+              },
+            });
+          }
         }
       }
 
@@ -302,12 +321,13 @@ export async function PUT(request: NextRequest) {
         ])
       );
 
-      // If sale was on Due, update customer's totalDue
-      if (existingSale.customerId && existingSale.paymentMethod === 'Due') {
+      // If sale was partially or fully due, reverse customer's totalDue update
+      if (existingSale.customerId && existingSale.amountPaid < existingSale.totalAmount) {
+        const dueAmount = existingSale.totalAmount - existingSale.amountPaid;
         await tx.customer.update({
           where: { id: existingSale.customerId },
           data: {
-            totalDue: { decrement: existingSale.totalAmount },
+            totalDue: { decrement: dueAmount },
             updatedAt: new Date(),
           },
         });
@@ -318,16 +338,31 @@ export async function PUT(request: NextRequest) {
         });
 
         if (customer) {
+          // Add debit for the total amount
           await tx.ledgerEntry.create({
             data: {
               customerId: existingSale.customerId,
               entryType: 'debit',
               amount: existingSale.totalAmount,
               balanceAfter: customer.totalDue - existingSale.totalAmount,
-              description: `${status}: ${existingSale.invoiceNumber}`,
+              description: `${status}: reverse credit for ${existingSale.invoiceNumber}`,
               referenceId: existingSale.id,
             },
           });
+
+          // Add credit for the amount paid if partial payment
+          if (existingSale.amountPaid > 0) {
+            await tx.ledgerEntry.create({
+              data: {
+                customerId: existingSale.customerId,
+                entryType: 'credit',
+                amount: existingSale.amountPaid,
+                balanceAfter: customer.totalDue - existingSale.totalAmount + existingSale.amountPaid,
+                description: `${status}: reverse payment for ${existingSale.invoiceNumber}`,
+                referenceId: existingSale.id,
+              },
+            });
+          }
         }
       }
 

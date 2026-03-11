@@ -20,6 +20,7 @@ interface CartState {
   customerName?: string;
   customerPhone?: string;
   paymentMethod: PaymentMethod;
+  amountPaid: number;
   notes: string;
   lastScannedBarcode: string;
   isOfflineMode: boolean;
@@ -35,6 +36,7 @@ interface CartActions {
   setTax: (tax: number) => void;
   setCustomer: (customer: Customer | null) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
+  setAmountPaid: (amount: number) => void;
   setNotes: (notes: string) => void;
   setLastScannedBarcode: (barcode: string) => void;
   setOfflineMode: (isOffline: boolean) => void;
@@ -52,6 +54,7 @@ const initialCartState: CartState = {
   customerName: undefined,
   customerPhone: undefined,
   paymentMethod: 'Cash',
+  amountPaid: 0,
   notes: '',
   lastScannedBarcode: '',
   isOfflineMode: false,
@@ -150,6 +153,7 @@ export const useCartStore = create<CartState & CartActions>()(
           customerName: undefined,
           customerPhone: undefined,
           paymentMethod: 'Cash',
+          amountPaid: 0,
           notes: '',
         });
       },
@@ -174,6 +178,7 @@ export const useCartStore = create<CartState & CartActions>()(
       },
 
       setPaymentMethod: (method: PaymentMethod) => set({ paymentMethod: method }),
+      setAmountPaid: (amount: number) => set({ amountPaid: amount }),
       setNotes: (notes: string) => set({ notes }),
       setLastScannedBarcode: (barcode: string) => set({ lastScannedBarcode: barcode }),
       setOfflineMode: (isOffline: boolean) => set({ isOfflineMode: isOffline }),
@@ -204,6 +209,7 @@ export const useCartStore = create<CartState & CartActions>()(
         customerName: state.customerName,
         customerPhone: state.customerPhone,
         paymentMethod: state.paymentMethod,
+        amountPaid: state.amountPaid,
         notes: state.notes,
       }),
     }

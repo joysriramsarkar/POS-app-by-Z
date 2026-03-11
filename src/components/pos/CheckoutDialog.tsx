@@ -41,6 +41,7 @@ interface CheckoutDialogProps {
 
 export interface PaymentData {
   amountReceived: number;
+  amountPaid: number;
   change: number;
   paymentMethod: PaymentMethod;
   customerId?: string;
@@ -119,8 +120,12 @@ export function CheckoutDialog({
       // Due payments don't require immediate payment
       return true;
     }
+    if (customerId && parsedAmount < total) {
+      // Partial payments are allowed if a customer is selected
+      return true;
+    }
     return parsedAmount >= total;
-  }, [paymentMethod, parsedAmount, total]);
+  }, [paymentMethod, parsedAmount, total, customerId]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -179,8 +184,8 @@ export function CheckoutDialog({
 
   const handleComplete = useCallback(() => {
     // Validate payment for Cash/UPI
-    if (paymentMethod !== 'Due' && parsedAmount < total) {
-      setInputError(`Insufficient amount. Need ${formatPrice(total - parsedAmount)} more.`);
+    if (paymentMethod !== 'Due' && parsedAmount < total && !customerId) {
+      setInputError(`Insufficient amount. Need ${formatPrice(total - parsedAmount)} more or select a customer for partial payment.`);
       return;
     }
 
@@ -249,8 +254,9 @@ export function CheckoutDialog({
       discount,
       tax,
       totalAmount: total,
+      amountPaid: paymentMethod === 'Due' ? 0 : (customerId && parsedAmount < total ? parsedAmount : total),
       paymentMethod,
-      paymentStatus: paymentMethod === 'Due' ? 'Due' : 'Paid',
+      paymentStatus: paymentMethod === 'Due' ? 'Due' : (customerId && parsedAmount < total ? 'Partial' : 'Paid'),
       status: 'Completed',
       offlineSynced: false,
       createdAt: new Date(),
@@ -260,8 +266,18 @@ export function CheckoutDialog({
     setLastSale(sale);
     setShowSuccess(true);
 
+    let amountPaidForSale = 0;
+    if (paymentMethod === 'Due') {
+      amountPaidForSale = 0; // Pure due
+    } else if (customerId && parsedAmount < total) {
+      amountPaidForSale = parsedAmount; // Partial payment
+    } else {
+      amountPaidForSale = total; // Full payment
+    }
+
     const paymentData: PaymentData = {
       amountReceived: paymentMethod === 'Due' ? 0 : parsedAmount,
+      amountPaid: amountPaidForSale,
       change: paymentMethod === 'Due' ? 0 : Math.max(0, change),
       paymentMethod,
       customerId,
