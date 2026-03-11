@@ -4,15 +4,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { generateInvoiceNumber } from '@/lib/invoice';
 import { v4 as uuidv4 } from 'uuid';
-
-// Generate invoice number: INV-YYYYMMDD-XXXX
-function generateInvoiceNumber(): string {
-  const date = new Date();
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-  return `INV-${dateStr}-${random}`;
-}
 
 // GET /api/sales - Fetch sales
 export async function GET(request: NextRequest) {

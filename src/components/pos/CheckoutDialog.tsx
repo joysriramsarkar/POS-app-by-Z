@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { generateInvoiceNumber } from '@/lib/invoice';
 import {
   Dialog,
   DialogContent,
@@ -240,7 +241,7 @@ export function CheckoutDialog({
 
     const sale: Sale = {
       id: uuidv4(),
-      invoiceNumber: `INV-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoiceNumber: generateInvoiceNumber(),
       customerId,
       customer,
       items: saleItems,
