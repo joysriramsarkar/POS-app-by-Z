@@ -8,6 +8,7 @@
 // ============================================================================
 
 import { useEffect, useRef, useCallback } from 'react';
+import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 
 // ============================================================================
 // CONFIGURATION
@@ -219,7 +220,8 @@ export function useSimpleBarcodeScanner({
       // Check for Enter key (barcode end marker)
       if (event.key === 'Enter' || event.key === 'NumpadEnter') {
         if (bufferRef.current.length >= 3) { // Reduced to 3 to support shorter barcodes
-          const barcode = bufferRef.current;
+          const rawBarcode = bufferRef.current;
+          const barcode = convertBengaliToEnglishNumerals(rawBarcode);
           bufferRef.current = '';
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
@@ -231,8 +233,8 @@ export function useSimpleBarcodeScanner({
         return;
       }
 
-      // Only accept alphanumeric and common barcode characters
-      if (/^[a-zA-Z0-9\-_.]$/.test(event.key)) {
+      // Only accept alphanumeric, Bengali numerals and common barcode characters
+      if (/^[a-zA-Z0-9\-_.০-৯]$/.test(event.key)) {
         bufferRef.current += event.key;
 
         // Clear existing timeout
