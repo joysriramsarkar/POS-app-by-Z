@@ -34,6 +34,7 @@ import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
+import { generateInvoiceNumber } from '@/lib/invoice';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
@@ -225,15 +226,6 @@ export default function Home() {
   });
 
   // Handle checkout completion
-  // generate invoice number the same way server does
-  const generateInvoiceNumber = () => {
-    const date = new Date();
-    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-    const random = Math.floor(Math.random() * 10000)
-      .toString()
-      .padStart(4, '0');
-    return `INV-${dateStr}-${random}`;
-  };
 
   const handleCheckoutComplete = useCallback(async (paymentData: PaymentData) => {
     setIsProcessingPayment(true);
