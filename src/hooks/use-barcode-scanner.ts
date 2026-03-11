@@ -218,7 +218,7 @@ export function useSimpleBarcodeScanner({
 
       // Check for Enter key (barcode end marker)
       if (event.key === 'Enter' || event.key === 'NumpadEnter') {
-        if (bufferRef.current.length >= 4) {
+        if (bufferRef.current.length >= 3) { // Reduced to 3 to support shorter barcodes
           const barcode = bufferRef.current;
           bufferRef.current = '';
           if (timeoutRef.current) {
@@ -241,9 +241,10 @@ export function useSimpleBarcodeScanner({
         }
 
         // Set timeout to clear buffer if typing stops (human typing)
+        // Some wireless barcode scanners have a 100-200ms delay between keys
         timeoutRef.current = setTimeout(() => {
           bufferRef.current = '';
-        }, 100);
+        }, 250);
       }
     };
 
