@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from 'react';
 import Papa from 'papaparse';
 import { ProductsDB, SyncQueueDB } from '@/lib/offline/indexeddb';
 import { v4 as uuidv4 } from 'uuid';
+import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -81,7 +82,8 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
         const stockUpdateData: StockUpdateData[] = data
           .filter(row => row.quantity_to_add && !isNaN(parseInt(row.quantity_to_add, 10)) && parseInt(row.quantity_to_add, 10) !== 0)
           .map(row => {
-            const product = products.find(p => p.barcode === row.barcode);
+            const normalizedRowBarcode = convertBengaliToEnglishNumerals(row.barcode);
+            const product = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedRowBarcode);
             return {
                 barcode: row.barcode,
                 name: product?.name || 'Unknown Product',
@@ -139,7 +141,8 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
 
     // iterate and send each update to backend or handle offline
     for (const item of parsedData) {
-      const product = products.find(p => p.barcode === item.barcode);
+      const normalizedItemBarcode = convertBengaliToEnglishNumerals(item.barcode);
+      const product = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedItemBarcode);
       if (!product) continue;
 
       if (isOnline) {
@@ -213,6 +216,8 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
                 </Button>
                 <Input
                     ref={fileInputRef}
+                    id="csv-upload"
+                    name="csv-upload"
                     type="file"
                     accept=".csv"
                     className="hidden"

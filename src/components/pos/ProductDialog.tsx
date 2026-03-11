@@ -201,9 +201,9 @@ export function ProductDialog({
         <div className="space-y-4 py-4">
           {/* Product Name */}
           <div className="space-y-2">
-            <Label htmlFor="name">Product Name *</Label>
+            <Label htmlFor="product-form-name">Product Name *</Label>
             <Input
-              id="name"
+              id="product-form-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Tata Salt"
@@ -212,12 +212,12 @@ export function ProductDialog({
 
           {/* Bengali Name */}
           <div className="space-y-2">
-            <Label htmlFor="nameBn" className="flex items-center gap-2">
+            <Label htmlFor="product-form-nameBn" className="flex items-center gap-2">
               <Languages className="w-4 h-4" />
               Bengali Name (বাংলা)
             </Label>
             <Input
-              id="nameBn"
+              id="product-form-nameBn"
               value={nameBn}
               onChange={(e) => setNameBn(e.target.value)}
               placeholder="e.g., টাটা লবণ"
@@ -226,13 +226,13 @@ export function ProductDialog({
 
           {/* Barcode */}
           <div className="space-y-2">
-            <Label htmlFor="barcode" className="flex items-center gap-2">
+            <Label htmlFor="product-form-barcode" className="flex items-center gap-2">
               <Barcode className="w-4 h-4" />
               Barcode
             </Label>
             <div className="flex gap-2">
               <Input
-                id="barcode"
+                id="product-form-barcode"
                 value={barcode}
                 onChange={(e) => setBarcode(e.target.value)}
                 placeholder="Scan or enter barcode"
@@ -252,7 +252,7 @@ export function ProductDialog({
 
           {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="category">Category *</Label>
+            <Label htmlFor="product-form-category">Category *</Label>
             <Select 
               value={category} 
               onValueChange={(val) => {
@@ -262,7 +262,7 @@ export function ProductDialog({
                 }
               }}
             >
-              <SelectTrigger id="category">
+              <SelectTrigger id="product-form-category">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -276,7 +276,10 @@ export function ProductDialog({
             </Select>
             {category === 'new_category_custom_value' && (
               <div className="animate-in fade-in slide-in-from-top-1 pt-2">
+                <label htmlFor="product-form-newCategory" className="sr-only">New category name</label>
                 <Input
+                  id="product-form-newCategory"
+                  name="newCategory"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   placeholder="Enter new category name"
@@ -289,9 +292,9 @@ export function ProductDialog({
 
           {/* Unit */}
           <div className="space-y-2">
-            <Label htmlFor="unit">Unit</Label>
+            <Label htmlFor="product-form-unit">Unit</Label>
             <Select value={unit} onValueChange={setUnit}>
-              <SelectTrigger id="unit">
+              <SelectTrigger id="product-form-unit">
                 <SelectValue placeholder="Select unit" />
               </SelectTrigger>
               <SelectContent>
@@ -307,9 +310,9 @@ export function ProductDialog({
           {/* Prices */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="buyingPrice">Buying Price (₹) *</Label>
+              <Label htmlFor="product-form-buyingPrice">Buying Price (₹) *</Label>
               <Input
-                id="buyingPrice"
+                id="product-form-buyingPrice"
                 type="number"
                 value={buyingPrice}
                 onChange={(e) => setBuyingPrice(e.target.value)}
@@ -319,9 +322,9 @@ export function ProductDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sellingPrice">Selling Price (₹) *</Label>
+              <Label htmlFor="product-form-sellingPrice">Selling Price (₹) *</Label>
               <Input
-                id="sellingPrice"
+                id="product-form-sellingPrice"
                 type="number"
                 value={sellingPrice}
                 onChange={(e) => setSellingPrice(e.target.value)}
@@ -349,9 +352,9 @@ export function ProductDialog({
           {/* Stock */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="currentStock">Current Stock</Label>
+              <Label htmlFor="product-form-currentStock">Current Stock</Label>
               <Input
-                id="currentStock"
+                id="product-form-currentStock"
                 type="number"
                 value={currentStock}
                 onChange={(e) => setCurrentStock(e.target.value)}
@@ -361,9 +364,9 @@ export function ProductDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="minStockLevel">Min Stock Level</Label>
+              <Label htmlFor="product-form-minStockLevel">Min Stock Level</Label>
               <Input
-                id="minStockLevel"
+                id="product-form-minStockLevel"
                 type="number"
                 value={minStockLevel}
                 onChange={(e) => setMinStockLevel(e.target.value)}
@@ -377,11 +380,11 @@ export function ProductDialog({
           {/* Active Status */}
           <div className="flex items-center justify-between">
             <div>
-              <Label htmlFor="isActive">Active</Label>
+              <Label htmlFor="product-form-isActive">Active</Label>
               <p className="text-xs text-muted-foreground">Inactive products won't appear in POS</p>
             </div>
             <Switch
-              id="isActive"
+              id="product-form-isActive"
               checked={isActive}
               onCheckedChange={setIsActive}
             />

@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, X, Grid3X3, LayoutGrid, Package } from 'lucide-react';
+import { Search, X, Grid3X3, LayoutGrid, Package, Camera } from 'lucide-react';
 import { ProductCard } from './ProductCard';
+import { CameraScannerDialog } from './CameraScannerDialog';
 import type { Product } from '@/types/pos';
 import { useProductsStore, useUIStore, useCartStore } from '@/stores/pos-store';
-import { cn } from '@/lib/utils';
+import { cn, convertBengaliToEnglishNumerals } from '@/lib/utils';
 
 type ViewMode = 'grid' | 'compact';
 
@@ -30,6 +31,7 @@ export function ProductGrid({
 }: ProductGridProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const storeProducts = useProductsStore((state) => state.products);
@@ -58,10 +60,12 @@ export function ProductGrid({
       // Search filter
       if (searchQuery) {
         const lowerQuery = searchQuery.toLowerCase();
+        const normalizedQuery = convertBengaliToEnglishNumerals(searchQuery);
         const matchesName = product.name.toLowerCase().includes(lowerQuery);
         const matchesBengaliName = product.nameBn?.includes(searchQuery);
         const matchesBarcode = product.barcode?.includes(searchQuery);
-        return matchesName || matchesBengaliName || matchesBarcode;
+        const matchesBarcodeNormalized = convertBengaliToEnglishNumerals(product.barcode || '').includes(normalizedQuery);
+        return matchesName || matchesBengaliName || matchesBarcode || matchesBarcodeNormalized;
       }
 
       return true;
@@ -100,6 +104,31 @@ export function ProductGrid({
     }
   }, [externalProducts, setSearchQuery]);
 
+  const handleCameraBarcode = useCallback(
+    (barcode: string) => {
+      const normalizedBarcode = convertBengaliToEnglishNumerals(barcode);
+      const matchedProduct = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedBarcode);
+      
+      if (matchedProduct) {
+        if (externalProducts) {
+          onProductSelect?.(matchedProduct);
+        } else {
+          addItem(matchedProduct, 1);
+        }
+        setIsCameraScannerOpen(false);
+      } else {
+        // Product not found - show in search to let user know
+        if (externalProducts) {
+          setLocalSearchQuery(barcode);
+        } else {
+          setSearchQuery(barcode);
+        }
+        setIsCameraScannerOpen(false);
+      }
+    },
+    [products, externalProducts, onProductSelect, addItem, setSearchQuery]
+  );
+
   const handleCategorySelect = useCallback(
     (category: string | null) => {
       setSelectedCategoryId(category === selectedCategoryId ? null : category);
@@ -117,34 +146,39 @@ export function ProductGrid({
       {/* Search and Filter Controls */}
       {showSearch && (
         <div className="flex flex-col gap-3 p-4 border-b bg-background sticky top-0 z-10">
-          {/* Search Input */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search products by name, barcode..."
-              value={searchQuery}
-              onChange={handleSearchChange}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  const scannedValue = e.currentTarget.value.trim();
-                  const matchedProduct = products.find(p => p.barcode === scannedValue);
-                  
-                  if (matchedProduct) {
-                    if (externalProducts) {
-                      onProductSelect?.(matchedProduct);
-                    } else {
-                      addItem(matchedProduct, 1);
-                    }
-                    e.currentTarget.value = '';
-                    if (externalProducts) {
-                      setLocalSearchQuery('');
-                    } else {
-                      setSearchQuery('');
-                    }
-                    e.currentTarget.focus();
+          {/* Search Input with Camera Button */}
+          <label htmlFor="product-search" className="sr-only">Search products</label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="product-search"
+                name="product-search"
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search products by name, barcode..."
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const scannedValue = e.currentTarget.value.trim();
+                    const normalizedScanValue = convertBengaliToEnglishNumerals(scannedValue);
+                    const matchedProduct = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedScanValue);
+                    
+                    if (matchedProduct) {
+                      if (externalProducts) {
+                        onProductSelect?.(matchedProduct);
+                      } else {
+                        addItem(matchedProduct, 1);
+                      }
+                      e.currentTarget.value = '';
+                      if (externalProducts) {
+                        setLocalSearchQuery('');
+                      } else {
+                        setSearchQuery('');
+                      }
+                      e.currentTarget.focus();
                   }
                 }
               }}
@@ -155,13 +189,25 @@ export function ProductGrid({
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                className="absolute right-2 md:right-1 top-1/2 -translate-y-1/2 h-8 w-8 md:h-7 md:w-7 p-0"
                 onClick={clearSearch}
                 aria-label="Clear search"
               >
                 <X className="w-4 h-4" />
               </Button>
             )}
+            </div>
+            {/* Camera Scanner Button - Mobile friendly */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsCameraScannerOpen(true)}
+              className="w-full md:w-auto"
+              title="Scan barcode with camera"
+            >
+              <Camera className="w-4 h-4 mr-2" />
+              Scan
+            </Button>
           </div>
 
           {/* Category Chips */}
@@ -279,6 +325,15 @@ export function ProductGrid({
           )}
         </div>
       </div>
+
+      {/* Camera Scanner Dialog */}
+      <CameraScannerDialog
+        open={isCameraScannerOpen}
+        onOpenChange={setIsCameraScannerOpen}
+        onBarcodeScanned={handleCameraBarcode}
+        title="Scan Barcode"
+        description="Position barcode/QR code in the center of the frame"
+      />
     </div>
   );
 }

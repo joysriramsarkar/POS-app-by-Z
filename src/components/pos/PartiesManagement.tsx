@@ -301,8 +301,11 @@ export function PartiesManagement() {
 
         {/* Search */}
         <div className="relative">
+          <label htmlFor="parties-search" className="sr-only">Search by name or phone</label>
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
+            id="parties-search"
+            name="parties-search"
             placeholder="Search by name or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -555,11 +558,11 @@ export function PartiesManagement() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paymentAmount">Payment Amount</Label>
+              <Label htmlFor="payment-dialog-amount">Payment Amount</Label>
               <div className="relative">
                 <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  id="paymentAmount"
+                  id="payment-dialog-amount"
                   type="number"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
@@ -618,9 +621,9 @@ export function PartiesManagement() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="partyName">Name *</Label>
+              <Label htmlFor="party-form-name">Name *</Label>
               <Input
-                id="partyName"
+                id="party-form-name"
                 value={newParty.name}
                 onChange={(e) => setNewParty(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Enter name"
@@ -628,11 +631,11 @@ export function PartiesManagement() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="partyPhone">Phone</Label>
+              <Label htmlFor="party-form-phone">Phone</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  id="partyPhone"
+                  id="party-form-phone"
                   value={newParty.phone}
                   onChange={(e) => setNewParty(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="Enter phone number"
@@ -642,9 +645,9 @@ export function PartiesManagement() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="partyAddress">Address</Label>
+              <Label htmlFor="party-form-address">Address</Label>
               <Input
-                id="partyAddress"
+                id="party-form-address"
                 value={newParty.address}
                 onChange={(e) => setNewParty(prev => ({ ...prev, address: e.target.value }))}
                 placeholder="Enter address"
@@ -652,9 +655,9 @@ export function PartiesManagement() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="partyNotes">Notes</Label>
+              <Label htmlFor="party-form-notes">Notes</Label>
               <Textarea
-                id="partyNotes"
+                id="party-form-notes"
                 value={newParty.notes}
                 onChange={(e) => setNewParty(prev => ({ ...prev, notes: e.target.value }))}
                 placeholder="Additional notes..."

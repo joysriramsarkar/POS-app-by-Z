@@ -46,7 +46,7 @@ import {
 } from 'lucide-react';
 import type { Product } from '@/types/pos';
 import { useProductsStore } from '@/stores/pos-store';
-import { cn } from '@/lib/utils';
+import { cn, convertBengaliToEnglishNumerals } from '@/lib/utils';
 
 interface StockManagementProps {
   onAddProduct?: () => void;
@@ -77,10 +77,12 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
+      const normalizedQuery = convertBengaliToEnglishNumerals(searchQuery);
       result = result.filter(p =>
         p.name.toLowerCase().includes(query) ||
         p.nameBn?.includes(query) ||
-        p.barcode?.includes(query)
+        p.barcode?.includes(query) ||
+        convertBengaliToEnglishNumerals(p.barcode || '').includes(normalizedQuery)
       );
     }
 
@@ -180,18 +182,22 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[200px]">
+            <label htmlFor="stock-search" className="sr-only">Search items</label>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
+              id="stock-search"
+              name="stock-search"
               placeholder="Search items..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
+              aria-label="Search items"
             />
             {searchQuery && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                className="absolute right-2 md:right-1 top-1/2 -translate-y-1/2 h-8 w-8 md:h-7 md:w-7 p-0"
                 onClick={() => setSearchQuery('')}
               >
                 <X className="w-4 h-4" />

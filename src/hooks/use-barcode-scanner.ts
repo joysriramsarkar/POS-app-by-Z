@@ -111,8 +111,8 @@ export function useBarcodeScanner(config: BarcodeScannerConfig) {
         return;
       }
 
-      // Check for valid barcode characters (alphanumeric and some special chars)
-      const isValidBarcodeChar = /^[a-zA-Z0-9\-_.]$/.test(event.key);
+      // Check for valid barcode characters (alphanumeric, Bengali numerals, and some special chars)
+      const isValidBarcodeChar = /^[a-zA-Z0-9\-_.০-৯]$/.test(event.key);
 
       if (!isValidBarcodeChar) {
         // Reset if invalid character

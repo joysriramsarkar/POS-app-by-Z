@@ -176,6 +176,8 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
 
             {/* Quantity Input */}
             <Input
+              id={`quantity-${item.id}`}
+              name={`quantity-${item.id}`}
               type="text" // Use text to allow empty state
               inputMode="decimal" // Hint for mobile keyboards
               value={inputValue}

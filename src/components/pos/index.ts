@@ -5,6 +5,7 @@ export { CartItem } from './CartItem';
 export { CartPanel } from './CartPanel';
 export { CheckoutDialog } from './CheckoutDialog';
 export type { PaymentData } from './CheckoutDialog';
+export { CameraScannerDialog } from './CameraScannerDialog';
 
 // Dashboard & Management
 export { Dashboard } from './Dashboard';

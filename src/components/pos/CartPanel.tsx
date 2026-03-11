@@ -150,7 +150,10 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
           {customerSearchOpen && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50">
               <div className="p-2 border-b">
+                <label htmlFor="customer-search" className="sr-only">Search customer</label>
                 <Input
+                  id="customer-search"
+                  name="customer-search"
                   placeholder="Search customer..."
                   value={customerSearchQuery}
                   onChange={(e) => setCustomerSearchQuery(e.target.value)}
@@ -158,7 +161,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
                 />
               </div>
               <div className="max-h-48 overflow-y-auto">
-                <div className="p-1">
+                <div className="p-2">
                   <Button
                     variant="ghost"
                     className="w-full justify-start h-9 text-sm"

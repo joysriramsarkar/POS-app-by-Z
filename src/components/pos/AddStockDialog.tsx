@@ -143,7 +143,7 @@ export function AddStockDialog({
               onValueChange={setSelectedProductId}
               disabled={!!initialProduct}
             >
-              <SelectTrigger id="product">
+              <SelectTrigger id="add-stock-product">
                 <SelectValue placeholder="Select product" />
               </SelectTrigger>
               <SelectContent>
@@ -169,10 +169,10 @@ export function AddStockDialog({
 
           {/* Quantity */}
           <div className="space-y-2">
-            <Label htmlFor="quantity">Quantity *</Label>
+            <Label htmlFor="add-stock-quantity">Quantity *</Label>
             <div className="flex items-center gap-2">
               <Input
-                id="quantity"
+                id="add-stock-quantity"
                 type="number"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
@@ -189,11 +189,11 @@ export function AddStockDialog({
 
           {/* Purchase Price */}
           <div className="space-y-2">
-            <Label htmlFor="price">Purchase Price (per unit) *</Label>
+              <Label htmlFor="add-stock-price">Purchase Price (per unit) *</Label>
             <div className="relative">
               <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                id="price"
+                id="add-stock-price"
                 type="number"
                 value={purchasePrice}
                 onChange={(e) => setPurchasePrice(e.target.value)}
@@ -223,12 +223,12 @@ export function AddStockDialog({
 
           {/* Date */}
           <div className="space-y-2">
-            <Label htmlFor="date" className="flex items-center gap-2">
+            <Label htmlFor="add-stock-date" className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Date
             </Label>
             <Input
-              id="date"
+              id="add-stock-date"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
@@ -242,7 +242,7 @@ export function AddStockDialog({
               Supplier (Optional)
             </Label>
             <Select value={supplierId} onValueChange={setSupplierId}>
-              <SelectTrigger id="supplier">
+              <SelectTrigger id="add-stock-supplier">
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
               <SelectContent>
@@ -257,9 +257,9 @@ export function AddStockDialog({
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Label htmlFor="add-stock-notes">Notes (Optional)</Label>
             <Input
-              id="notes"
+              id="add-stock-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Invoice number, remarks..."

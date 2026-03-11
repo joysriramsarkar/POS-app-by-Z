@@ -1,0 +1,19 @@
+{
+  "name": "POS App",
+  "short_name": "POS",
+  "description": "Point of Sale Application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "screenshots": [],
+  "categories": ["business", "productivity"]
+}

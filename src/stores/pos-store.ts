@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CartItem, PaymentMethod, Product, Customer, Sale } from '@/types/pos';
 import { v4 as uuidv4 } from 'uuid';
+import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 
 // ============================================================================
 // CART STORE
@@ -325,17 +326,24 @@ export const useProductsStore = create<ProductsState & ProductsActions>((set, ge
   },
 
   getProductByBarcode: (barcode) => {
-    return get().products.find((p) => p.barcode === barcode);
+    // Convert Bengali numerals to English for comparison
+    const normalizedBarcode = convertBengaliToEnglishNumerals(barcode);
+    return get().products.find((p) => {
+      const normalizedProductBarcode = convertBengaliToEnglishNumerals(p.barcode || '');
+      return normalizedProductBarcode === normalizedBarcode;
+    });
   },
 
   searchProducts: (query) => {
     const lowerQuery = query.toLowerCase();
+    const normalizedQuery = convertBengaliToEnglishNumerals(query);
     return get().products.filter(
       (p) =>
         p.isActive &&
         (p.name.toLowerCase().includes(lowerQuery) ||
           p.nameBn?.includes(query) ||
-          p.barcode?.includes(query))
+          p.barcode?.includes(query) ||
+          convertBengaliToEnglishNumerals(p.barcode || '').includes(normalizedQuery))
     );
   },
 }));
