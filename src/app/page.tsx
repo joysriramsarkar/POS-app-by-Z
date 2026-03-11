@@ -477,7 +477,8 @@ export default function Home() {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to update product');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update product');
         }
         
         const { data: updatedProduct } = await response.json();
@@ -492,7 +493,8 @@ export default function Home() {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to create product');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create product');
         }
 
         const { data: newProduct } = await response.json();

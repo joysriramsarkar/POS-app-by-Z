@@ -60,15 +60,43 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // Validate required fields
+    const errors: string[] = [];
+
+    if (!body.name || !String(body.name).trim()) {
+      errors.push('Product name is required');
+    }
+
+    if (!body.category || !String(body.category).trim()) {
+      errors.push('Category is required');
+    }
+
+    const buyingPrice = parseFloat(body.buyingPrice);
+    if (isNaN(buyingPrice) || buyingPrice < 0) {
+      errors.push('Valid buying price is required');
+    }
+
+    const sellingPrice = parseFloat(body.sellingPrice);
+    if (isNaN(sellingPrice) || sellingPrice < 0) {
+      errors.push('Valid selling price is required');
+    }
+
+    if (errors.length > 0) {
+      return NextResponse.json(
+        { success: false, error: errors.join(', ') },
+        { status: 400 }
+      );
+    }
     
     const product = await db.product.create({
       data: {
-        barcode: body.barcode || null,
-        name: body.name,
-        nameBn: body.nameBn,
-        category: body.category || 'General',
-        buyingPrice: parseFloat(body.buyingPrice) || 0,
-        sellingPrice: parseFloat(body.sellingPrice) || 0,
+        barcode: body.barcode ? String(body.barcode).trim() : null,
+        name: String(body.name).trim(),
+        nameBn: body.nameBn ? String(body.nameBn).trim() : null,
+        category: String(body.category).trim(),
+        buyingPrice: buyingPrice,
+        sellingPrice: sellingPrice,
         unit: body.unit || 'piece',
         currentStock: parseFloat(body.currentStock) || 0,
         minStockLevel: parseFloat(body.minStockLevel) || 5,
@@ -83,6 +111,21 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating product:', error);
+    
+    // Handle specific Prisma errors
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint failed')) {
+        return NextResponse.json(
+          { success: false, error: 'Barcode already exists for another product' },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { success: false, error: `Database error: ${error.message}` },
+        { status: 500 }
+      );
+    }
+    
     return NextResponse.json(
       { success: false, error: 'Failed to create product' },
       { status: 500 }

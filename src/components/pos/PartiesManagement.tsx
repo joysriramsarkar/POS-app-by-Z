@@ -40,6 +40,7 @@ import {
   ArrowDownRight,
   FileText,
   X,
+  Edit,
 } from 'lucide-react';
 import type { Customer, Supplier, LedgerEntry } from '@/types/pos';
 import { cn } from '@/lib/utils';
@@ -57,6 +58,8 @@ export function PartiesManagement() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingParty, setEditingParty] = useState<Customer | null>(null);
   const [newParty, setNewParty] = useState({
     name: '',
     phone: '',
@@ -167,6 +170,51 @@ export function PartiesManagement() {
     setSelectedCustomer(customer);
     setPaymentAmount('');
     setShowPaymentDialog(true);
+  };
+
+  const handleEditParty = (party: Customer) => {
+    setEditingParty(party);
+    setNewParty({
+      name: party.name,
+      phone: party.phone || '',
+      address: party.address || '',
+      notes: party.notes || '',
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateParty = async () => {
+    if (!editingParty || !newParty.name) return;
+
+    // ensure phone is 10 digits when provided
+    if (newParty.phone && !/^[0-9]{10}$/.test(newParty.phone)) {
+      toast({ title: 'Invalid phone', description: 'Phone number must be exactly 10 digits.', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingParty.id,
+          ...newParty,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update customer');
+      }
+
+      const { data: updatedCustomer } = await response.json();
+      updateCustomer(editingParty.id, updatedCustomer);
+      setShowEditDialog(false);
+      setEditingParty(null);
+      setNewParty({ name: '', phone: '', address: '', notes: '' });
+    } catch (error) {
+      console.error('Failed to update customer:', error);
+    }
   };
 
   const handlePaymentSubmit = async () => {
@@ -390,15 +438,24 @@ export function PartiesManagement() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => handleEditParty(customer)}
+                        >
+                          <Edit className="w-4 h-4 md:mr-1" />
+                          <span className="hidden md:inline">Edit</span>
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-8"
                           onClick={() => handleViewLedger(customer)}
                         >
-                          <FileText className="w-4 h-4 mr-1" />
-                          Ledger
+                          <FileText className="w-4 h-4 md:mr-1" />
+                          <span className="hidden md:inline">Ledger</span>
                         </Button>
                         {customer.totalDue > 0 && (
                           <Button
@@ -407,8 +464,8 @@ export function PartiesManagement() {
                             className="h-8 text-green-600 hover:text-green-700"
                             onClick={() => handleRecordPayment(customer)}
                           >
-                            <IndianRupee className="w-4 h-4 mr-1" />
-                            Payment
+                            <IndianRupee className="w-4 h-4 md:mr-1" />
+                            <span className="hidden md:inline">Payment</span>
                           </Button>
                         )}
                       </div>
@@ -609,6 +666,81 @@ export function PartiesManagement() {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Party Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5" />
+              Edit {activeTab === 'customer' ? 'Customer' : 'Supplier'}
+            </DialogTitle>
+            <DialogDescription>
+              Update {activeTab === 'customer' ? 'customer' : 'supplier'} details
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-party-name">Name *</Label>
+              <Input
+                id="edit-party-name"
+                value={newParty.name}
+                onChange={(e) => setNewParty(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-party-phone">Phone</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="edit-party-phone"
+                  value={newParty.phone}
+                  onChange={(e) => setNewParty(prev => ({ ...prev, phone: e.target.value }))}
+                  placeholder="Enter phone number"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-party-address">Address</Label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="edit-party-address"
+                  value={newParty.address}
+                  onChange={(e) => setNewParty(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Enter address"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-party-notes">Notes</Label>
+              <Textarea
+                id="edit-party-notes"
+                value={newParty.notes}
+                onChange={(e) => setNewParty(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Enter notes"
+                className="resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => { setShowEditDialog(false); setEditingParty(null); setNewParty({ name: '', phone: '', address: '', notes: '' }); }}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateParty} disabled={!newParty.name}>
+              Update {activeTab === 'customer' ? 'Customer' : 'Supplier'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Party Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="sm:max-w-md">
@@ -617,6 +749,9 @@ export function PartiesManagement() {
               <UserPlus className="w-5 h-5" />
               Add New {activeTab === 'customer' ? 'Customer' : 'Supplier'}
             </DialogTitle>
+            <DialogDescription>
+              Enter {activeTab === 'customer' ? 'customer' : 'supplier'} details
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

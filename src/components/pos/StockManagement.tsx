@@ -312,7 +312,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -320,7 +320,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
                           onClick={() => onAddStock?.(product)}
                         >
                           <Plus className="w-4 h-4 mr-1" />
-                          Stock
+                          <span className="hidden sm:inline">Stock</span>
                         </Button>
                         <Button
                           variant="ghost"

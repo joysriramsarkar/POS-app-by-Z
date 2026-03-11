@@ -8,6 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { CartItem } from './CartItem';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import {
   ShoppingCart,
   Trash2,
   User,
@@ -17,6 +26,7 @@ import {
   Clock,
   ChevronDown,
   Check,
+  UserPlus,
 } from 'lucide-react';
 import type { PaymentMethod, Customer } from '@/types/pos';
 import { useCartStore, useUIStore } from '@/stores/pos-store';
@@ -38,6 +48,13 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [showAddPartyDialog, setShowAddPartyDialog] = useState(false);
+  const [newParty, setNewParty] = useState({
+    name: '',
+    phone: '',
+    address: '',
+    notes: '',
+  });
 
   const items = useCartStore((state) => state.items);
   const discount = useCartStore((state) => state.discount);
@@ -94,9 +111,44 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
       setCustomer(customer);
       setCustomerSearchOpen(false);
       setCustomerSearchQuery('');
+      // If selecting walk-in customer and current payment is Due, switch to Cash
+      if (!customer && paymentMethod === 'Due') {
+        setPaymentMethod('Cash');
+      }
     },
-    [setCustomer]
+    [setCustomer, paymentMethod, setPaymentMethod]
   );
+
+  const handleAddPartyFromCart = async () => {
+    if (!newParty.name) return;
+
+    // Validate phone if provided
+    if (newParty.phone && !/^[0-9]{10}$/.test(newParty.phone)) {
+      alert('Phone number must be exactly 10 digits.');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newParty),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create customer');
+      }
+
+      const { data: newCustomer } = await response.json();
+      // Select the newly created customer
+      handleCustomerSelect(newCustomer);
+      setShowAddPartyDialog(false);
+      setNewParty({ name: '', phone: '', address: '', notes: '' });
+    } catch (error) {
+      console.error('Failed to add customer:', error);
+      alert('Failed to create customer');
+    }
+  };
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -192,17 +244,31 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
                 </div>
               </div>
               {onAddCustomer && (
-                <div className="p-2 border-t">
+                <div className="p-2 border-t space-y-2">
+                  {onAddCustomer && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => {
+                        setCustomerDialogOpen(true);
+                        onAddCustomer();
+                      }}
+                    >
+                      Add from Party List
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
                     className="w-full"
                     onClick={() => {
-                      setCustomerDialogOpen(true);
-                      onAddCustomer();
+                      setShowAddPartyDialog(true);
+                      setCustomerSearchOpen(false);
                     }}
                   >
-                    Add New Customer
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    New Customer
                   </Button>
                 </div>
               )}
@@ -234,7 +300,9 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
         <div className="p-3 border-b">
           <Label className="text-xs text-muted-foreground mb-2 block">Payment Method</Label>
           <div className="grid grid-cols-3 gap-2">
-            {paymentMethods.map(({ method, icon, label, color }) => (
+            {paymentMethods
+              .filter(({ method }) => method !== 'Due' || customerName) // Hide Due for walk-in customers
+              .map(({ method, icon, label, color }) => (
               <button
                 key={method}
                 type="button"
@@ -335,6 +403,82 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
           </Button>
         </div>
       </div>
+
+      {/* Add New Party Dialog */}
+      <Dialog open={showAddPartyDialog} onOpenChange={setShowAddPartyDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Add New Customer
+            </DialogTitle>
+            <DialogDescription>
+              Create a new customer and add to this order
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="cart-party-name">Name *</Label>
+              <Input
+                id="cart-party-name"
+                value={newParty.name}
+                onChange={(e) => setNewParty(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter customer name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cart-party-phone">Phone</Label>
+              <Input
+                id="cart-party-phone"
+                value={newParty.phone}
+                onChange={(e) => setNewParty(prev => ({ ...prev, phone: e.target.value }))}
+                placeholder="10-digit phone number"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cart-party-address">Address</Label>
+              <Input
+                id="cart-party-address"
+                value={newParty.address}
+                onChange={(e) => setNewParty(prev => ({ ...prev, address: e.target.value }))}
+                placeholder="Enter address"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cart-party-notes">Notes</Label>
+              <Textarea
+                id="cart-party-notes"
+                value={newParty.notes}
+                onChange={(e) => setNewParty(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Enter notes"
+                className="resize-none h-20"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowAddPartyDialog(false);
+                setNewParty({ name: '', phone: '', address: '', notes: '' });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddPartyFromCart} 
+              disabled={!newParty.name}
+            >
+              Create Customer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

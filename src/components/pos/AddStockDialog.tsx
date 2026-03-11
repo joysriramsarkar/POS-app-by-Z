@@ -137,7 +137,7 @@ export function AddStockDialog({
         <div className="space-y-4 py-4">
           {/* Product Select */}
           <div className="space-y-2">
-            <Label htmlFor="product">Product *</Label>
+            <Label htmlFor="add-stock-product">Product *</Label>
             <Select
               value={selectedProductId}
               onValueChange={setSelectedProductId}
@@ -237,7 +237,7 @@ export function AddStockDialog({
 
           {/* Supplier */}
           <div className="space-y-2">
-            <Label htmlFor="supplier" className="flex items-center gap-2">
+            <Label htmlFor="add-stock-supplier" className="flex items-center gap-2">
               <User className="w-4 h-4" />
               Supplier (Optional)
             </Label>

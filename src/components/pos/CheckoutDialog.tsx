@@ -311,6 +311,7 @@ export function CheckoutDialog({
         <DialogContent className="sm:max-w-md no-print">
           <DialogHeader>
             <DialogTitle className="sr-only">Payment Success</DialogTitle>
+            <DialogDescription className="sr-only">Payment has been successfully processed</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center py-6">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
