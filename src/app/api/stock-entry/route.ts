@@ -47,7 +47,15 @@ export async function POST(request: NextRequest) {
       };
 
       if (purchasePrice !== undefined && purchasePrice !== null) {
-        if (purchasePrice !== product.buyingPrice) {
+        // Calculate the Weighted Average Cost (WAC)
+        const oldStock = product.currentStock > 0 ? product.currentStock : 0;
+        const newStock = oldStock + quantity;
+
+        // Handle division by zero edge case (though newStock should be > 0 since quantity > 0)
+        if (newStock > 0) {
+          const wac = ((oldStock * product.buyingPrice) + (quantity * purchasePrice)) / newStock;
+          updateData.buyingPrice = wac;
+        } else {
           updateData.buyingPrice = purchasePrice;
         }
       }
