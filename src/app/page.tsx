@@ -219,9 +219,12 @@ export default function Home() {
   );
 
   // Initialize barcode scanner
+  // It should be disabled when any major dialog is open that might interfere or consume input
+  const isAnyDialogOpen = isCheckoutOpen || isAddStockOpen || isProductDialogOpen || isPrintDialogOpen;
+
   useSimpleBarcodeScanner({
     onBarcodeDetected: handleBarcodeDetected,
-    enabled: !isCheckoutOpen,
+    enabled: !isAnyDialogOpen,
   });
 
   // Handle checkout completion
