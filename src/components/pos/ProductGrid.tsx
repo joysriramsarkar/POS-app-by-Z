@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,7 @@ export function ProductGrid({
 }: ProductGridProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const storeProducts = useProductsStore((state) => state.products);
   const storeCategories = useProductsStore((state) => state.categories);
@@ -37,6 +38,7 @@ export function ProductGrid({
   const selectedCategoryId = useUIStore((state) => state.selectedCategoryId);
   const setSearchQuery = useUIStore((state) => state.setSearchQuery);
   const setSelectedCategoryId = useUIStore((state) => state.setSelectedCategoryId);
+  const addItem = useCartStore((state) => state.addItem);
 
   // Use external products if provided, otherwise use store products
   const products = externalProducts || storeProducts;
@@ -119,10 +121,33 @@ export function ProductGrid({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
+              ref={searchInputRef}
               type="text"
               placeholder="Search products by name, barcode..."
               value={searchQuery}
               onChange={handleSearchChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  const scannedValue = e.currentTarget.value.trim();
+                  const matchedProduct = products.find(p => p.barcode === scannedValue);
+                  
+                  if (matchedProduct) {
+                    if (externalProducts) {
+                      onProductSelect?.(matchedProduct);
+                    } else {
+                      addItem(matchedProduct, 1);
+                    }
+                    e.currentTarget.value = '';
+                    if (externalProducts) {
+                      setLocalSearchQuery('');
+                    } else {
+                      setSearchQuery('');
+                    }
+                    e.currentTarget.focus();
+                  }
+                }
+              }}
               className="pl-9 pr-9 h-10 touch-manipulation"
               aria-label="Search products"
             />

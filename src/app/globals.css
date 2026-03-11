@@ -122,50 +122,136 @@
 }
 
 @media print {
-  /* 1. By default, hide everything on the page. */
-  body * {
-    visibility: hidden;
-  }
-
-  /* 2. Then, selectively make the print dialog container and EVERYTHING inside it visible. */
-  .print-dialog-content, .print-dialog-content * {
-    visibility: visible;
-  }
+  /* ========================================================================
+     STEP 1: HIDE ALL NON-PRINT ELEMENTS
+     ======================================================================== */
   
-  /* 3. Take the print dialog container out of the normal flow and make it fill the entire page. */
-  .print-dialog-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    margin: 0;
-    border: none;
-    box-shadow: none;
-    background: white;
-  }
-  
-  /* 4. Now, hide the specific parts inside the print dialog that we don't want. */
-  .print-dialog-content .no-print {
-    visibility: hidden;
+  /* Hide all body children except print-invoice-container */
+  body > * {
+    display: none !important;
   }
 
-  /* 5. The invoice preview is scaled for the screen; reset it for printing. */
-  .print-scroll-area > div {
-    transform: none !important;
+  /* Explicitly hide navigation, headers, sidebars, and marked no-print elements */
+  header,
+  nav,
+  aside,
+  footer,
+  .sidebar,
+  .navbar,
+  .navigation,
+  .menu,
+  .no-print,
+  .print-dialog-content,
+  .print-scroll-area {
+    display: none !important;
   }
 
-  /* Ensure background colors and images are printed */
+  /* ========================================================================
+     STEP 2: SHOW ONLY THE PRINT CONTAINER
+     ======================================================================== */
+
+  .print-invoice-container {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    page-break-after: auto;
+  }
+
+  /* ========================================================================
+     STEP 3: ENSURE COLORS AND IMAGES PRINT
+     ======================================================================== */
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
 
-  /* Set page rules */
+  /* ========================================================================
+     STEP 4: PAGE SETUP FOR DIFFERENT PRINT FORMATS
+     ======================================================================== */
+
+  /* Default page setup */
   @page {
     size: auto;
     margin: 0;
+    padding: 0;
+  }
+
+  /* Thermal 58mm format */
+  @page thermal-58 {
+    size: 58mm auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Thermal 80mm format */
+  @page thermal-80 {
+    size: 80mm auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* A4 portrait */
+  @page a4-portrait {
+    size: A4 portrait;
+    margin: 0.5cm;
+  }
+
+  /* A5 portrait */
+  @page a5-portrait {
+    size: A5 portrait;
+    margin: 0.5cm;
+  }
+
+  /* ========================================================================
+     STEP 5: APPLY PAGE SPECS TO CONTAINERS
+     ======================================================================== */
+
+  .print-invoice-container[data-format="thermal-58"] {
+    page: thermal-58;
+    width: 58mm !important;
+    max-width: 58mm !important;
+  }
+
+  .print-invoice-container[data-format="thermal-80"] {
+    page: thermal-80;
+    width: 80mm !important;
+    max-width: 80mm !important;
+  }
+
+  .print-invoice-container[data-format="a4"] {
+    page: a4-portrait;
+    width: 210mm !important;
+    max-width: 210mm !important;
+  }
+
+  .print-invoice-container[data-format="a5"] {
+    page: a5-portrait;
+    width: 148mm !important;
+    max-width: 148mm !important;
+  }
+
+  /* ========================================================================
+     STEP 6: PREVENT PAGE BREAKS IN CRITICAL AREAS
+     ======================================================================== */
+
+  .thermal-invoice,
+  .standard-invoice {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  /* Allow breaks between invoice items on multi-page A4 documents */
+  .thermal-invoice > div,
+  .standard-invoice > div {
+    page-break-inside: auto;
   }
 }
 

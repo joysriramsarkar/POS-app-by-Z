@@ -28,11 +28,12 @@ import {
 } from 'lucide-react';
 import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
 import { useSimpleBarcodeScanner } from '@/hooks/use-barcode-scanner';
-import { ProductsDB } from '@/lib/offline/indexeddb';
+import { ProductsDB, SalesDB, SyncQueueDB, CustomersDB } from '@/lib/offline/indexeddb';
 import { STORE_CONFIG } from '@/types/pos';
 import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { useToast } from '@/hooks/use-toast';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
@@ -67,6 +68,9 @@ export default function Home() {
 
   const customers = useCustomersStore((state) => state.customers);
   const updateCustomerDue = useCustomersStore((state) => state.updateCustomerDue);
+  const setCustomers = useCustomersStore((state) => state.setCustomers);
+
+  const { toast } = useToast();
 
   const addItem = useCartStore((state) => state.addItem);
   const clearCart = useCartStore((state) => state.clearCart);
@@ -78,6 +82,8 @@ export default function Home() {
   const setOnline = useSyncStore((state) => state.setOnline);
   const isSyncing = useSyncStore((state) => state.isSyncing);
   const pendingCount = useSyncStore((state) => state.pendingCount);
+  const setSyncing = useSyncStore((state) => state.setSyncing);
+  const setPendingCount = useSyncStore((state) => state.setPendingCount);
 
   const isCheckoutOpen = useUIStore((state) => state.isCheckoutOpen);
   const setCheckoutOpen = useUIStore((state) => state.setCheckoutOpen);
@@ -136,6 +142,64 @@ export default function Home() {
     };
   }, [setOnline]);
 
+  // Sync pending offline operations when we regain connection
+  useEffect(() => {
+    if (!isOnline) return;
+
+    const syncPending = async () => {
+      setSyncing(true);
+      try {
+        const unsynced = await SyncQueueDB.getUnsynced();
+        setPendingCount(unsynced.length);
+
+        for (const item of unsynced) {
+          try {
+            const res = await fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(item),
+            });
+
+            if (res.ok) {
+              await SyncQueueDB.markSynced(item.id);
+              if (item.entityType === 'Sale') {
+                await SalesDB.markSynced(item.entityId);
+              }
+            } else {
+              const err = await res.json();
+              console.error('Failed to sync item', item, err);
+              break; // abandon further sync until next attempt
+            }
+          } catch (err) {
+            console.error('Sync request failed', err);
+            break;
+          }
+        }
+
+        const remaining = await SyncQueueDB.getUnsynced();
+        setPendingCount(remaining.length);
+
+        // refresh caches after sync
+        const [prods, custs] = await Promise.all([
+          fetch('/api/products'),
+          fetch('/api/customers'),
+        ]);
+        if (prods.ok) {
+          const { data } = await prods.json();
+          setProducts(data);
+        }
+        if (custs.ok) {
+          const { data } = await custs.json();
+          setCustomers(data);
+        }
+      } finally {
+        setSyncing(false);
+      }
+    };
+
+    syncPending().catch(console.error);
+  }, [isOnline, setSyncing, setPendingCount, setProducts, setCustomers]);
+
   // Barcode scanner handler
   const handleBarcodeDetected = useCallback(
     (barcode: string) => {
@@ -161,16 +225,23 @@ export default function Home() {
   });
 
   // Handle checkout completion
+  // generate invoice number the same way server does
+  const generateInvoiceNumber = () => {
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const random = Math.floor(Math.random() * 10000)
+      .toString()
+      .padStart(4, '0');
+    return `INV-${dateStr}-${random}`;
+  };
+
   const handleCheckoutComplete = useCallback(async (paymentData: PaymentData) => {
     setIsProcessingPayment(true);
     try {
-      // The backend will handle all the logic of creating the sale,
-      // updating stock, and handling dues. We just need to send the
-      // essential information.
       const salePayload = {
         items: cartItems.map(item => ({
           productId: item.productId,
-          productName: item.productName, // Send a snapshot of the name
+          productName: item.productName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
@@ -179,54 +250,229 @@ export default function Home() {
         paymentMethod: paymentData.paymentMethod,
         discount: paymentData.discount,
         tax: paymentData.tax,
-        notes: paymentData.notes,
       };
 
-      const response = await fetch('/api/sales', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(salePayload),
-      });
+      if (isOnline) {
+        const response = await fetch('/api/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(salePayload),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create sale');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to create sale');
+        }
+
+        const { data: completedSale } = await response.json();
+
+        // Set the completed sale for the print dialog
+        setCurrentSale(completedSale);
+        clearCart();
+
+        // refresh products and customers from server
+        const [productsRes, customersRes] = await Promise.all([
+          fetch('/api/products'),
+          fetch('/api/customers'),
+        ]);
+
+        if (productsRes.ok) {
+          const { data: updatedProducts } = await productsRes.json();
+          setProducts(updatedProducts);
+        }
+
+        if (customersRes.ok && paymentData.paymentMethod === 'Due' && paymentData.customerId) {
+          // we know how much due to add
+          updateCustomerDue(paymentData.customerId, paymentData.total);
+        }
+      } else {
+        // --- OFFLINE FALLBACK ------------------------------------------------
+        // create a local sale object and queue for sync
+        const sale: Sale = {
+          id: uuidv4(),
+          invoiceNumber: generateInvoiceNumber(),
+          customerId: paymentData.customerId,
+          subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
+          discount: paymentData.discount,
+          tax: paymentData.tax,
+          totalAmount: paymentData.total,
+          paymentMethod: paymentData.paymentMethod,
+          paymentStatus: paymentData.paymentMethod === 'Due' ? 'Due' : 'Paid',
+          status: 'Completed',
+          notes: undefined,
+          offlineSynced: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          items: cartItems.map(item => ({
+            id: uuidv4(),
+            saleId: '',
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+            createdAt: new Date(),
+          })),
+        } as Sale;
+
+        await SalesDB.save(sale);
+        await SyncQueueDB.add({
+          id: uuidv4(),
+          entityType: 'Sale',
+          entityId: sale.id,
+          action: 'create',
+          payload: JSON.stringify(sale),
+          synced: false,
+          retryCount: 0,
+          createdAt: new Date(),
+        });
+
+        // adjust local stock and customer due
+        cartItems.forEach((item) => {
+          updateProductStock(item.productId, -item.quantity);
+          ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
+        });
+
+        if (paymentData.paymentMethod === 'Due' && paymentData.customerId) {
+          updateCustomerDue(paymentData.customerId, paymentData.total);
+          CustomersDB.updateDue(paymentData.customerId, paymentData.total).catch(console.error);
+        }
+
+        setCurrentSale(sale);
+        clearCart();
+        toast({ title: 'Offline sale saved', description: 'Will sync when connection is restored.' });
       }
-
-      const { data: completedSale } = await response.json();
-
-      // Set the completed sale for the print dialog
-      setCurrentSale(completedSale);
-      
-      // Clear the cart for the next transaction
-      clearCart();
-
-      // The backend now updates product stock and customer dues,
-      // so we no longer need to call `updateProductStock` or `updateCustomerDue` here.
-      // We might want to trigger a refresh of products/customers data though.
-      // For now, let's rely on the data being consistent until the next full load.
-
-    } catch (error) {
+    } catch (error: any) {
       console.error('Checkout failed:', error);
-      // TODO: Show an error toast to the user
+      toast({
+        title: 'Checkout error',
+        description: error?.message || 'Unable to complete sale',
+        variant: 'destructive',
+      });
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [cartItems, isOnline, setCurrentSale, setPrintDialogOpen, clearCart]);
+  }, [
+    cartItems,
+    isOnline,
+    setCurrentSale,
+    setPrintDialogOpen,
+    clearCart,
+    setProducts,
+    updateCustomerDue,
+    toast,
+  ]);
 
   const handleOpenCheckout = useCallback(() => {
     setCheckoutOpen(true);
   }, [setCheckoutOpen]);
 
   // Handle stock entry
-  const handleStockEntry = useCallback((data: StockEntryData) => {
-    console.log('Stock entry:', data);
-    updateProductStock(data.productId, data.quantity);
-  }, [updateProductStock]);
+  const handleStockEntry = useCallback(async (data: StockEntryData) => {
+    try {
+      if (isOnline) {
+        // Send stock entry to backend API
+        const response = await fetch('/api/stock-entry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId: data.productId,
+            quantity: data.quantity,
+            purchasePrice: data.purchasePrice,
+            date: data.date,
+            supplierId: data.supplierId,
+            notes: data.notes,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Stock entry failed:', errorData.error);
+          toast({ title: 'Stock entry failed', description: errorData.error, variant: 'destructive' });
+          return;
+        }
+
+        const { data: updatedProduct } = await response.json();
+
+        // Update local store with new stock
+        updateProductStock(data.productId, data.quantity);
+
+        // Refetch all products to sync database changes
+        const productsRes = await fetch('/api/products');
+        if (productsRes.ok) {
+          const { data: refreshedProducts } = await productsRes.json();
+          setProducts(refreshedProducts);
+        }
+
+        console.log('Stock entry successful:', updatedProduct);
+      } else {
+        // offline: update local store and queue sync
+        updateProductStock(data.productId, data.quantity);
+        ProductsDB.updateStock(data.productId, data.quantity).catch(console.error);
+        await SyncQueueDB.add({
+          id: uuidv4(),
+          entityType: 'Product',
+          entityId: data.productId,
+          action: 'update',
+          payload: JSON.stringify({ productId: data.productId, quantityChange: data.quantity }),
+          synced: false,
+          retryCount: 0,
+          createdAt: new Date(),
+        });
+        setPendingCount(pendingCount + 1);
+        toast({ title: 'Offline entry saved', description: 'Stock will sync when back online.' });
+      }
+    } catch (error) {
+      console.error('Stock entry error:', error);
+      toast({ title: 'Stock entry error', description: (error as any)?.message || 'Unknown error', variant: 'destructive' });
+    }
+  }, [isOnline, updateProductStock, setProducts, pendingCount, toast]);
 
   // Handle product save
   const handleProductSave = useCallback(async (data: ProductFormData) => {
     try {
+      if (!isOnline) {
+        // offline: store locally and queue a sync entry
+        if (data.id) {
+          updateProduct(data.id, { ...data, updatedAt: new Date() } as any);
+          ProductsDB.upsert({ ...(data as any), updatedAt: new Date(), createdAt: new Date(), currentStock: (data as any).currentStock || 0 });
+          await SyncQueueDB.add({
+            id: uuidv4(),
+            entityType: 'Product',
+            entityId: data.id,
+            action: 'update',
+            payload: JSON.stringify(data),
+            synced: false,
+            retryCount: 0,
+            createdAt: new Date(),
+          });
+        } else {
+          const newProduct = {
+            ...data,
+            id: uuidv4(),
+            currentStock: 0,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as any;
+          addProduct(newProduct);
+          ProductsDB.upsert(newProduct);
+          await SyncQueueDB.add({
+            id: uuidv4(),
+            entityType: 'Product',
+            entityId: newProduct.id,
+            action: 'create',
+            payload: JSON.stringify(newProduct),
+            synced: false,
+            retryCount: 0,
+            createdAt: new Date(),
+          });
+        }
+
+        toast({ title: 'Offline product saved', description: 'Changes will sync when online.' });
+        return;
+      }
+
       if (data.id) {
         // Update existing product
         const response = await fetch('/api/products', {
@@ -259,9 +505,9 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Failed to save product:", error);
-      // Here you could add a user-facing notification, e.g., using a toast library
+      toast({ title: 'Product save error', description: (error as any)?.message || 'Unexpected error', variant: 'destructive' });
     }
-  }, [updateProduct, addProduct]);
+  }, [updateProduct, addProduct, isOnline, toast]);
 
   // Handle navigation
   const handleNavigate = useCallback((page: string) => {

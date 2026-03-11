@@ -27,7 +27,7 @@ import {
   Receipt,
 } from 'lucide-react';
 import type { PaymentMethod, Sale, SaleItem, Customer } from '@/types/pos';
-import { useCartStore, useUIStore } from '@/stores/pos-store';
+import { useCartStore, useUIStore, useProductsStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
 
 interface CheckoutDialogProps {
@@ -75,6 +75,9 @@ export function CheckoutDialog({
   const getSubtotal = useCartStore((state) => state.getSubtotal);
   const getTotal = useCartStore((state) => state.getTotal);
   const clearCart = useCartStore((state) => state.clearCart);
+
+  // Products store - for stock validation
+  const products = useProductsStore((state) => state.products);
 
   // UI store
   const isCheckoutOpen = useUIStore((state) => state.isCheckoutOpen);
@@ -180,6 +183,40 @@ export function CheckoutDialog({
       return;
     }
 
+    // ========================================================================
+    // CRITICAL: VALIDATE STOCK BEFORE CHECKOUT
+    // Prevent checkout if any cart item exceeds available stock
+    // ========================================================================
+    const insufficientStockItems: Array<{ name: string; qty: number; available: number }> = [];
+    
+    for (const cartItem of items) {
+      const product = products.find((p) => p.id === cartItem.productId);
+      if (!product) {
+        setInputError(`Product "${cartItem.productName}" no longer exists in inventory.`);
+        return;
+      }
+      
+      if (cartItem.quantity > product.currentStock) {
+        insufficientStockItems.push({
+          name: cartItem.productName,
+          qty: cartItem.quantity,
+          available: product.currentStock,
+        });
+      }
+    }
+
+    // If any items lack sufficient stock, show error and prevent checkout
+    if (insufficientStockItems.length > 0) {
+      const itemsText = insufficientStockItems
+        .map((item) => `${item.name} (Need: ${item.qty}, Available: ${item.available})`)
+        .join('\n');
+      
+      setInputError(
+        `Insufficient stock for:\n${itemsText}\n\nPlease adjust quantities and try again.`
+      );
+      return;
+    }
+
     const saleItems: SaleItem[] = items.map((item) => ({
       id: uuidv4(),
       saleId: '', // To be filled by backend/process
@@ -239,6 +276,7 @@ export function CheckoutDialog({
     parsedAmount,
     total,
     items,
+    products,
     customerId,
     customerName,
     subtotal,
@@ -481,7 +519,7 @@ export function CheckoutDialog({
           <Button
             onClick={handleComplete}
             disabled={!isValidPayment || isProcessing}
-            className="min-w-[120px]"
+            className="min-w-30"
           >
             {isProcessing ? (
               'Processing...'

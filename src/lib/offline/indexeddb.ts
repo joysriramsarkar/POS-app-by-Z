@@ -303,11 +303,10 @@ export const SalesDB = {
     const db = await initDatabase();
     const transaction = db.transaction(STORES.SALES, 'readonly');
     const store = transaction.objectStore(STORES.SALES);
-    const index = store.index('synced');
 
     return new Promise((resolve, reject) => {
-      const request = index.getAll(false);
-      request.onsuccess = () => resolve(request.result);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result.filter((s: Sale) => !s.offlineSynced));
       request.onerror = () => reject(request.error);
     });
   },
@@ -342,11 +341,10 @@ export const SyncQueueDB = {
     const db = await initDatabase();
     const transaction = db.transaction(STORES.SYNC_QUEUE, 'readonly');
     const store = transaction.objectStore(STORES.SYNC_QUEUE);
-    const index = store.index('synced');
 
     return new Promise((resolve, reject) => {
-      const request = index.getAll(false);
-      request.onsuccess = () => resolve(request.result);
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result.filter((i: SyncQueueItem) => !i.synced));
       request.onerror = () => reject(request.error);
     });
   },

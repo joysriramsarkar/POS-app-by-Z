@@ -63,6 +63,13 @@ export const useCartStore = create<CartState & CartActions>()(
       ...initialCartState,
 
       addItem: (product: Product, quantity: number = 1) => {
+        // Prevent adding more quantity than available stock for "piece" units
+        const available = product.currentStock;
+        if (product.unit === 'piece' && quantity > available) {
+          console.error(`Cannot add ${quantity} of ${product.name}, only ${available} in stock`);
+          return;
+        }
+
         const currentItems = get().items;
         const existingItemIndex = currentItems.findIndex(
           (item) => item.productId === product.id
@@ -72,6 +79,13 @@ export const useCartStore = create<CartState & CartActions>()(
           const updatedItems = [...currentItems];
           const existingItem = updatedItems[existingItemIndex];
           const newQuantity = existingItem.quantity + quantity;
+
+          // check again against stock
+          if (product.unit === 'piece' && newQuantity > available) {
+            console.error(`Cannot increase quantity to ${newQuantity}, only ${available} in stock`);
+            return;
+          }
+
           updatedItems[existingItemIndex] = {
             ...existingItem,
             quantity: newQuantity,
@@ -104,6 +118,17 @@ export const useCartStore = create<CartState & CartActions>()(
         if (quantity <= 0) {
           get().removeItem(itemId);
           return;
+        }
+
+        // check against product stock if possible
+        const state = get();
+        const item = state.items.find((i) => i.id === itemId);
+        if (item) {
+          const product = state.products.find((p) => p.id === item.productId);
+          if (product && product.unit === 'piece' && quantity > product.currentStock) {
+            console.error(`Cannot set quantity to ${quantity}, only ${product.currentStock} in stock`);
+            return;
+          }
         }
 
         set((state) => ({

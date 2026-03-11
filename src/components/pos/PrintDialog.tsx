@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { renderToString } from "react-dom/server";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InvoicePreview, PrintInvoice } from "./PrintInvoice";
 import type { Sale, PrintFormat } from "@/types/pos";
+import { printToIframe } from "@/lib/printUtility";
 
 // ============================================================================
 // TYPES
@@ -149,13 +151,69 @@ export function PrintDialog({
   }, [open]);
 
   const handlePrint = () => {
-    if (onPrint) {
-      onPrint(selectedFormat);
-    } else {
-      // Default print behavior
-      window.print();
-    }
-    onOpenChange(false);
+    if (!sale) return;
+
+    // 1. Create a temporary container for the invoice
+    const printContainer = document.createElement("div");
+    printContainer.className = "print-invoice-container";
+    printContainer.setAttribute("data-format", selectedFormat);
+
+    // 2. Render the PrintInvoice component to an HTML string
+    const invoiceHtml = renderToString(
+      <PrintInvoice
+        sale={sale}
+        format={selectedFormat}
+        showLogo={showLogo}
+        showGst={showGst}
+        footerMessage={footerMessage}
+      />
+    );
+    printContainer.innerHTML = invoiceHtml;
+
+    // 3. Define page-specific styles for the iframe
+    const getPageStyle = (format: PrintFormat) => {
+      switch (format) {
+        case "thermal-58":
+          return `
+            @page { size: 58mm auto; margin: 0; padding: 0; }
+            body { width: 58mm; max-width: 58mm; margin: 0; padding: 0; overflow: hidden; }
+            .thermal-invoice { width: 56mm !important; max-width: 56mm !important; overflow: hidden; }
+          `;
+        case "thermal-80":
+          return `
+            @page { size: 80mm auto; margin: 0; padding: 0; }
+            body { width: 80mm; max-width: 80mm; margin: 0; padding: 0; overflow: hidden; }
+            .thermal-invoice { width: 78mm !important; max-width: 78mm !important; overflow: hidden; }
+          `;
+        case "a4":
+          return `
+            @page { size: A4 portrait; margin: 0.5cm; }
+            body { width: 210mm; max-width: 210mm; margin: 0; padding: 0; }
+            .standard-invoice { width: 210mm !important; max-width: 210mm !important; }
+          `;
+        case "a5":
+          return `
+            @page { size: A5 portrait; margin: 0.5cm; }
+            body { width: 148mm; max-width: 148mm; margin: 0; padding: 0; }
+            .standard-invoice { width: 148mm !important; max-width: 148mm !important; }
+          `;
+        default:
+          return "@page { size: auto; margin: 1cm; }";
+      }
+    };
+
+    // 4. Use the iframe print utility with format parameter
+    printToIframe({
+      printContent: printContainer,
+      pageStyle: getPageStyle(selectedFormat),
+      format: selectedFormat,
+      onAfterPrint: () => {
+        onOpenChange(false);
+        if (onPrint) {
+          onPrint(selectedFormat);
+        }
+      },
+    });
   };
 
   if (!sale) {

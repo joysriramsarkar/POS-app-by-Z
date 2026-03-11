@@ -75,6 +75,9 @@ export async function POST(request: NextRequest) {
       case 'Customer':
         result = await syncCustomer(parsedPayload, action);
         break;
+      case 'Product':
+        result = await syncProduct(parsedPayload, action);
+        break;
       default:
         return NextResponse.json(
           { success: false, error: 'Unknown entity type' },
@@ -220,6 +223,50 @@ async function syncCustomer(customerData: Record<string, unknown>, action: strin
         totalPaid: customerData.totalPaid as number,
         updatedAt: new Date(),
       },
+    });
+  }
+
+  throw new Error(`Unknown action: ${action}`);
+}
+
+// Sync product updates (primarily stock changes) from offline
+async function syncProduct(productData: Record<string, unknown>, action: string) {
+  if (action === 'update') {
+    const { productId, quantityChange } = productData as any;
+
+    if (typeof productId !== 'string') {
+      throw new Error('Invalid productId');
+    }
+
+    if (typeof quantityChange === 'number') {
+      return db.$transaction(async (tx) => {
+        const updated = await tx.product.update({
+          where: { id: productId },
+          data: {
+            currentStock: { increment: quantityChange },
+            updatedAt: new Date(),
+          },
+        });
+
+        await tx.stockHistory.create({
+          data: {
+            productId,
+            changeType: quantityChange > 0 ? 'purchase' : 'sale',
+            quantity: quantityChange,
+            reason: 'Offline sync',
+          },
+        });
+
+        return updated;
+      });
+    }
+
+    // fallback to upsert entire object if no quantityChange provided
+    const { id, ...fields } = productData as any;
+    return db.product.upsert({
+      where: { id },
+      create: productData as any,
+      update: fields,
     });
   }
 

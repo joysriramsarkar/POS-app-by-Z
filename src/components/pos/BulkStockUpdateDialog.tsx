@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useRef } from 'react';
 import Papa from 'papaparse';
+import { ProductsDB, SyncQueueDB } from '@/lib/offline/indexeddb';
+import { v4 as uuidv4 } from 'uuid';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +15,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useProductsStore } from '@/stores/pos-store';
+import { useProductsStore, useSyncStore } from '@/stores/pos-store';
+import { useToast } from '@/hooks/use-toast';
 import { Upload, FileDown, Table as TableIcon, AlertCircle, CheckCircle } from 'lucide-react';
 import {
   Table,
@@ -41,7 +44,11 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
   const [parsedData, setParsedData] = useState<StockUpdateData[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { products, updateProductStock } = useProductsStore();
+  const { products, updateProductStock, setProducts } = useProductsStore();
+  const isOnline = useSyncStore((state) => state.isOnline);
+  const pendingCount = useSyncStore((state) => state.pendingCount);
+  const setPendingCount = useSyncStore((state) => state.setPendingCount);
+  const { toast } = useToast();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -124,18 +131,66 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
     document.body.removeChild(link);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (parsedData.length === 0) {
       setError("No data to save.");
       return;
     }
 
-    parsedData.forEach(item => {
-        const product = products.find(p => p.barcode === item.barcode);
-        if (product) {
+    // iterate and send each update to backend or handle offline
+    for (const item of parsedData) {
+      const product = products.find(p => p.barcode === item.barcode);
+      if (!product) continue;
+
+      if (isOnline) {
+        try {
+          const res = await fetch('/api/stock-entry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              productId: product.id,
+              quantity: item.quantity,
+              notes: 'Bulk update from CSV',
+            }),
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            console.warn('Bulk stock update failed for', item.barcode, err.error);
+            toast({ title: 'Bulk update failed', description: err.error, variant: 'destructive' });
+          } else {
             updateProductStock(product.id, item.quantity);
+          }
+        } catch (e) {
+          console.error('Error during bulk stock update', e);
+          toast({ title: 'Bulk update error', description: String(e), variant: 'destructive' });
         }
-    });
+      } else {
+        // offline behavior: update local state and queue
+        updateProductStock(product.id, item.quantity);
+        ProductsDB.updateStock(product.id, item.quantity).catch(console.error);
+        await SyncQueueDB.add({
+          id: uuidv4(),
+          entityType: 'Product',
+          entityId: product.id,
+          action: 'update',
+          payload: JSON.stringify({ productId: product.id, quantityChange: item.quantity }),
+          synced: false,
+          retryCount: 0,
+          createdAt: new Date(),
+        });
+        setPendingCount(pendingCount + 1);
+      }
+    }
+
+    if (isOnline) {
+      // refresh products list after all updates
+      const productsRes = await fetch('/api/products');
+      if (productsRes.ok) {
+        const { data: refreshed } = await productsRes.json();
+        setProducts(refreshed);
+      }
+    }
 
     onOpenChange(false);
   };

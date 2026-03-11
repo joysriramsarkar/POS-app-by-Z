@@ -161,7 +161,7 @@ export function ProductDialog({
         name,
         nameBn: nameBn || undefined,
         barcode: barcode || undefined,
-        category: newCategory || category,
+        category: category === 'new_category_custom_value' ? newCategory.trim() : category,
         buyingPrice: parseFloat(buyingPrice),
         sellingPrice: parseFloat(sellingPrice),
         unit,
@@ -177,7 +177,8 @@ export function ProductDialog({
     }
   };
 
-  const isValid = name && (category || newCategory) && buyingPrice && sellingPrice;
+  const isCategoryValid = category === 'new_category_custom_value' ? newCategory.trim().length > 0 : !!category;
+  const isValid = name && isCategoryValid && buyingPrice && sellingPrice;
 
   // Calculate profit margin
   const profitMargin = buyingPrice && sellingPrice && parseFloat(buyingPrice) > 0
@@ -252,7 +253,15 @@ export function ProductDialog({
           {/* Category */}
           <div className="space-y-2">
             <Label htmlFor="category">Category *</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select 
+              value={category} 
+              onValueChange={(val) => {
+                setCategory(val);
+                if (val !== 'new_category_custom_value') {
+                  setNewCategory('');
+                }
+              }}
+            >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
@@ -260,17 +269,22 @@ export function ProductDialog({
                 {allCategories.map((cat) => (
                   <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                 ))}
+                <SelectItem value="new_category_custom_value" className="text-primary font-medium">
+                  + Add New Category
+                </SelectItem>
               </SelectContent>
             </Select>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Or add new:</span>
-              <Input
-                value={newCategory}
-                onChange={(e) => setNewCategory(e.target.value)}
-                placeholder="New category"
-                className="h-8 text-sm"
-              />
-            </div>
+            {category === 'new_category_custom_value' && (
+              <div className="animate-in fade-in slide-in-from-top-1 pt-2">
+                <Input
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  placeholder="Enter new category name"
+                  className="h-9 text-sm"
+                  autoFocus
+                />
+              </div>
+            )}
           </div>
 
           {/* Unit */}

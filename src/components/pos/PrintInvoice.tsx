@@ -62,54 +62,64 @@ function ThermalInvoice({
   const is58mm = width === "58mm";
   const fontSize = is58mm ? "text-[10px]" : "text-xs";
   const padding = is58mm ? "p-2" : "p-3";
-  const lineWidth = is58mm ? "max-w-[58mm]" : "max-w-[80mm]";
+  
+  // ========================================================================
+  // CRITICAL: Strict width constraints to prevent thermal printer breaks
+  // ========================================================================
+  const therminalWidth = is58mm ? "w-[56mm]" : "w-[78mm]"; // Leave margin
+  const containerStyle: React.CSSProperties = {
+    width: is58mm ? "56mm" : "78mm",
+    maxWidth: is58mm ? "56mm" : "78mm",
+    margin: "0 auto",
+    overflow: "hidden",
+  };
 
   return (
     <div
-      className={`thermal-invoice ${lineWidth} ${padding} bg-white text-black font-mono`}
-      style={{ width: width }}
+      className={`thermal-invoice ${therminalWidth} ${padding} bg-white text-black font-mono`}
+      style={containerStyle}
     >
       {/* Header */}
-      <div className="text-center space-y-1">
+      <div className="text-center space-y-1 truncate">
         {showLogo && (
           <div className="flex justify-center mb-2">
-            <div className="w-10 h-10 border-2 border-black rounded-full flex items-center justify-center">
+            <div className="w-10 h-10 border-2 border-black rounded-full flex items-center justify-center shrink-0">
               <span className="text-lg font-bold">LB</span>
             </div>
           </div>
         )}
-        <h1 className="font-bold text-sm">{STORE_CONFIG.name}</h1>
-        <p className={`${fontSize} font-semibold`}>{STORE_CONFIG.nameBn}</p>
-        <p className={`${fontSize}`}>{STORE_CONFIG.address}</p>
-        <p className={`${fontSize}`}>Ph: {STORE_CONFIG.phone}</p>
+        <h1 className="font-bold text-sm truncate">{STORE_CONFIG.name}</h1>
+        <p className={`${fontSize} font-semibold truncate`}>{STORE_CONFIG.nameBn}</p>
+        <p className={`${fontSize} truncate`}>{STORE_CONFIG.address}</p>
+        <p className={`${fontSize} truncate`}>Ph: {STORE_CONFIG.phone}</p>
       </div>
 
       <Separator className="my-2 bg-black" />
 
       {/* Invoice Info */}
       <div className={`${fontSize} space-y-0.5`}>
-        <div className="flex justify-between">
-          <span>Invoice:</span>
-          <span className="font-semibold">{sale.invoiceNumber}</span>
+        <div className="flex justify-between min-w-0">
+          <span className="shrink-0">Invoice:</span>
+          <span className="font-semibold shrink-0 ml-2">{sale.invoiceNumber}</span>
         </div>
-        <div className="flex justify-between">
-          <span>Date:</span>
-          <span>{formatDate(sale.createdAt)}</span>
+        <div className="flex justify-between min-w-0">
+          <span className="shrink-0">Date:</span>
+          <span className="shrink-0 ml-2">{formatDate(sale.createdAt)}</span>
         </div>
-        <div className="flex justify-between">
-          <span>Time:</span>
-          <span>{formatTime(sale.createdAt)}</span>
+        <div className="flex justify-between min-w-0">
+          <span className="shrink-0">Time:</span>
+          <span className="shrink-0 ml-2">{formatTime(sale.createdAt)}</span>
         </div>
         {sale.customer && (
           <div className="mt-1 pt-1 border-t border-dashed border-gray-400">
-            <div className="flex justify-between">
-              <span>Customer:</span>
-              <span>{sale.customer.name}</span>
+            <div className="flex justify-between min-w-0 truncate">
+              <span className="shrink-0">Customer:</span>
+              <span className="truncate ml-2">{sale.customer.name}</span>
             </div>
             {sale.customer.phone && (
-              <div className="flex justify-between">
-                <span>Phone:</span>
-                <span>{sale.customer.phone}</span>
+              <div className="flex justify-between min-w-0">
+                <span className="shrink-0">Phone:</span>
+                <span className="shrink-0 ml-2">{sale.customer.phone}</span>
               </div>
             )}
           </div>
@@ -118,28 +128,28 @@ function ThermalInvoice({
 
       <Separator className="my-2 bg-black" />
 
-      {/* Items Table Header */}
-      <div className={`${fontSize}`}>
-        <div className="flex font-bold border-b border-black pb-0.5">
-          <span className="flex-1">Item</span>
-          <span className="w-12 text-right">Qty</span>
-          <span className="w-16 text-right">Price</span>
-          <span className="w-16 text-right">Total</span>
+      {/* Items Table - STRICTLY SIZED TO PREVENT OVERFLOW */}
+      <div className={`${fontSize} overflow-hidden`}>
+        <div className="flex font-bold border-b border-black pb-0.5 min-w-0">
+          <span className="flex-1 min-w-0 truncate">Item</span>
+          <span className="w-10 text-right shrink-0">Qty</span>
+          <span className="w-14 text-right shrink-0">Price</span>
+          <span className="w-14 text-right shrink-0">Total</span>
         </div>
 
         {/* Items */}
-        <div className="border-b border-dashed border-gray-400">
+        <div className="border-b border-dashed border-gray-400 overflow-hidden">
           {sale.items.map((item) => (
             <div
               key={item.id}
-              className="py-0.5 flex border-b border-dotted border-gray-300 last:border-0"
+              className="py-0.5 flex border-b border-dotted border-gray-300 last:border-0 min-w-0 overflow-hidden"
             >
-              <span className="flex-1 truncate pr-1">{item.productName}</span>
-              <span className="w-12 text-right">{item.quantity}</span>
-              <span className="w-16 text-right">
+              <span className="flex-1 min-w-0 truncate pr-1">{item.productName}</span>
+              <span className="w-10 text-right shrink-0">{item.quantity}</span>
+              <span className="w-14 text-right shrink-0">
                 {item.unitPrice.toFixed(0)}
               </span>
-              <span className="w-16 text-right font-medium">
+              <span className="w-14 text-right shrink-0 font-medium">
                 {item.totalPrice.toFixed(0)}
               </span>
             </div>
@@ -147,21 +157,21 @@ function ThermalInvoice({
         </div>
 
         {/* Totals */}
-        <div className="mt-1 space-y-0.5">
-          <div className="flex justify-between">
-            <span>Subtotal:</span>
-            <span>{formatCurrency(sale.subtotal)}</span>
+        <div className="mt-1 space-y-0.5 overflow-hidden">
+          <div className="flex justify-between min-w-0">
+            <span className="shrink-0">Subtotal:</span>
+            <span className="shrink-0 ml-2 font-medium">{formatCurrency(sale.subtotal)}</span>
           </div>
           {sale.discount > 0 && (
-            <div className="flex justify-between text-green-700">
-              <span>Discount:</span>
-              <span>-{formatCurrency(sale.discount)}</span>
+            <div className="flex justify-between min-w-0 text-green-700">
+              <span className="shrink-0">Discount:</span>
+              <span className="shrink-0 ml-2 font-medium">-{formatCurrency(sale.discount)}</span>
             </div>
           )}
           {sale.tax > 0 && (
-            <div className="flex justify-between">
-              <span>Tax:</span>
-              <span>+{formatCurrency(sale.tax)}</span>
+            <div className="flex justify-between min-w-0">
+              <span className="shrink-0">Tax:</span>
+              <span className="shrink-0 ml-2 font-medium">+{formatCurrency(sale.tax)}</span>
             </div>
           )}
         </div>
@@ -170,33 +180,33 @@ function ThermalInvoice({
       <Separator className="my-1 bg-black" />
 
       {/* Grand Total */}
-      <div className={`${fontSize} font-bold flex justify-between text-sm`}>
-        <span>GRAND TOTAL:</span>
-        <span>{formatCurrency(sale.totalAmount)}</span>
+      <div className={`${fontSize} font-bold flex justify-between text-sm min-w-0`}>
+        <span className="shrink-0">GRAND TOTAL:</span>
+        <span className="shrink-0 ml-2">{formatCurrency(sale.totalAmount)}</span>
       </div>
 
       <Separator className="my-2 bg-black" />
 
       {/* Payment Info */}
-      <div className={`${fontSize} space-y-0.5`}>
-        <div className="flex justify-between">
-          <span>Payment:</span>
-          <span className="font-semibold">{sale.paymentMethod}</span>
+      <div className={`${fontSize} space-y-0.5 overflow-hidden`}>
+        <div className="flex justify-between min-w-0">
+          <span className="shrink-0">Payment:</span>
+          <span className="font-semibold shrink-0 ml-2">{sale.paymentMethod}</span>
         </div>
-        <div className="flex justify-between">
-          <span>Status:</span>
-          <span>{sale.paymentStatus}</span>
+        <div className="flex justify-between min-w-0">
+          <span className="shrink-0">Status:</span>
+          <span className="shrink-0 ml-2">{sale.paymentStatus}</span>
         </div>
       </div>
 
       {/* Footer */}
-      <div className={`${fontSize} text-center mt-3 space-y-1`}>
+      <div className={`${fontSize} text-center mt-3 space-y-1 overflow-hidden`}>
         <Separator className="my-1 bg-black" />
         <p className="font-semibold">ধন্যবাদ!</p>
         <p>Thank you for shopping!</p>
         <p>Visit us again!</p>
         {footerMessage && (
-          <p className="mt-1 text-[8px]">{footerMessage}</p>
+          <p className="mt-1 text-[8px] truncate">{footerMessage}</p>
         )}
       </div>
     </div>

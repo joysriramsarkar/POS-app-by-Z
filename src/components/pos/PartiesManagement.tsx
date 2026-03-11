@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import type { Customer, Supplier, LedgerEntry } from '@/types/pos';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 
 
@@ -69,6 +70,7 @@ export function PartiesManagement() {
   const setCustomers = useCustomersStore((state) => state.setCustomers);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
+  const { toast } = useToast();
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -78,8 +80,10 @@ export function PartiesManagement() {
     }).format(price);
   };
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const formatDate = (date: Date | string) => {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   // Fetch customers and suppliers on component mount
@@ -140,9 +144,22 @@ export function PartiesManagement() {
   const totalDue = customers.reduce((sum, c) => sum + c.totalDue, 0);
   const customersWithDue = customers.filter(c => c.totalDue > 0).length;
 
-  const handleViewLedger = (customer: Customer) => {
+  const handleViewLedger = async (customer: Customer) => {
     setSelectedCustomer(customer);
-    // TODO: Fetch ledger entries for the customer
+    try {
+      const res = await fetch(`/api/customers?id=${customer.id}`);
+      if (res.ok) {
+        const { data } = await res.json();
+        // server returns the customer including ledgerEntries when id supplied
+        setLedgerEntries(data.ledgerEntries || []);
+      } else {
+        console.error('Failed to load ledger entries');
+        setLedgerEntries([]);
+      }
+    } catch (err) {
+      console.error('Error fetching ledger entries', err);
+      setLedgerEntries([]);
+    }
     setShowLedger(true);
   };
 
@@ -184,6 +201,12 @@ export function PartiesManagement() {
 
   const handleAddParty = async () => {
     if (!newParty.name) return;
+
+    // ensure phone is 10 digits when provided
+    if (newParty.phone && !/^[0-9]{10}$/.test(newParty.phone)) {
+      toast({ title: 'Invalid phone', description: 'Phone number must be exactly 10 digits.', variant: 'destructive' });
+      return;
+    }
 
     if (activeTab === 'customer') {
       try {
@@ -464,7 +487,7 @@ export function PartiesManagement() {
             </Card>
 
             {/* Ledger Entries */}
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-75">
               <div className="space-y-2 pr-2">
                 {ledgerEntries.map((entry) => (
                   <div

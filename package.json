@@ -3,14 +3,13 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build && shx cp -r .next/static .next/standalone/.next/ && shx cp -r public .next/standalone/ && shx mkdir -p .next/standalone/prisma && shx cp prisma/dev.db .next/standalone/prisma/ && shx cp prisma/schema.prisma .next/standalone/prisma/",
-    "start": "cd .next/standalone && cross-env DATABASE_URL=file:./prisma/dev.db NODE_ENV=production node server.js",
-    "lint": "eslint .",
+    "dev": "next dev -p 3000",
+    "clean": "npx rimraf .next",
+    "build": "npm run clean && prisma generate && next build",
+    "start": "cross-env NODE_ENV=production next start -p 3000",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -90,6 +89,7 @@
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "^16.1.6",
+    "rimraf": "^6.1.3",
     "shx": "^0.4.0",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.5",
