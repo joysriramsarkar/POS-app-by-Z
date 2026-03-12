@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Camera, AlertCircle, RefreshCw } from 'lucide-react';
+import { Camera, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import useCameraBarcodeScanner from '@/hooks/use-camera-barcode-scanner';
 
 interface CameraScannerDialogProps {
@@ -27,63 +27,55 @@ export function CameraScannerDialog({
   onOpenChange,
   onBarcodeScanned,
   title = 'Scan Barcode',
-  description = 'Position barcode in the center of the frame',
+  description = 'Position barcode within the frame',
 }: CameraScannerDialogProps) {
   const [cameraMode, setCameraMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState<string | null>(null);
 
-  const handleBarcodeDetected = useCallback(
-    (barcode: string) => {
-      onBarcodeScanned(barcode);
-      onOpenChange(false);
-    },
-    [onBarcodeScanned, onOpenChange]
-  );
+  const handleClose = useCallback(() => {
+    onOpenChange(false);
+  }, [onOpenChange]);
 
-  const { isSupported, isInitialized, scannerId } = useCameraBarcodeScanner({
+  const {
+    isSupported,
+    isInitialized,
+    isShuttingDown,
+    startShutdown,
+    scannerId,
+  } = useCameraBarcodeScanner({
     enabled: open,
-    onBarcodeDetected: handleBarcodeDetected,
+    onBarcodeDetected: (barcode: string) => {
+      onBarcodeScanned(barcode);
+      startShutdown();
+    },
+    onClose: handleClose,
     onError: setError,
     facingMode: cameraMode,
   });
 
+  const handleCloseIntent = useCallback(() => {
+    // This is now the single entry point for triggering a close.
+    // It will not immediately unmount the component.
+    startShutdown();
+  }, [startShutdown]);
+
+  const handleDialogInteraction = useCallback((newOpen: boolean) => {
+    if (newOpen) {
+      onOpenChange(true);
+      setError(null);
+    } else {
+      // User initiated close via ESC or overlay click
+      handleCloseIntent();
+    }
+  }, [onOpenChange, handleCloseIntent]);
+  
   const toggleCamera = useCallback(() => {
-    setCameraMode(prev => {
-      const newMode = prev === 'environment' ? 'user' : 'environment';
-      setError(null); // Clear any errors when switching
-      return newMode;
-    });
+    setCameraMode(prev => (prev === 'environment' ? 'user' : 'environment'));
+    setError(null); // Clear errors when toggling
   }, []);
 
-  if (!isSupported) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Camera className="w-5 h-5" />
-              {title}
-            </DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
-          </DialogHeader>
-
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs sm:text-sm">
-              {error || 'Camera is not supported on this device or access was denied. Please check your device settings and camera permissions.'}
-            </AlertDescription>
-          </Alert>
-
-          <DialogFooter>
-            <Button onClick={() => onOpenChange(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogInteraction}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -93,61 +85,45 @@ export function CameraScannerDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {error && (
+        {error && !isShuttingDown && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs sm:text-sm">
-              {error}
-            </AlertDescription>
+            <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
           </Alert>
         )}
 
-        {/* Scanner container - will be populated by html5-qrcode */}
-        {isInitialized ? (
-          <div className="relative w-full bg-black rounded-lg overflow-hidden border-2 border-gray-700">
-            <div
-              id={scannerId}
-              className="w-full"
-              style={{ 
-                minHeight: '300px',
-                backgroundColor: '#000',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            />
-          </div>
-        ) : (
-          <div className="relative w-full bg-gray-900 rounded-lg overflow-hidden border-2 border-gray-700">
-            <div
-              id={scannerId}
-              className="w-full flex items-center justify-center"
-              style={{ 
-                minHeight: '300px',
-                backgroundColor: '#1a1a1a'
-              }}
-            >
-              <div className="text-center">
-                <Camera className="w-12 h-12 text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">Initializing camera...</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Blackboxed container for the scanner */}
+        <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border-2 border-gray-700">
+          {/* This div is surrendered to the html5-qrcode library. React will not touch its children. */}
+          <div id={scannerId} dangerouslySetInnerHTML={{ __html: '' }} />
 
-        {isInitialized && (
-          <div className="text-center text-sm text-muted-foreground">
-            <p>Point camera at barcode and hold still</p>
-          </div>
-        )}
+          {/* Loading / Shutdown Overlay */}
+          {(!isInitialized || isShuttingDown) && (
+            <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white pointer-events-none">
+              <Loader2 className="w-10 h-10 animate-spin mb-3" />
+              <p className="text-sm font-medium">
+                {isShuttingDown ? 'Closing Camera...' : 'Initializing Camera...'}
+              </p>
+            </div>
+          )}
+        </div>
 
         <DialogFooter className="flex gap-2">
-          <Button variant="outline" onClick={toggleCamera} className="flex-1">
+          <Button
+            variant="outline"
+            onClick={toggleCamera}
+            className="flex-1"
+            disabled={!isInitialized || isShuttingDown}
+          >
             <RefreshCw className="w-4 h-4 mr-2" />
-            {cameraMode === 'environment' ? 'Front Camera' : 'Back Camera'}
+            <span>{cameraMode === 'environment' ? 'Front Cam' : 'Back Cam'}</span>
           </Button>
-          <Button onClick={() => onOpenChange(false)} className="flex-1">
-            Close
+          <Button
+            onClick={handleCloseIntent}
+            className="flex-1"
+            disabled={isShuttingDown}
+          >
+            {isShuttingDown ? 'Closing...' : 'Close'}
           </Button>
         </DialogFooter>
       </DialogContent>

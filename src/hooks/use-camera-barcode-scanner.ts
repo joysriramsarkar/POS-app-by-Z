@@ -1,17 +1,20 @@
 // ============================================================================
 // useCameraBarcodeScanner - Camera Barcode Scanning Hook
 // Lakhan Bhandar POS System
-// 
-// This hook enables camera-based barcode/QR code scanning
+//
+// This hook enables camera-based barcode/QR code scanning with a robust,
+// race-condition-free cleanup mechanism.
 // ============================================================================
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Html5Qrcode, Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 
 interface CameraBarcodeScannerConfig {
   /** Callback when barcode/QR is successfully scanned */
   onBarcodeDetected: (barcode: string) => void;
+  /** Callback to trigger component close/unmount *after* cleanup */
+  onClose: () => void;
   /** Callback for error handling */
   onError?: (error: string) => void;
   /** Enable or disable scanner */
@@ -24,278 +27,189 @@ const SCANNER_ID = 'html5-qr-code-full-region';
 
 // Helper function to get user-friendly error messages
 function getErrorMessage(error: any): string {
+  if (typeof error === 'string') return error;
   if (error.name === 'NotAllowedError' || error.code === 'PERMISSION_DENIED') {
-    return 'Camera permission denied. Please allow camera access in your browser settings and try again.';
+    return 'Camera permission denied. Please allow camera access in your browser settings.';
   }
   if (error.name === 'NotFoundError' || error.code === 'DEVICE_NOT_FOUND') {
-    return 'No camera device found. Please check your device has a camera connected.';
+    return 'No camera device found. Please check if a camera is connected and enabled.';
   }
   if (error.name === 'NotReadableError' || error.code === 'DEVICE_IN_USE') {
-    return 'Camera is in use by another application. Please close other camera apps and try again.';
+    return 'Camera is already in use by another application. Please close other camera apps.';
   }
-  if (error.name === 'SecurityError') {
-    return 'Camera access requires HTTPS connection (or localhost for development).';
-  }
-  if (error.message?.includes('getUserMedia')) {
-    return 'Camera access is not available. Please check your browser permissions.';
-  }
-  return error?.message || 'Camera access failed. Please try again.';
+  return error?.message || 'An unknown camera error occurred. Please try again.';
 }
 
 export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
   const {
     onBarcodeDetected,
+    onClose,
     onError,
     enabled = false,
     facingMode = 'environment',
   } = config;
 
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const videoTrackRef = useRef<MediaStreamTrack[]>([]);
+  const isInitializingRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(false);
+  
   const [isSupported, setIsSupported] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isShuttingDown, setIsShuttingDown] = useState(false);
+  
   const lastScannedRef = useRef<string>('');
   const lastScannedTimeRef = useRef<number>(0);
 
-  // Verify secure context at mount
-  useEffect(() => {
-    if (!navigator.mediaDevices) {
-      setIsSupported(false);
-      onError?.('Camera API is not supported on this browser');
-      return;
-    }
-    
-    if (!window.isSecureContext) {
-      setIsSupported(false);
-      onError?.('Camera access requires HTTPS connection (or localhost for development). Current URL is not secure.');
-      return;
-    }
-  }, [onError]);
-
-  const cleanupScanner = useCallback(async () => {
-    console.log('[Scanner] Cleaning up scanner and tracks...');
-    
-    // Stop all video tracks
-    videoTrackRef.current.forEach(track => {
-      try {
-        track.stop();
-      } catch (e) {
-        console.error('[Scanner] Error stopping track:', e);
+  // --- Strict, Blocking Shutdown ---
+  const startShutdown = useCallback(async () => {
+    // If already shutting down, or no scanner exists, just ensure close is called.
+    if (isShuttingDown || !scannerRef.current) {
+      if (!isShuttingDown) { // Prevent calling onClose multiple times
+        onClose();
       }
-    });
-    videoTrackRef.current = [];
-
-    // Clear scanner
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.clear();
-        console.log('[Scanner] Scanner cleared successfully');
-      } catch (error) {
-        console.error('[Scanner] Error clearing scanner:', error);
-      }
-      scannerRef.current = null;
-    }
-    
-    setIsInitialized(false);
-  }, []);
-
-  const initializeScanner = useCallback(async () => {
-    if (!enabled || !isSupported) {
-      console.log('[Scanner] Initialization skipped. Enabled:', enabled, 'Supported:', isSupported);
       return;
     }
 
-    console.log('[Scanner] Starting initialization with facingMode:', facingMode);
-    
+    setIsShuttingDown(true);
+    console.log('[Scanner] Starting blocking shutdown...');
+
     try {
-      // Clean up any previous scanner
-      await cleanupScanner();
+      // Await the scanner cleanup promise to complete fully.
+      await scannerRef.current.clear();
+      console.log('[Scanner] Scanner cleared successfully.');
+    } catch (error) {
+      console.error('[Scanner] Error during scanner.clear(), but proceeding with close:', error);
+      // Even if cleanup fails, we must proceed to unmount to avoid getting stuck.
+    } finally {
+      if (isMountedRef.current) {
+        scannerRef.current = null;
+        setIsInitialized(false);
+      }
+      console.log('[Scanner] Shutdown complete. Calling onClose().');
+      onClose(); // Triggers the parent component to unmount.
+    }
+  }, [isShuttingDown, onClose]);
 
-      // Step 1: Verify container exists
-      console.log('[Scanner] Checking for container element...');
+
+  // --- Scanner Initialization ---
+  const initializeScanner = useCallback(async () => {
+    // Strict Mode Protection: Prevent double initialization.
+    if (isInitializingRef.current || scannerRef.current) {
+      console.log('[Scanner] Initialization skipped: already initializing or initialized.');
+      return;
+    }
+    isInitializingRef.current = true;
+    setIsInitialized(false);
+    console.log('[Scanner] Starting initialization...');
+
+    try {
+      // Pre-flight check: Container must exist in the DOM.
       const container = document.getElementById(SCANNER_ID);
       if (!container) {
-        throw new Error(`Scanner container (#${SCANNER_ID}) not found in DOM. Ensure the dialog is properly rendered.`);
+        throw new Error(`Scanner container #${SCANNER_ID} not found in DOM.`);
       }
-      console.log('[Scanner] Container found');
+      container.innerHTML = ''; // Clear previous content
 
-      // Step 2: Clear container
-      container.innerHTML = '';
-      container.style.backgroundColor = '#000';
-
-      // Step 3: Wait for DOM to fully render
-      console.log('[Scanner] Waiting for DOM to stabilize...');
-      await new Promise(resolve => setTimeout(resolve, 150));
-
-      // Step 4: Test camera access before initializing scanner
-      console.log('[Scanner] Testing camera access with constraints:', { facingMode });
-      let testStream: MediaStream | null = null;
-      try {
-        const constraints = {
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          },
-          audio: false
-        };
-        
-        testStream = await navigator.mediaDevices.getUserMedia(constraints);
-        const videoTrack = testStream.getVideoTracks()[0];
-        const settings = videoTrack?.getSettings();
-        console.log('[Scanner] Camera access successful. Settings:', {
-          width: settings?.width,
-          height: settings?.height,
-          facingMode: settings?.facingMode
-        });
-        
-        // Store the test stream's track for cleanup
-        testStream.getTracks().forEach(track => {
-          videoTrackRef.current.push(track);
-        });
-      } catch (error: any) {
-        const errorMsg = getErrorMessage(error);
-        console.error('[Scanner] Camera access test failed:', errorMsg, error);
-        throw new Error(`Camera test failed: ${errorMsg}`);
-      }
-
-      // Step 5: Initialize Html5QrcodeScanner
-      console.log('[Scanner] Initializing Html5QrcodeScanner...');
+      // Initialize the scanner library.
       const scanner = new Html5QrcodeScanner(
         SCANNER_ID,
         {
           fps: 10,
-          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-            const size = Math.min(viewfinderWidth, viewfinderHeight) * 0.75;
-            return {
-              width: Math.floor(size),
-              height: Math.floor(size),
-            };
-          },
+          qrbox: (w, h) => { const size = Math.min(w, h) * 0.75; return { width: size, height: size }; },
           rememberLastUsedCamera: true,
-          showTorchButtonIfSupported: true,
           supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-          disableFlip: false,
           videoConstraints: {
             facingMode: { ideal: facingMode },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
           }
         },
-        false // verbose logging disabled
+        false // verbose
       );
 
-      console.log('[Scanner] Scanner instance created, rendering...');
-
-      // Step 6: Render scanner with proper error handling
-      await new Promise<void>((resolve, reject) => {
-        try {
-          scanner.render(
-            (decodedText: string) => {
-              console.log('[Scanner] Barcode detected:', decodedText);
-              // Normalize Bengali numerals to English numerals
-              const normalizedText = convertBengaliToEnglishNumerals(decodedText);
-              
-              // Prevent duplicate scans within 1 second
-              const now = Date.now();
-              if (normalizedText === lastScannedRef.current && now - lastScannedTimeRef.current < 1000) {
-                console.log('[Scanner] Duplicate scan detected within 1s, ignoring');
-                return;
-              }
-
-              lastScannedRef.current = normalizedText;
-              lastScannedTimeRef.current = now;
-
-              onBarcodeDetected(normalizedText);
-            },
-            (error: any) => {
-              // Ignore continuous scanning errors - they're normal
-              // Only log warnings for critical issues
-              if (error?.message?.includes('No QR')) {
-                // Normal scanning - no QR code detected
-                return;
-              }
-              console.warn('[Scanner] Scanning warning:', error?.message);
-            }
-          );
-
-          // Check if video element is actually rendering
-          const videoElement = container.querySelector('video');
-          if (videoElement) {
-            console.log('[Scanner] Video element found, attaching event listeners');
-            videoElement.onloadedmetadata = () => {
-              console.log('[Scanner] Video metadata loaded, dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
-              resolve();
-            };
-            
-            // Fallback timeout after 2 seconds
-            const timeout = setTimeout(() => {
-              console.warn('[Scanner] Video metadata not received within 2s, continuing anyway');
-              resolve();
-            }, 2000);
-            
-            videoElement.onloadstart = () => {
-              clearTimeout(timeout);
-            };
-          } else {
-            console.warn('[Scanner] Video element not found yet, waiting...');
-            setTimeout(() => resolve(), 1000);
+      // Render the scanner. This is an async operation.
+      await scanner.render(
+        (decodedText: string) => {
+          const normalizedText = convertBengaliToEnglishNumerals(decodedText);
+          const now = Date.now();
+          if (normalizedText === lastScannedRef.current && now - lastScannedTimeRef.current < 1500) {
+            return; // Debounce duplicate scans
           }
-        } catch (renderError: any) {
-          const errorMsg = getErrorMessage(renderError);
-          console.error('[Scanner] Render error:', errorMsg, renderError);
-          reject(new Error(`Scanner render failed: ${errorMsg}`));
+          lastScannedRef.current = normalizedText;
+          lastScannedTimeRef.current = now;
+          onBarcodeDetected(normalizedText);
+        },
+        (error: any) => {
+          // These errors happen continuously during scanning, ignore them.
+          if (!error?.message?.includes('No QR code found')) {
+            console.warn('[Scanner] Non-critical scan error:', error?.message);
+          }
         }
-      });
+      );
 
-      scannerRef.current = scanner;
-      setIsInitialized(true);
-      console.log('[Scanner] ✅ Scanner initialized successfully');
+      // Check if component is still mounted before setting state.
+      if (isMountedRef.current) {
+        scannerRef.current = scanner;
+        setIsInitialized(true);
+        console.log('[Scanner] ✅ Scanner initialized successfully.');
+      } else {
+        console.log('[Scanner] Component unmounted during initialization, cleaning up.');
+        await scanner.clear();
+      }
 
     } catch (error: any) {
-      const errorMsg = getErrorMessage(error);
-      console.error('[Scanner] ❌ Initialization failed:', errorMsg, error);
-      await cleanupScanner();
-      setIsSupported(false);
-      onError?.(errorMsg);
+      const errorMessage = getErrorMessage(error);
+      console.error('[Scanner] ❌ Initialization failed:', errorMessage, error);
+      if (isMountedRef.current) {
+        onError?.(errorMessage);
+        setIsSupported(false); // Assume non-recoverable error
+      }
+    } finally {
+      isInitializingRef.current = false;
     }
-  }, [enabled, facingMode, isSupported, cleanupScanner, onBarcodeDetected, onError]);
+  }, [facingMode, onBarcodeDetected, onError]);
 
-  // Initialize/cleanup scanner based on enabled state
+
+  // --- Lifecycle Effects ---
+
+  // Handle mount and unmount status.
   useEffect(() => {
-    let isMounted = true;
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
+  // Initialize scanner when the 'enabled' prop becomes true.
+  useEffect(() => {
     if (enabled && isSupported) {
-      // Delay to ensure container is in DOM
+      // Use a short delay to ensure the DOM element is available after the dialog opens.
       const timer = setTimeout(() => {
-        if (isMounted) {
+        if (isMountedRef.current) {
           initializeScanner();
         }
-      }, 100);
-
-      return () => {
-        clearTimeout(timer);
-        isMounted = false;
-      };
-    } else {
-      cleanupScanner();
+      }, 150);
+      return () => clearTimeout(timer);
     }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [enabled, isSupported, initializeScanner, cleanupScanner]);
-
-  // Cleanup on unmount
+  }, [enabled, isSupported, initializeScanner]);
+  
+  // Final safety-net cleanup on unmount.
+  // This should ideally not be needed if startShutdown is always called.
   useEffect(() => {
     return () => {
-      cleanupScanner();
+      if (scannerRef.current) {
+        console.warn('[Scanner] Unsafe unmount cleanup triggered. The scanner was not shut down correctly.');
+        scannerRef.current.clear().catch(err => {
+          console.error('[Scanner] Unsafe cleanup failed:', err);
+        });
+        scannerRef.current = null;
+      }
     };
-  }, [cleanupScanner]);
+  }, []);
 
   return {
     isSupported,
     isInitialized,
+    isShuttingDown,
+    startShutdown,
     scannerId: SCANNER_ID,
   };
 }
