@@ -124,17 +124,6 @@ export const useCartStore = create<CartState & CartActions>()(
           return;
         }
 
-        // check against product stock if possible
-        const state = get();
-        const item = state.items.find((i) => i.id === itemId);
-        if (item) {
-          const product = state.products.find((p) => p.id === item.productId);
-          if (product && product.unit === 'piece' && quantity > product.currentStock) {
-            console.error(`Cannot set quantity to ${quantity}, only ${product.currentStock} in stock`);
-            return;
-          }
-        }
-
         set((state) => ({
           items: state.items.map((item) =>
             item.id === itemId
