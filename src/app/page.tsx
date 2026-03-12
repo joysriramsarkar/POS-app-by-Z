@@ -57,6 +57,7 @@ export default function Home() {
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [completedCheckoutSale, setCompletedCheckoutSale] = useState<Sale | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // Store hooks
   const products = useProductsStore((state) => state.products);
@@ -95,6 +96,11 @@ export default function Home() {
   const setCurrentSale = useUIStore((state) => state.setCurrentSale);
 
   const itemCount = getItemCount();
+
+  // Hydration tracking to prevent mismatches with store-dependent renders
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   // Load products on mount
   useEffect(() => {
@@ -405,6 +411,11 @@ export default function Home() {
     setCheckoutOpen(true);
   }, [setCheckoutOpen]);
 
+  // Handle opening parties page to add/select customer
+  const handleOpenPartiesPage = useCallback(() => {
+    setCurrentPage('parties');
+  }, [setCurrentPage]);
+
   // Handle stock entry
   const handleStockEntry = useCallback(async (data: StockEntryData) => {
     try {
@@ -666,7 +677,7 @@ export default function Home() {
 
             {/* Desktop Cart Panel */}
             <aside className="hidden sm:block w-96 border-l bg-card shrink-0">
-              <CartPanel onCheckout={handleOpenCheckout} customers={customers} />
+              <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} />
             </aside>
           </div>
         );
@@ -763,7 +774,7 @@ export default function Home() {
                 <SheetTrigger asChild>
                   <Button variant="outline" size="sm" className="relative">
                     <ShoppingCart className="w-5 h-5" />
-                    {itemCount > 0 && (
+                    {isHydrated && itemCount > 0 && (
                       <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
                         {itemCount}
                       </span>
@@ -771,7 +782,7 @@ export default function Home() {
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="right" className="w-full sm:w-96 p-0">
-                  <CartPanel onCheckout={handleOpenCheckout} customers={customers} />
+                  <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} />
                 </SheetContent>
               </Sheet>
             )}

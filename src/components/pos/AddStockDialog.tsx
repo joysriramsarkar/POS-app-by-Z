@@ -63,9 +63,27 @@ export function AddStockDialog({
   const [supplierId, setSupplierId] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [liveSupplers, setLiveSuppliers] = useState<Supplier[]>(suppliers);
 
   const products = useProductsStore((state) => state.products);
   const selectedProduct = products.find(p => p.id === selectedProductId);
+
+  // Fetch suppliers from database when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetch('/api/suppliers')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            setLiveSuppliers(data.data);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to load suppliers:', err);
+          setLiveSuppliers(suppliers);
+        });
+    }
+  }, [open, suppliers]);
 
   // Set initial product if provided
   useEffect(() => {
@@ -246,7 +264,7 @@ export function AddStockDialog({
                 <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
               <SelectContent>
-                {suppliers.filter(s => s.isActive).map((supplier) => (
+                {liveSupplers.filter(s => s.isActive).map((supplier) => (
                   <SelectItem key={supplier.id} value={supplier.id}>
                     {supplier.name}
                   </SelectItem>

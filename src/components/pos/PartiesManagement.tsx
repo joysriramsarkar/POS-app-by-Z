@@ -321,7 +321,7 @@ export function PartiesManagement() {
           </div>
           <Button onClick={() => setShowAddDialog(true)}>
             <UserPlus className="w-4 h-4 mr-2" />
-            Add Party
+            Add {activeTab === 'customer' ? 'Customer' : 'Supplier'}
           </Button>
         </div>
 

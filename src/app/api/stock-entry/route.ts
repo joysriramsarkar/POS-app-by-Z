@@ -78,39 +78,47 @@ export async function POST(request: NextRequest) {
 
       // Optionally create Purchase record if supplierId provided
       if (supplierId) {
-        const purchase = await tx.purchase.create({
-          data: {
-            supplierId,
-            invoiceNumber: `PUR-${Date.now()}`,
-            totalAmount: quantity * purchasePrice,
-            paymentStatus: 'Paid',
-            notes,
-            items: {
-              create: {
-                productId,
-                productName: product.name,
-                quantity,
-                buyingPrice: purchasePrice,
-                totalPrice: quantity * purchasePrice,
-              },
-            },
-          },
-          include: { items: true },
+        // Verify supplier exists before creating purchase
+        const supplier = await tx.supplier.findUnique({
+          where: { id: supplierId },
         });
 
-        // Update StockHistory to link to Purchase
-        await tx.stockHistory.updateMany({
-          where: {
-            productId,
-            changeType: 'purchase',
-            createdAt: {
-              gte: new Date(Date.now() - 1000), // Within last second
+        if (supplier) {
+          const purchase = await tx.purchase.create({
+            data: {
+              supplierId,
+              invoiceNumber: `PUR-${Date.now()}`,
+              totalAmount: quantity * purchasePrice,
+              paymentStatus: 'Paid',
+              notes,
+              items: {
+                create: {
+                  productId,
+                  productName: product.name,
+                  quantity,
+                  buyingPrice: purchasePrice,
+                  totalPrice: quantity * purchasePrice,
+                },
+              },
             },
-          },
-          data: {
-            referenceId: purchase.id,
-          },
-        });
+            include: { items: true },
+          });
+
+          // Update StockHistory to link to Purchase
+          await tx.stockHistory.updateMany({
+            where: {
+              productId,
+              changeType: 'purchase',
+              createdAt: {
+                gte: new Date(Date.now() - 1000), // Within last second
+              },
+            },
+            data: {
+              referenceId: purchase.id,
+            },
+          });
+        }
+        // If supplier doesn't exist, just skip purchase creation and only update stock
       }
 
       return updatedProduct;

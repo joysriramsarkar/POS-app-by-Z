@@ -100,8 +100,9 @@ export function useBarcodeScanner(config: BarcodeScannerConfig) {
       if (endChars.includes(event.key)) {
         // If we have a buffer and it's long enough, process it
         if (state.buffer.length >= minBarcodeLength && state.buffer.length <= maxBarcodeLength) {
-          const barcode = state.buffer;
-          debug(`Barcode detected: ${barcode}`);
+          const rawBarcode = state.buffer;
+          const barcode = convertBengaliToEnglishNumerals(rawBarcode);
+          debug(`Barcode detected: ${barcode} (raw: ${rawBarcode})`);
           onBarcodeDetected(barcode);
         }
         // Reset state

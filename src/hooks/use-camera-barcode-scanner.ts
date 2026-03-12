@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { Html5Qrcode, Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 
 interface CameraBarcodeScannerConfig {
   /** Callback when barcode/QR is successfully scanned */
@@ -59,7 +60,6 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
           },
           rememberLastUsedCamera: true,
           showTorchButtonIfSupported: true,
-          facingMode,
           supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
         },
         false
@@ -67,16 +67,19 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
 
       scanner.render(
         (decodedText: string) => {
+          // Normalize Bengali numerals to English numerals
+          const normalizedText = convertBengaliToEnglishNumerals(decodedText);
+          
           // Prevent duplicate scans within 1 second
           const now = Date.now();
-          if (decodedText === lastScannedRef.current && now - lastScannedTimeRef.current < 1000) {
+          if (normalizedText === lastScannedRef.current && now - lastScannedTimeRef.current < 1000) {
             return;
           }
 
-          lastScannedRef.current = decodedText;
+          lastScannedRef.current = normalizedText;
           lastScannedTimeRef.current = now;
 
-          onBarcodeDetected(decodedText);
+          onBarcodeDetected(normalizedText);
         },
         (error: any) => {
           // Ignore continuous scanning errors (they're normal)
