@@ -48,7 +48,11 @@ export function CameraScannerDialog({
   });
 
   const toggleCamera = useCallback(() => {
-    setCameraMode(prev => prev === 'environment' ? 'user' : 'environment');
+    setCameraMode(prev => {
+      const newMode = prev === 'environment' ? 'user' : 'environment';
+      setError(null); // Clear any errors when switching
+      return newMode;
+    });
   }, []);
 
   if (!isSupported) {
@@ -65,8 +69,8 @@ export function CameraScannerDialog({
 
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Camera is not supported on this device or access was denied. Please check your device settings and camera permissions.
+            <AlertDescription className="text-xs sm:text-sm">
+              {error || 'Camera is not supported on this device or access was denied. Please check your device settings and camera permissions.'}
             </AlertDescription>
           </Alert>
 
@@ -92,16 +96,44 @@ export function CameraScannerDialog({
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="text-xs sm:text-sm">
+              {error}
+            </AlertDescription>
           </Alert>
         )}
 
         {/* Scanner container - will be populated by html5-qrcode */}
-        <div
-          id={scannerId}
-          className="w-full bg-black rounded-lg overflow-hidden"
-          style={{ minHeight: '300px' }}
-        />
+        {isInitialized ? (
+          <div className="relative w-full bg-black rounded-lg overflow-hidden border-2 border-gray-700">
+            <div
+              id={scannerId}
+              className="w-full"
+              style={{ 
+                minHeight: '300px',
+                backgroundColor: '#000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            />
+          </div>
+        ) : (
+          <div className="relative w-full bg-gray-900 rounded-lg overflow-hidden border-2 border-gray-700">
+            <div
+              id={scannerId}
+              className="w-full flex items-center justify-center"
+              style={{ 
+                minHeight: '300px',
+                backgroundColor: '#1a1a1a'
+              }}
+            >
+              <div className="text-center">
+                <Camera className="w-12 h-12 text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">Initializing camera...</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {isInitialized && (
           <div className="text-center text-sm text-muted-foreground">
