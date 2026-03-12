@@ -56,6 +56,7 @@ export default function Home() {
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [completedCheckoutSale, setCompletedCheckoutSale] = useState<Sale | null>(null);
 
   // Store hooks
   const products = useProductsStore((state) => state.products);
@@ -249,39 +250,57 @@ export default function Home() {
       };
 
       if (isOnline) {
-        const response = await fetch('/api/sales', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(salePayload),
-        });
+        try {
+          const response = await fetch('/api/sales', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(salePayload),
+          });
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create sale');
-        }
+          if (!response.ok) {
+            let errorMessage = 'Failed to create sale';
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.error || errorMessage;
+            } catch (parseError) {
+              // If response is not JSON, use status text
+              errorMessage = `Server error: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
+          }
 
-        const { data: completedSale } = await response.json();
+          const responseData = await response.json();
+          const completedSale = responseData.data;
 
-        // Set the completed sale for the print dialog
-        setCurrentSale(completedSale);
-        clearCart();
+          // Set the completed sale to trigger success modal in CheckoutDialog
+          setCompletedCheckoutSale(completedSale);
+          setCurrentSale(completedSale);
+          clearCart();
 
-        // refresh products and customers from server
-        const [productsRes, customersRes] = await Promise.all([
-          fetch('/api/products'),
-          fetch('/api/customers'),
-        ]);
+          // refresh products and customers from server
+          const [productsRes, customersRes] = await Promise.all([
+            fetch('/api/products'),
+            fetch('/api/customers'),
+          ]);
 
-        if (productsRes.ok) {
-          const { data: updatedProducts } = await productsRes.json();
-          setProducts(updatedProducts);
-        }
+          if (productsRes.ok) {
+            const { data: updatedProducts } = await productsRes.json();
+            setProducts(updatedProducts);
+          }
 
-        if (customersRes.ok && paymentData.customerId) {
-          // we know how much due to add
-          const dueAmount = paymentData.total - paymentData.amountPaid;
-          if (dueAmount > 0) {
-            updateCustomerDue(paymentData.customerId, dueAmount);
+          if (customersRes.ok && paymentData.customerId) {
+            // we know how much due to add
+            const dueAmount = paymentData.total - paymentData.amountPaid;
+            if (dueAmount > 0) {
+              updateCustomerDue(paymentData.customerId, dueAmount);
+            }
+          }
+        } catch (fetchError) {
+          if (fetchError instanceof Error) {
+            console.error('Fetch error:', fetchError.message);
+            throw fetchError;
+          } else {
+            throw new Error('Network error while creating sale');
           }
         }
       } else {
@@ -346,14 +365,25 @@ export default function Home() {
         }
 
         setCurrentSale(sale);
+        setCompletedCheckoutSale(sale);
         clearCart();
         toast({ title: 'Offline sale saved', description: 'Will sync when connection is restored.' });
       }
     } catch (error: any) {
-      console.error('Checkout failed:', error);
+      const errorMessage = error?.message || 'Unable to complete sale';
+      console.error('Checkout failed:', {
+        error: error,
+        message: errorMessage,
+        stack: error?.stack,
+      });
+      
+      // Reset checkout state on error
+      setCompletedCheckoutSale(null);
+      setCheckoutOpen(false);
+      
       toast({
         title: 'Checkout error',
-        description: error?.message || 'Unable to complete sale',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -367,6 +397,7 @@ export default function Home() {
     clearCart,
     setProducts,
     updateCustomerDue,
+    setCheckoutOpen,
     toast,
   ]);
 
@@ -764,6 +795,14 @@ export default function Home() {
       <CheckoutDialog
         onComplete={handleCheckoutComplete}
         isProcessing={isProcessingPayment}
+        completedSale={completedCheckoutSale}
+        onOpenChange={(open) => {
+          setCheckoutOpen(open);
+          // Reset completed sale when dialog closes
+          if (!open) {
+            setCompletedCheckoutSale(null);
+          }
+        }}
       />
 
       {/* Add Stock Dialog */}

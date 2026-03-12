@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { generateInvoiceNumber } from '@/lib/invoice';
 import {
@@ -37,6 +37,9 @@ interface CheckoutDialogProps {
   onComplete: (paymentData: PaymentData) => void;
   onPrint?: (paymentData: PaymentData) => void;
   isProcessing?: boolean;
+  onCheckoutSuccess?: (sale: Sale) => void;
+  onCheckoutError?: (error: string) => void;
+  completedSale?: Sale | null;
 }
 
 export interface PaymentData {
@@ -59,13 +62,26 @@ export function CheckoutDialog({
   onComplete,
   onPrint,
   isProcessing = false,
+  onCheckoutSuccess,
+  onCheckoutError,
+  completedSale,
 }: CheckoutDialogProps) {
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
   const [lastSale, setLastSale] = useState<Sale | null>(null);
 
   // Track previous open state to detect when dialog opens
   const prevOpenRef = useRef(false);
+
+  // When parent confirms checkout succeeded, show success modal
+  useEffect(() => {
+    if (completedSale) {
+      setIsCheckingOut(false);
+      setShowSuccess(true);
+      setLastSale(completedSale);
+    }
+  }, [completedSale]);
 
   // Store state
   const items = useCartStore((state) => state.items);
@@ -264,7 +280,7 @@ export function CheckoutDialog({
     };
 
     setLastSale(sale);
-    setShowSuccess(true);
+    setIsCheckingOut(true);
 
     let amountPaidForSale = 0;
     if (paymentMethod === 'Due') {
@@ -287,6 +303,8 @@ export function CheckoutDialog({
       total,
     };
 
+    // Call parent to handle API request
+    // Parent will call onCheckoutSuccess/onCheckoutError when done
     onComplete(paymentData);
   }, [
     paymentMethod,
@@ -531,15 +549,17 @@ export function CheckoutDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isProcessing}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isProcessing || isCheckingOut}>
             Cancel
           </Button>
           <Button
             onClick={handleComplete}
-            disabled={!isValidPayment || isProcessing}
+            disabled={!isValidPayment || isProcessing || isCheckingOut}
             className="min-w-30"
           >
-            {isProcessing ? (
+            {isCheckingOut ? (
+              'Processing Payment...'
+            ) : isProcessing ? (
               'Processing...'
             ) : (
               <>

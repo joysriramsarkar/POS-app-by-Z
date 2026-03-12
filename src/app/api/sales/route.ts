@@ -101,48 +101,97 @@ export async function GET(request: NextRequest) {
 // POST /api/sales - Create new sale
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { items, customerId, paymentMethod, amountPaid, discount, tax, notes } = body;
-
-    // Validate items
-    if (!items || items.length === 0) {
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
       return NextResponse.json(
-        { success: false, error: 'No items in sale' },
+        { success: false, error: 'Invalid request body: JSON parsing failed' },
         { status: 400 }
       );
     }
 
-    // Calculate totals
-    const subtotal = items.reduce((sum: number, item: { totalPrice: number }) => sum + item.totalPrice, 0);
-    const totalAmount = subtotal - (discount || 0) + (tax || 0);
+    const { items, customerId, paymentMethod, amountPaid, discount, tax, notes } = body;
+
+    // Validate items
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Items must be a non-empty array' },
+        { status: 400 }
+      );
+    }
+
+    // Validate and convert item structure - ensure all numeric values are actual numbers
+    const validatedItems = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item.productId || !item.productName) {
+        return NextResponse.json(
+          { success: false, error: `Invalid item at index ${i}: missing productId or productName` },
+          { status: 400 }
+        );
+      }
+
+      const quantity = parseFloat(item.quantity);
+      const unitPrice = parseFloat(item.unitPrice);
+      const totalPrice = parseFloat(item.totalPrice);
+
+      if (isNaN(quantity) || isNaN(unitPrice) || isNaN(totalPrice)) {
+        return NextResponse.json(
+          { success: false, error: `Invalid numeric values for item at index ${i}` },
+          { status: 400 }
+        );
+      }
+
+      if (quantity <= 0 || unitPrice < 0 || totalPrice < 0) {
+        return NextResponse.json(
+          { success: false, error: `Invalid item values at index ${i}: quantity must be > 0, prices must be >= 0` },
+          { status: 400 }
+        );
+      }
+
+      validatedItems.push({
+        productId: item.productId,
+        productName: item.productName,
+        quantity,
+        unitPrice,
+        totalPrice,
+      });
+    }
+
+    // Calculate totals with validated numeric values
+    const subtotal = validatedItems.reduce((sum: number, item: { totalPrice: number }) => sum + item.totalPrice, 0);
+    const discountAmount = Math.max(0, parseFloat(discount as any) || 0);
+    const taxAmount = Math.max(0, parseFloat(tax as any) || 0);
+    const totalAmount = subtotal - discountAmount + taxAmount;
+    const amountPaidValue = Math.max(0, parseFloat(amountPaid as any) || 0);
 
     // Determine payment status
     let paymentStatus = 'Paid';
-    if (amountPaid === 0) {
+    if (amountPaidValue === 0) {
       paymentStatus = 'Due';
-    } else if (amountPaid > 0 && amountPaid < totalAmount) {
+    } else if (amountPaidValue > 0 && amountPaidValue < totalAmount) {
       paymentStatus = 'Partial';
     }
 
     // Create sale with items in transaction
     const sale = await db.$transaction(async (tx) => {
-      // Create sale
+      // Create sale with proper Prisma syntax
       const newSale = await tx.sale.create({
         data: {
           invoiceNumber: generateInvoiceNumber(),
-          customerId: customerId || null,
           subtotal,
-          discount: discount || 0,
-          tax: tax || 0,
+          discount: discountAmount,
+          tax: taxAmount,
           totalAmount,
-          amountPaid: amountPaid || 0,
+          amountPaid: amountPaidValue,
           paymentMethod: paymentMethod || 'Cash',
           paymentStatus,
           status: 'Completed',
           notes: notes || null,
           offlineSynced: true,
           items: {
-            create: items.map((item: { productId: string; productName: string; quantity: number; unitPrice: number; totalPrice: number }) => ({
+            create: validatedItems.map((item) => ({
               productId: item.productId,
               productName: item.productName,
               quantity: item.quantity,
@@ -150,6 +199,11 @@ export async function POST(request: NextRequest) {
               totalPrice: item.totalPrice,
             })),
           },
+          ...(customerId && {
+            customer: {
+              connect: { id: customerId },
+            },
+          }),
         },
         include: {
           items: true,
@@ -158,7 +212,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Update stock for each item
-      for (const item of items as Array<{ productId: string; quantity: number }>) {
+      for (const item of validatedItems) {
         // Find product with locking or latest state in tx
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -192,8 +246,18 @@ export async function POST(request: NextRequest) {
       }
 
       // If payment is partially or fully due, update customer's totalDue
-      if (customerId && amountPaid < totalAmount) {
-        const dueAmount = totalAmount - amountPaid;
+      if (customerId && amountPaidValue < totalAmount) {
+        const dueAmount = totalAmount - amountPaidValue;
+        
+        // Verify customer exists before updating
+        const customer = await tx.customer.findUnique({
+          where: { id: customerId },
+        });
+
+        if (!customer) {
+          throw new Error(`Customer ${customerId} not found`);
+        }
+
         await tx.customer.update({
           where: { id: customerId },
           data: {
@@ -203,36 +267,29 @@ export async function POST(request: NextRequest) {
         });
 
         // Create ledger entry
-        const customer = await tx.customer.findUnique({
-          where: { id: customerId },
+        await tx.ledgerEntry.create({
+          data: {
+            customerId,
+            entryType: 'credit',
+            amount: totalAmount,
+            balanceAfter: customer.totalDue + totalAmount,
+            description: `Credit purchase: ${newSale.invoiceNumber}`,
+            referenceId: newSale.id,
+          },
         });
 
-        if (customer) {
-          // Add credit for the total amount
+        // Add debit for the amount paid if partial payment
+        if (amountPaidValue > 0) {
           await tx.ledgerEntry.create({
             data: {
               customerId,
-              entryType: 'credit',
-              amount: totalAmount,
-              balanceAfter: customer.totalDue + totalAmount,
-              description: `Credit purchase: ${newSale.invoiceNumber}`,
+              entryType: 'debit',
+              amount: amountPaidValue,
+              balanceAfter: customer.totalDue + totalAmount - amountPaidValue,
+              description: `Payment for purchase: ${newSale.invoiceNumber}`,
               referenceId: newSale.id,
             },
           });
-
-          // Add debit for the amount paid if partial payment
-          if (amountPaid > 0) {
-            await tx.ledgerEntry.create({
-              data: {
-                customerId,
-                entryType: 'debit',
-                amount: amountPaid,
-                balanceAfter: customer.totalDue + totalAmount - amountPaid,
-                description: `Payment for purchase: ${newSale.invoiceNumber}`,
-                referenceId: newSale.id,
-              },
-            });
-          }
         }
       }
 
@@ -246,9 +303,37 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error creating sale:', error);
+    
+    // Extract meaningful error message
+    let errorMessage = 'Failed to create sale';
+    let statusCode = 500;
+    
+    if (error instanceof Error) {
+      // Check for specific error patterns
+      if (error.message.includes('Insufficient stock')) {
+        errorMessage = error.message;
+        statusCode = 400;
+      } else if (error.message.includes('not found')) {
+        errorMessage = error.message;
+        statusCode = 404;
+      } else if (error.message.includes('No items')) {
+        errorMessage = error.message;
+        statusCode = 400;
+      } else {
+        // For Prisma errors and others, try to extract meaningful message
+        errorMessage = error.message || 'Failed to create sale';
+      }
+    }
+    
+    console.error('Sale creation error details:', {
+      message: errorMessage,
+      originalError: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    
     return NextResponse.json(
-      { success: false, error: 'Failed to create sale' },
-      { status: 500 }
+      { success: false, error: errorMessage },
+      { status: statusCode }
     );
   }
 }
