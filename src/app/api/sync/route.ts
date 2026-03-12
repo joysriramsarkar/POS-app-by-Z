@@ -6,6 +6,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+import { ProductInputSchema, SaleInputSchema, CustomerInputSchema } from '@/schemas';
+
+const ProductSyncPayloadSchema = z.union([
+  ProductInputSchema,
+  z.object({
+    productId: z.string(),
+    quantityChange: z.number(),
+  }),
+]);
 
 // GET /api/sync - Get pending sync items or sync status
 export async function GET(request: NextRequest) {
@@ -69,15 +79,30 @@ export async function POST(request: NextRequest) {
     let result;
 
     switch (entityType) {
-      case 'Sale':
-        result = await syncSale(parsedPayload, action);
+      case 'Sale': {
+        const saleResult = SaleInputSchema.safeParse(parsedPayload);
+        if (!saleResult.success) {
+          return NextResponse.json({ success: false, error: 'Invalid Sale payload' }, { status: 400 });
+        }
+        result = await syncSale(saleResult.data, action);
         break;
-      case 'Customer':
-        result = await syncCustomer(parsedPayload, action);
+      }
+      case 'Customer': {
+        const customerResult = CustomerInputSchema.safeParse(parsedPayload);
+        if (!customerResult.success) {
+          return NextResponse.json({ success: false, error: 'Invalid Customer payload' }, { status: 400 });
+        }
+        result = await syncCustomer(customerResult.data, action);
         break;
-      case 'Product':
-        result = await syncProduct(parsedPayload, action);
+      }
+      case 'Product': {
+        const productResult = ProductSyncPayloadSchema.safeParse(parsedPayload);
+        if (!productResult.success) {
+          return NextResponse.json({ success: false, error: 'Invalid Product payload' }, { status: 400 });
+        }
+        result = await syncProduct(productResult.data, action);
         break;
+      }
       default:
         return NextResponse.json(
           { success: false, error: 'Unknown entity type' },
@@ -114,11 +139,14 @@ export async function POST(request: NextRequest) {
 }
 
 // Sync sale from offline
-async function syncSale(saleData: Record<string, unknown>, action: string) {
+async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: string) {
   if (action === 'create') {
+    if (!saleData.invoiceNumber) {
+      throw new Error('Invoice number is required for sync');
+    }
     // Check if sale already exists (prevent duplicates)
     const existing = await db.sale.findUnique({
-      where: { invoiceNumber: saleData.invoiceNumber as string },
+      where: { invoiceNumber: saleData.invoiceNumber },
     });
 
     if (existing) {
@@ -129,26 +157,26 @@ async function syncSale(saleData: Record<string, unknown>, action: string) {
     return db.$transaction(async (tx) => {
       const sale = await tx.sale.create({
         data: {
-          id: saleData.id as string,
+          id: saleData.id,
           invoiceNumber: saleData.invoiceNumber as string,
-          customerId: (saleData.customerId as string) || null,
-          subtotal: saleData.subtotal as number,
-          discount: saleData.discount as number,
-          tax: saleData.tax as number,
-          totalAmount: saleData.totalAmount as number,
-          amountPaid: (saleData.amountPaid as number) || 0,
-          paymentMethod: saleData.paymentMethod as string,
-          paymentStatus: saleData.paymentStatus as string,
-          status: saleData.status as string,
-          notes: (saleData.notes as string) || null,
+          customerId: saleData.customerId || null,
+          subtotal: saleData.subtotal || 0,
+          discount: saleData.discount || 0,
+          tax: saleData.tax || 0,
+          totalAmount: saleData.totalAmount || 0,
+          amountPaid: saleData.amountPaid || 0,
+          paymentMethod: saleData.paymentMethod || 'Cash',
+          paymentStatus: saleData.paymentStatus || 'Paid',
+          status: saleData.status || 'Completed',
+          notes: saleData.notes || null,
           offlineSynced: true,
           items: {
-            create: (saleData.items as Array<Record<string, unknown>>).map((item) => ({
-              productId: item.productId as string,
-              productName: item.productName as string,
-              quantity: item.quantity as number,
-              unitPrice: item.unitPrice as number,
-              totalPrice: item.totalPrice as number,
+            create: saleData.items.map((item) => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
             })),
           },
         },
@@ -156,24 +184,24 @@ async function syncSale(saleData: Record<string, unknown>, action: string) {
       });
 
       // Update stock
-      for (const item of saleData.items as Array<Record<string, unknown>>) {
+      for (const item of saleData.items) {
         await tx.product.update({
-          where: { id: item.productId as string },
+          where: { id: item.productId },
           data: {
-            currentStock: { decrement: item.quantity as number },
+            currentStock: { decrement: item.quantity },
             updatedAt: new Date(),
           },
         });
       }
 
       // Update customer due if applicable
-      const amountPaid = (saleData.amountPaid as number) || 0;
-      const totalAmount = saleData.totalAmount as number;
+      const amountPaid = saleData.amountPaid || 0;
+      const totalAmount = saleData.totalAmount || 0;
 
       if (saleData.customerId && amountPaid < totalAmount) {
         const dueAmount = totalAmount - amountPaid;
         await tx.customer.update({
-          where: { id: saleData.customerId as string },
+          where: { id: saleData.customerId },
           data: {
             totalDue: { increment: dueAmount },
             updatedAt: new Date(),
@@ -182,14 +210,14 @@ async function syncSale(saleData: Record<string, unknown>, action: string) {
 
         // Add ledger entries for double-entry bookkeeping tracking
         const customer = await tx.customer.findUnique({
-          where: { id: saleData.customerId as string },
+          where: { id: saleData.customerId },
         });
 
         if (customer) {
           // Add credit for the total amount
           await tx.ledgerEntry.create({
             data: {
-              customerId: saleData.customerId as string,
+              customerId: saleData.customerId,
               entryType: 'credit',
               amount: totalAmount,
               balanceAfter: customer.totalDue + totalAmount,
@@ -202,7 +230,7 @@ async function syncSale(saleData: Record<string, unknown>, action: string) {
           if (amountPaid > 0) {
             await tx.ledgerEntry.create({
               data: {
-                customerId: saleData.customerId as string,
+                customerId: saleData.customerId,
                 entryType: 'debit',
                 amount: amountPaid,
                 balanceAfter: customer.totalDue + totalAmount - amountPaid,
@@ -222,12 +250,12 @@ async function syncSale(saleData: Record<string, unknown>, action: string) {
 }
 
 // Sync customer from offline
-async function syncCustomer(customerData: Record<string, unknown>, action: string) {
+async function syncCustomer(customerData: z.infer<typeof CustomerInputSchema>, action: string) {
   if (action === 'create') {
     // Check if customer already exists
     if (customerData.phone) {
       const existing = await db.customer.findUnique({
-        where: { phone: customerData.phone as string },
+        where: { phone: customerData.phone },
       });
 
       if (existing) {
@@ -237,28 +265,31 @@ async function syncCustomer(customerData: Record<string, unknown>, action: strin
 
     return db.customer.create({
       data: {
-        id: customerData.id as string,
-        name: customerData.name as string,
-        phone: (customerData.phone as string) || null,
-        address: (customerData.address as string) || null,
-        notes: (customerData.notes as string) || null,
-        totalDue: customerData.totalDue as number,
-        totalPaid: customerData.totalPaid as number,
+        id: customerData.id,
+        name: customerData.name,
+        phone: customerData.phone || null,
+        address: customerData.address || null,
+        notes: customerData.notes || null,
+        totalDue: customerData.totalDue || 0,
+        totalPaid: customerData.totalPaid || 0,
         isActive: true,
       },
     });
   }
 
   if (action === 'update') {
+    if (!customerData.id) {
+      throw new Error('Customer ID is required for update');
+    }
     return db.customer.update({
-      where: { id: customerData.id as string },
+      where: { id: customerData.id },
       data: {
-        name: customerData.name as string,
-        phone: (customerData.phone as string) || null,
-        address: (customerData.address as string) || null,
-        notes: (customerData.notes as string) || null,
-        totalDue: customerData.totalDue as number,
-        totalPaid: customerData.totalPaid as number,
+        name: customerData.name,
+        phone: customerData.phone || null,
+        address: customerData.address || null,
+        notes: customerData.notes || null,
+        totalDue: customerData.totalDue || 0,
+        totalPaid: customerData.totalPaid || 0,
         updatedAt: new Date(),
       },
     });
@@ -268,15 +299,11 @@ async function syncCustomer(customerData: Record<string, unknown>, action: strin
 }
 
 // Sync product updates (primarily stock changes) from offline
-async function syncProduct(productData: Record<string, unknown>, action: string) {
+async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>, action: string) {
   if (action === 'update') {
-    const { productId, quantityChange } = productData as any;
+    if ('productId' in productData && 'quantityChange' in productData) {
+      const { productId, quantityChange } = productData;
 
-    if (typeof productId !== 'string') {
-      throw new Error('Invalid productId');
-    }
-
-    if (typeof quantityChange === 'number') {
       return db.$transaction(async (tx) => {
         const updated = await tx.product.update({
           where: { id: productId },
@@ -300,12 +327,44 @@ async function syncProduct(productData: Record<string, unknown>, action: string)
     }
 
     // fallback to upsert entire object if no quantityChange provided
-    const { id, ...fields } = productData as any;
-    return db.product.upsert({
-      where: { id },
-      create: productData as any,
-      update: fields,
-    });
+    if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
+      if (!productData.id) {
+        throw new Error('Product ID is required for upsert sync');
+      }
+
+      const { id, barcode, name, nameBn, category, buyingPrice, sellingPrice, unit, currentStock, minStockLevel, isActive } = productData;
+
+      return db.product.upsert({
+        where: { id },
+        create: {
+          id,
+          barcode,
+          name,
+          nameBn,
+          category,
+          buyingPrice,
+          sellingPrice,
+          unit,
+          currentStock,
+          minStockLevel,
+          isActive,
+        },
+        update: {
+          barcode,
+          name,
+          nameBn,
+          category,
+          buyingPrice,
+          sellingPrice,
+          unit,
+          currentStock,
+          minStockLevel,
+          isActive,
+        },
+      });
+    }
+
+    throw new Error('Invalid product data payload');
   }
 
   throw new Error(`Unknown action: ${action}`);

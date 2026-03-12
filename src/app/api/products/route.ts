@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import type { Product } from '@/types/pos';
+import { ProductInputSchema } from '@/schemas';
 
 // GET /api/products - Fetch all products
 export async function GET(request: NextRequest) {
@@ -61,46 +62,29 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    // Validate required fields
-    const errors: string[] = [];
-
-    if (!body.name || !String(body.name).trim()) {
-      errors.push('Product name is required');
-    }
-
-    if (!body.category || !String(body.category).trim()) {
-      errors.push('Category is required');
-    }
-
-    const buyingPrice = parseFloat(body.buyingPrice);
-    if (isNaN(buyingPrice) || buyingPrice < 0) {
-      errors.push('Valid buying price is required');
-    }
-
-    const sellingPrice = parseFloat(body.sellingPrice);
-    if (isNaN(sellingPrice) || sellingPrice < 0) {
-      errors.push('Valid selling price is required');
-    }
-
-    if (errors.length > 0) {
+    // Validate with Zod
+    const result = ProductInputSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, error: errors.join(', ') },
+        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
         { status: 400 }
       );
     }
     
+    const validatedData = result.data;
+
     const product = await db.product.create({
       data: {
-        barcode: body.barcode ? String(body.barcode).trim() : null,
-        name: String(body.name).trim(),
-        nameBn: body.nameBn ? String(body.nameBn).trim() : null,
-        category: String(body.category).trim(),
-        buyingPrice: buyingPrice,
-        sellingPrice: sellingPrice,
-        unit: body.unit || 'piece',
-        currentStock: parseFloat(body.currentStock) || 0,
-        minStockLevel: parseFloat(body.minStockLevel) || 5,
-        isActive: true,
+        barcode: validatedData.barcode ? String(validatedData.barcode).trim() : null,
+        name: String(validatedData.name).trim(),
+        nameBn: validatedData.nameBn ? String(validatedData.nameBn).trim() : null,
+        category: String(validatedData.category).trim(),
+        buyingPrice: validatedData.buyingPrice,
+        sellingPrice: validatedData.sellingPrice,
+        unit: validatedData.unit,
+        currentStock: validatedData.currentStock,
+        minStockLevel: validatedData.minStockLevel,
+        isActive: validatedData.isActive,
       },
     });
 
@@ -137,23 +121,37 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, ...data } = body;
 
-    if (!id) {
+    if (!body.id) {
       return NextResponse.json(
         { success: false, error: 'Product ID is required' },
         { status: 400 }
       );
     }
 
+    const result = ProductInputSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
+        { status: 400 }
+      );
+    }
+
+    const { id, ...validatedData } = result.data;
+
     const product = await db.product.update({
-      where: { id },
+      where: { id: body.id },
       data: {
-        ...data,
-        buyingPrice: data.buyingPrice ? parseFloat(data.buyingPrice) : undefined,
-        sellingPrice: data.sellingPrice ? parseFloat(data.sellingPrice) : undefined,
-        currentStock: data.currentStock ? parseFloat(data.currentStock) : undefined,
-        minStockLevel: data.minStockLevel ? parseFloat(data.minStockLevel) : undefined,
+        barcode: validatedData.barcode !== undefined ? (validatedData.barcode ? String(validatedData.barcode).trim() : null) : undefined,
+        name: validatedData.name !== undefined ? String(validatedData.name).trim() : undefined,
+        nameBn: validatedData.nameBn !== undefined ? (validatedData.nameBn ? String(validatedData.nameBn).trim() : null) : undefined,
+        category: validatedData.category !== undefined ? String(validatedData.category).trim() : undefined,
+        buyingPrice: validatedData.buyingPrice,
+        sellingPrice: validatedData.sellingPrice,
+        unit: validatedData.unit,
+        currentStock: validatedData.currentStock,
+        minStockLevel: validatedData.minStockLevel,
+        isActive: validatedData.isActive,
         updatedAt: new Date(),
       },
     });

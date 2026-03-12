@@ -4,29 +4,23 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-
-interface StockEntryRequest {
-  productId: string;
-  quantity: number;
-  purchasePrice: number;
-  date?: string;
-  supplierId?: string;
-  notes?: string;
-}
+import { StockEntryInputSchema } from '@/schemas';
 
 // POST /api/stock-entry - Create stock entry (purchase)
 export async function POST(request: NextRequest) {
   try {
-    const body: StockEntryRequest = await request.json();
-    const { productId, quantity, purchasePrice, date, supplierId, notes } = body;
+    const body = await request.json();
 
-    // Validate input
-    if (!productId || !quantity || quantity <= 0 || purchasePrice == null) {
+    // Validate with Zod
+    const result = StockEntryInputSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, error: 'Invalid stock entry data' },
+        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
         { status: 400 }
       );
     }
+
+    const { productId, quantity, purchasePrice, date, supplierId, notes } = result.data;
 
     // Update stock in transaction
     const result = await db.$transaction(async (tx) => {
