@@ -5,7 +5,8 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-const dbPath = path.join(process.cwd(), 'prisma', 'dev.db')
+const dbPath = path.join(process.cwd(), 'prisma', 'data.db')
+const databaseUrl = process.env.DATABASE_URL || `file:${dbPath}`
 
 export const db =
   globalForPrisma.prisma ??
@@ -13,7 +14,7 @@ export const db =
     log: ['query'],
     datasources: {
       db: {
-        url: `file:${dbPath}`,
+        url: databaseUrl,
       },
     },
   })
