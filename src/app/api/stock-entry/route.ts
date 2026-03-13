@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const { productId, quantity, purchasePrice, date, supplierId, notes } = result.data;
 
     // Update stock in transaction
-    const result = await db.$transaction(async (tx) => {
+    const transactionResult = await db.$transaction(async (tx) => {
       // Verify product exists
       const product = await tx.product.findUnique({
         where: { id: productId },
@@ -120,8 +120,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: result,
-      message: `Stock updated: ${quantity} units added to ${result.name}`,
+      data: transactionResult,
+      message: `Stock updated: ${quantity} units added to ${transactionResult.name}`,
     });
   } catch (error) {
     console.error('Error creating stock entry:', error);

@@ -360,7 +360,7 @@ export function ProductDialog({
                 onChange={(e) => setCurrentStock(e.target.value)}
                 placeholder="0"
                 min="0"
-                step={unit === 'piece' ? '1' : '0.1'}
+                step={['kg', 'liter'].includes(unit) ? '0.1' : '1'}
               />
             </div>
             <div className="space-y-2">
@@ -372,7 +372,7 @@ export function ProductDialog({
                 onChange={(e) => setMinStockLevel(e.target.value)}
                 placeholder="5"
                 min="0"
-                step="1"
+                step={['kg', 'liter'].includes(unit) ? '0.1' : '1'}
               />
             </div>
           </div>

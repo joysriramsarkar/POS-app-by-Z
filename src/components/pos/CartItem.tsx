@@ -42,10 +42,16 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
     }).format(price);
   };
 
+  const getStep = (unit: string) => {
+    if (['kg', 'liter'].includes(unit)) return 0.1;
+    if (['gram', 'ml'].includes(unit)) return 50;
+    return 1;
+  };
+
   const handleQuantityChange = useCallback(
     (newQuantity: number) => {
-      // Ensure we don't go below 0 or above stock
-      const validatedQuantity = Math.max(0, Math.min(newQuantity, item.availableStock));
+      // Ensure we don't go below 0
+      const validatedQuantity = Math.max(0, newQuantity);
       if (validatedQuantity === 0) {
         // If quantity becomes 0, remove the item
         removeItem(item.id);
@@ -53,22 +59,25 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
         updateQuantity(item.id, validatedQuantity);
       }
     },
-    [item.id, item.availableStock, updateQuantity, removeItem]
+    [item.id, updateQuantity, removeItem]
   );
 
   const handleIncrement = useCallback(() => {
-    const newQty = item.quantity + 1;
-    if (newQty <= item.availableStock) {
-      updateQuantity(item.id, newQty);
-    }
-  }, [item.quantity, item.availableStock, updateQuantity]);
+    const step = getStep(item.unit);
+    // Use Number/toFixed to avoid floating point math issues like 0.1 + 0.2 = 0.30000000000000004
+    const newQty = Number((item.quantity + step).toFixed(3));
+    updateQuantity(item.id, newQty);
+  }, [item.id, item.quantity, item.unit, updateQuantity]);
 
   const handleDecrement = useCallback(() => {
-    const newQty = item.quantity - 1;
+    const step = getStep(item.unit);
+    const newQty = Number((item.quantity - step).toFixed(3));
     if (newQty > 0) {
       updateQuantity(item.id, newQty);
+    } else {
+      removeItem(item.id);
     }
-  }, [item.quantity, updateQuantity]);
+  }, [item.id, item.quantity, item.unit, updateQuantity, removeItem]);
 
   const handleRemove = useCallback(() => {
     removeItem(item.id);
@@ -192,12 +201,8 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
             <Button
               variant="outline"
               size="sm"
-              className={cn(
-                'h-8 w-8 p-0 touch-manipulation',
-                isAtStockLimit && 'opacity-50 cursor-not-allowed'
-              )}
+              className="h-8 w-8 p-0 touch-manipulation"
               onClick={handleIncrement}
-              disabled={isAtStockLimit}
               aria-label="Increase quantity"
             >
               <Plus className="w-4 h-4" />
