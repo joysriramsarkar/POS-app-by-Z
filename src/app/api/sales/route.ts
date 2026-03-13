@@ -115,8 +115,11 @@ export async function POST(request: NextRequest) {
     // Validate with Zod
     const result = SaleInputSchema.safeParse(body);
     if (!result.success) {
+      const errors = Object.values(result.error.flatten().fieldErrors)
+        .flat()
+        .join(', ');
       return NextResponse.json(
-        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
+        { success: false, error: errors || 'Validation failed' },
         { status: 400 }
       );
     }

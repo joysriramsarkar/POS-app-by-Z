@@ -92,8 +92,11 @@ export async function POST(request: NextRequest) {
 
     const result = CustomerInputSchema.safeParse(body);
     if (!result.success) {
+      const errors = Object.values(result.error.flatten().fieldErrors)
+        .flat()
+        .join(', ');
       return NextResponse.json(
-        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
+        { success: false, error: errors || 'Validation failed' },
         { status: 400 }
       );
     }
@@ -154,8 +157,11 @@ export async function PUT(request: NextRequest) {
 
     const result = CustomerInputSchema.safeParse(body);
     if (!result.success) {
+      const errors = Object.values(result.error.flatten().fieldErrors)
+        .flat()
+        .join(', ');
       return NextResponse.json(
-        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
+        { success: false, error: errors || 'Validation failed' },
         { status: 400 }
       );
     }
