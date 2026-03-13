@@ -7,7 +7,7 @@
 // ============================================================================
 
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 
 interface CameraBarcodeScannerConfig {
@@ -49,7 +49,7 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
     facingMode = 'environment',
   } = config;
 
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   const isInitializingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(false);
   
@@ -75,7 +75,11 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
 
     try {
       // Await the scanner cleanup promise to complete fully.
-      await scannerRef.current.clear();
+      const state = scannerRef.current.getState();
+      if (state === 2) { // Html5QrcodeScannerState.SCANNING = 2
+        await scannerRef.current.stop();
+      }
+      scannerRef.current.clear();
       console.log('[Scanner] Scanner cleared successfully.');
     } catch (error) {
       console.error('[Scanner] Error during scanner.clear(), but proceeding with close:', error);
@@ -111,22 +115,15 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
       container.innerHTML = ''; // Clear previous content
 
       // Initialize the scanner library.
-      const scanner = new Html5QrcodeScanner(
-        SCANNER_ID,
+      const scanner = new Html5Qrcode(SCANNER_ID);
+
+      // Start the scanner. This is an async operation.
+      await scanner.start(
+        { facingMode: facingMode },
         {
           fps: 10,
           qrbox: (w, h) => { const size = Math.min(w, h) * 0.75; return { width: size, height: size }; },
-          rememberLastUsedCamera: true,
-          supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-          videoConstraints: {
-            facingMode: { ideal: facingMode },
-          }
         },
-        false // verbose
-      );
-
-      // Render the scanner. This is an async operation.
-      await scanner.render(
         (decodedText: string) => {
           const normalizedText = convertBengaliToEnglishNumerals(decodedText);
           const now = Date.now();
@@ -139,8 +136,10 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
         },
         (error: any) => {
           // These errors happen continuously during scanning, ignore them.
-          if (!error?.message?.includes('No QR code found')) {
-            console.warn('[Scanner] Non-critical scan error:', error?.message);
+          // Error might be a string or an object depending on the library version
+          const errorMsg = typeof error === 'string' ? error : error?.message;
+          if (errorMsg && !errorMsg.includes('No MultiFormat Readers were able to detect the code') && !errorMsg.includes('No barcode or QR code detected')) {
+            // We usually don't need to log scanning failures to console as they happen on every frame
           }
         }
       );
@@ -152,7 +151,11 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
         console.log('[Scanner] ✅ Scanner initialized successfully.');
       } else {
         console.log('[Scanner] Component unmounted during initialization, cleaning up.');
-        await scanner.clear();
+        const state = scanner.getState();
+        if (state === 2) {
+          await scanner.stop();
+        }
+        scanner.clear();
       }
 
     } catch (error: any) {
@@ -197,10 +200,21 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
     return () => {
       if (scannerRef.current) {
         console.warn('[Scanner] Unsafe unmount cleanup triggered. The scanner was not shut down correctly.');
-        scannerRef.current.clear().catch(err => {
-          console.error('[Scanner] Unsafe cleanup failed:', err);
-        });
+        const scanner = scannerRef.current;
         scannerRef.current = null;
+
+        const cleanup = async () => {
+          try {
+            const state = scanner.getState();
+            if (state === 2) {
+              await scanner.stop();
+            }
+            scanner.clear();
+          } catch (err) {
+            console.error('[Scanner] Unsafe cleanup failed:', err);
+          }
+        };
+        cleanup();
       }
     };
   }, []);

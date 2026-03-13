@@ -95,7 +95,7 @@ export function CameraScannerDialog({
         {/* Blackboxed container for the scanner */}
         <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden border-2 border-gray-700">
           {/* This div is surrendered to the html5-qrcode library. React will not touch its children. */}
-          <div id={scannerId} dangerouslySetInnerHTML={{ __html: '' }} />
+          <div id={scannerId} />
 
           {/* Loading / Shutdown Overlay */}
           {(!isInitialized || isShuttingDown) && (
