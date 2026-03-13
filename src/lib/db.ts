@@ -1,19 +1,8 @@
 import { PrismaClient } from '@prisma/client'
-import path from 'path'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
-
-// Always use absolute path for SQLite database to ensure consistent resolution
-const getDbPath = () => {
-  const dbPath = path.resolve(process.cwd(), 'data', 'pos.db')
-  // Ensure proper file: protocol with absolute path
-  // On Windows, use forward slashes for SQLite
-  return `file:${dbPath.replace(/\\/g, '/')}`
-}
-
-const databaseUrl = process.env.DATABASE_URL || getDbPath()
 
 /**
  * Strict singleton factory function for PrismaClient
@@ -22,32 +11,13 @@ const databaseUrl = process.env.DATABASE_URL || getDbPath()
 function createPrismaClient(): PrismaClient {
   const client = new PrismaClient({
     log: ['query'],
-    datasources: {
-      db: {
-        url: databaseUrl,
-      },
-    },
   })
 
-  // Enable WAL (Write-Ahead Logging) mode for SQLite only (PostgreSQL doesn't support PRAGMA)
-  client.$connect().then(async () => {
-    try {
-      // Only run PRAGMA commands for SQLite databases
-      const isPostgreSQL = databaseUrl?.includes('postgresql')
-      if (!isPostgreSQL) {
-        // Enable WAL mode for better concurrent access (use $queryRawUnsafe for PRAGMA statements that return results)
-        await client.$queryRawUnsafe('PRAGMA journal_mode = WAL;')
-        // Set synchronous mode to NORMAL for better performance with WAL
-        await client.$queryRawUnsafe('PRAGMA synchronous = NORMAL;')
-        console.log('[PrismaClient] WAL mode enabled and synchronous set to NORMAL')
-      } else {
-        console.log('[PrismaClient] Connected to PostgreSQL (PRAGMA commands skipped)')
-      }
-    } catch (error) {
-      console.error('[PrismaClient] Failed to initialize database:', error)
-    }
+  // Log successful connection to PostgreSQL
+  client.$connect().then(() => {
+    console.log('[PrismaClient] Successfully connected to PostgreSQL (Supabase)')
   }).catch((error) => {
-    console.error('[PrismaClient] Connection pool initialization error:', error)
+    console.error('[PrismaClient] Connection failed:', error)
   })
 
   return client
