@@ -260,10 +260,13 @@ interface ProductsState {
   categories: string[];
   isLoading: boolean;
   lastUpdated: number | null;
+  hasMore: boolean;
+  nextCursor: string | null;
 }
 
 interface ProductsActions {
-  setProducts: (products: Product[]) => void;
+  setProducts: (products: Product[], hasMore?: boolean, nextCursor?: string | null) => void;
+  appendProducts: (products: Product[], hasMore: boolean, nextCursor: string | null) => void;
   setCategories: (categories: string[]) => void;
   setLoading: (loading: boolean) => void;
   updateProductStock: (productId: string, quantityChange: number) => void;
@@ -279,10 +282,29 @@ export const useProductsStore = create<ProductsState & ProductsActions>((set, ge
   categories: [],
   isLoading: true,
   lastUpdated: null,
+  hasMore: false,
+  nextCursor: null,
 
-  setProducts: (products) => {
+  setProducts: (products, hasMore = false, nextCursor = null) => {
     const categories = [...new Set(products.map((p) => p.category))].sort();
-    set({ products, categories, lastUpdated: Date.now(), isLoading: false });
+    set({ products, categories, lastUpdated: Date.now(), isLoading: false, hasMore, nextCursor });
+  },
+
+  appendProducts: (newProducts, hasMore, nextCursor) => {
+    set((state) => {
+      // Filter out products that might already exist to avoid duplicates
+      const existingIds = new Set(state.products.map(p => p.id));
+      const filteredNew = newProducts.filter(p => !existingIds.has(p.id));
+      const combinedProducts = [...state.products, ...filteredNew];
+      const categories = [...new Set(combinedProducts.map((p) => p.category))].sort();
+      return {
+        products: combinedProducts,
+        categories,
+        lastUpdated: Date.now(),
+        hasMore,
+        nextCursor
+      };
+    });
   },
 
   setCategories: (categories) => set({ categories }),

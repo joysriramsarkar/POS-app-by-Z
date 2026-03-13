@@ -17,6 +17,9 @@ export async function GET() {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
     // 1. Get Today's Sales and Orders
     const salesToday = await db.sale.aggregate({
       where: {
@@ -34,6 +37,23 @@ export async function GET() {
       },
     });
 
+    // 1b. Get Yesterday's Sales and Orders
+    const salesYesterday = await db.sale.aggregate({
+      where: {
+        createdAt: {
+          gte: yesterday,
+          lt: today,
+        },
+        status: 'Completed',
+      },
+      _sum: {
+        totalAmount: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
     // 2. Get Total Due Payments
     const totalDue = await db.customer.aggregate({
       _sum: {
@@ -41,10 +61,29 @@ export async function GET() {
       },
     });
 
+    const todaySales = salesToday._sum.totalAmount || 0;
+    const todayOrders = salesToday._count.id || 0;
+    const yesterdaySales = salesYesterday._sum.totalAmount || 0;
+    const yesterdayOrders = salesYesterday._count.id || 0;
+
+    let salesComparison = 'N/A';
+    if (yesterdaySales > 0) {
+      const diff = ((todaySales - yesterdaySales) / yesterdaySales) * 100;
+      salesComparison = `${diff >= 0 ? '+' : ''}${diff.toFixed(1)}% from yesterday`;
+    }
+
+    let ordersComparison = 'N/A';
+    if (yesterdayOrders > 0) {
+      const diff = todayOrders - yesterdayOrders;
+      ordersComparison = `${diff >= 0 ? '+' : ''}${diff} from yesterday`;
+    }
+
     const stats = {
-      todaySales: salesToday._sum.totalAmount || 0,
-      todayOrders: salesToday._count.id || 0,
+      todaySales,
+      todayOrders,
       duePayments: totalDue._sum.totalDue || 0,
+      salesComparison,
+      ordersComparison,
     };
 
     return NextResponse.json({

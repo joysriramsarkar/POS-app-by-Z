@@ -32,10 +32,14 @@ export function ProductGrid({
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const storeProducts = useProductsStore((state) => state.products);
   const storeCategories = useProductsStore((state) => state.categories);
+  const hasMore = useProductsStore((state) => state.hasMore);
+  const nextCursor = useProductsStore((state) => state.nextCursor);
+  const appendProducts = useProductsStore((state) => state.appendProducts);
   const storeSearchQuery = useUIStore((state) => state.searchQuery);
   const selectedCategoryId = useUIStore((state) => state.selectedCategoryId);
   const setSearchQuery = useUIStore((state) => state.setSearchQuery);
@@ -140,6 +144,23 @@ export function ProductGrid({
     clearSearch();
     setSelectedCategoryId(null);
   }, [clearSearch, setSelectedCategoryId]);
+
+  const loadMoreProducts = useCallback(async () => {
+    if (isLoadingMore || !hasMore || !nextCursor || externalProducts) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await fetch(`/api/products?limit=50&cursor=${nextCursor}`);
+      if (res.ok) {
+        const { data, nextCursor: newNextCursor } = await res.json();
+        const hasMoreData = !!newNextCursor;
+        appendProducts(data, hasMoreData, newNextCursor);
+      }
+    } catch (error) {
+      console.error('Error loading more products', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMore, nextCursor, externalProducts, appendProducts]);
 
   return (
     <div className="flex flex-col h-full">
@@ -321,6 +342,17 @@ export function ProductGrid({
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {!externalProducts && hasMore && (
+            <div className="flex justify-center mt-6 mb-4">
+              <Button
+                variant="outline"
+                onClick={loadMoreProducts}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? 'Loading...' : 'Load More Products'}
+              </Button>
             </div>
           )}
         </div>

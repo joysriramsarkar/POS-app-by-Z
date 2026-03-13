@@ -109,10 +109,11 @@ function POSDashboard() {
       setLoading(true);
       try {
         // Fetch from API to get actual DB data
-        const res = await fetch('/api/products');
+        const res = await fetch('/api/products?limit=50');
         if (res.ok) {
-          const { data: products } = await res.json();
-          setProducts(products);
+          const { data: products, nextCursor } = await res.json();
+          const hasMore = !!nextCursor;
+          setProducts(products, hasMore, nextCursor);
           // Update cache
           await ProductsDB.upsertMany(products);
         } else {
@@ -190,12 +191,13 @@ function POSDashboard() {
 
         // refresh caches after sync
         const [prods, custs] = await Promise.all([
-          fetch('/api/products'),
+          fetch('/api/products?limit=50'),
           fetch('/api/customers'),
         ]);
         if (prods.ok) {
-          const { data } = await prods.json();
-          setProducts(data);
+          const { data, nextCursor } = await prods.json();
+          const hasMore = !!nextCursor;
+          setProducts(data, hasMore, nextCursor);
         }
         if (custs.ok) {
           const { data } = await custs.json();
@@ -286,13 +288,14 @@ function POSDashboard() {
 
           // refresh products and customers from server
           const [productsRes, customersRes] = await Promise.all([
-            fetch('/api/products'),
+            fetch('/api/products?limit=50'),
             fetch('/api/customers'),
           ]);
 
           if (productsRes.ok) {
-            const { data: updatedProducts } = await productsRes.json();
-            setProducts(updatedProducts);
+            const { data: updatedProducts, nextCursor } = await productsRes.json();
+            const hasMore = !!nextCursor;
+            setProducts(updatedProducts, hasMore, nextCursor);
           }
 
           if (customersRes.ok && paymentData.customerId) {
@@ -448,10 +451,11 @@ function POSDashboard() {
         updateProductStock(data.productId, data.quantity);
 
         // Refetch all products to sync database changes
-        const productsRes = await fetch('/api/products');
+        const productsRes = await fetch('/api/products?limit=50');
         if (productsRes.ok) {
-          const { data: refreshedProducts } = await productsRes.json();
-          setProducts(refreshedProducts);
+          const { data: refreshedProducts, nextCursor } = await productsRes.json();
+          const hasMore = !!nextCursor;
+          setProducts(refreshedProducts, hasMore, nextCursor);
         }
 
         console.log('Stock entry successful:', updatedProduct);

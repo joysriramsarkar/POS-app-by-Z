@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category');
     const search = searchParams.get('search');
     const includeInactive = searchParams.get('includeInactive') === 'true';
+    const cursor = searchParams.get('cursor');
+    const limitParam = searchParams.get('limit');
+
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -38,14 +42,34 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const products = await db.product.findMany({
+    const findManyArgs: any = {
       where,
-      orderBy: [{ category: 'asc' }, { name: 'asc' }],
-    });
+      orderBy: [{ category: 'asc' }, { name: 'asc' }, { id: 'asc' }],
+    };
+
+    if (limit) {
+      findManyArgs.take = limit + 1; // Fetch one extra to check if there are more
+    }
+
+    if (cursor) {
+      findManyArgs.cursor = { id: cursor };
+      // Note: when using cursor pagination, typically you skip the cursor itself,
+      // but if the client sends the last ID they saw, we should skip it.
+      findManyArgs.skip = 1;
+    }
+
+    const products = await db.product.findMany(findManyArgs);
+
+    let nextCursor: string | undefined = undefined;
+    if (limit && products.length > limit) {
+      const nextItem = products.pop();
+      nextCursor = nextItem?.id;
+    }
 
     return NextResponse.json({
       success: true,
       data: products,
+      nextCursor,
     });
   } catch (error) {
     console.error('Error fetching products:', error);

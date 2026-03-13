@@ -26,6 +26,8 @@ interface DashboardStats {
   todayOrders: number;
   lowStockCount: number;
   duePayments: number;
+  salesComparison?: string;
+  ordersComparison?: string;
 }
 
 interface RecentTransaction {
@@ -49,6 +51,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     todayOrders: 0,
     lowStockCount: 0,
     duePayments: 0,
+    salesComparison: 'N/A',
+    ordersComparison: 'N/A',
   });
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   
@@ -158,8 +162,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <CardContent>
                 <div className="text-2xl font-bold text-green-700">{formatPrice(stats.todaySales)}</div>
                 <p className="text-xs text-green-600 flex items-center mt-1">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  +12% from yesterday
+                  {stats.salesComparison === 'N/A' ? null : stats.salesComparison?.startsWith('-') ? (
+                    <TrendingDown className="w-3 h-3 mr-1" />
+                  ) : (
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                  )}
+                  {stats.salesComparison || 'N/A'}
                 </p>
               </CardContent>
             </Card>
@@ -173,8 +181,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <CardContent>
                 <div className="text-2xl font-bold text-blue-700">{stats.todayOrders}</div>
                 <p className="text-xs text-blue-600 flex items-center mt-1">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  +5 from yesterday
+                  {stats.ordersComparison === 'N/A' ? null : stats.ordersComparison?.startsWith('-') ? (
+                    <TrendingDown className="w-3 h-3 mr-1" />
+                  ) : (
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                  )}
+                  {stats.ordersComparison || 'N/A'}
                 </p>
               </CardContent>
             </Card>
