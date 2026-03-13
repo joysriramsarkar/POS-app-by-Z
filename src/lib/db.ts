@@ -29,16 +29,22 @@ function createPrismaClient(): PrismaClient {
     },
   })
 
-  // Enable WAL (Write-Ahead Logging) mode for concurrent read/write support
+  // Enable WAL (Write-Ahead Logging) mode for SQLite only (PostgreSQL doesn't support PRAGMA)
   client.$connect().then(async () => {
     try {
-      // Enable WAL mode for better concurrent access (use $queryRawUnsafe for PRAGMA statements that return results)
-      await client.$queryRawUnsafe('PRAGMA journal_mode = WAL;')
-      // Set synchronous mode to NORMAL for better performance with WAL
-      await client.$queryRawUnsafe('PRAGMA synchronous = NORMAL;')
-      console.log('[PrismaClient] WAL mode enabled and synchronous set to NORMAL')
+      // Only run PRAGMA commands for SQLite databases
+      const isPostgreSQL = databaseUrl?.includes('postgresql')
+      if (!isPostgreSQL) {
+        // Enable WAL mode for better concurrent access (use $queryRawUnsafe for PRAGMA statements that return results)
+        await client.$queryRawUnsafe('PRAGMA journal_mode = WAL;')
+        // Set synchronous mode to NORMAL for better performance with WAL
+        await client.$queryRawUnsafe('PRAGMA synchronous = NORMAL;')
+        console.log('[PrismaClient] WAL mode enabled and synchronous set to NORMAL')
+      } else {
+        console.log('[PrismaClient] Connected to PostgreSQL (PRAGMA commands skipped)')
+      }
     } catch (error) {
-      console.error('[PrismaClient] Failed to enable WAL mode:', error)
+      console.error('[PrismaClient] Failed to initialize database:', error)
     }
   }).catch((error) => {
     console.error('[PrismaClient] Connection pool initialization error:', error)
