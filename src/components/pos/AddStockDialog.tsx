@@ -196,7 +196,7 @@ export function AddStockDialog({
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder="0"
                 min="0"
-                step={selectedProduct?.unit === 'piece' ? '1' : '0.1'}
+                step={['kg', 'liter'].includes(selectedProduct?.unit || '') ? '0.1' : '1'}
                 className="flex-1"
               />
               <span className="text-sm text-muted-foreground w-16">
