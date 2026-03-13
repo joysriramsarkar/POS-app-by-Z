@@ -181,7 +181,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
+          <div className="relative flex-1 min-w-50">
             <label htmlFor="stock-search" className="sr-only">Search items</label>
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -207,7 +207,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
 
           {/* Category Filter */}
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-35">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Category" />
             </SelectTrigger>
@@ -221,7 +221,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
 
           {/* Stock Filter */}
           <Select value={stockFilter} onValueChange={(v: 'all' | 'low' | 'out') => setStockFilter(v)}>
-            <SelectTrigger className="w-[130px]">
+            <SelectTrigger className="w-32.5">
               <SelectValue placeholder="Stock Status" />
             </SelectTrigger>
             <SelectContent>

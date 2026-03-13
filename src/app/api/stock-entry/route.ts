@@ -63,13 +63,13 @@ export async function POST(request: NextRequest) {
       });
 
       // Create StockHistory record for audit trail
-      await tx.stockHistory.create({
+      const stockHistory = await tx.stockHistory.create({
         data: {
           productId,
           changeType: 'purchase',
           quantity, // Positive number for addition
           reason: notes || `Stock purchase: ${quantity} units @ ₹${purchasePrice}`,
-          referenceId: undefined, // Could link to Purchase ID if needed
+          referenceId: undefined, // Will be set after purchase creation
         },
       });
 
@@ -101,14 +101,10 @@ export async function POST(request: NextRequest) {
             include: { items: true },
           });
 
-          // Update StockHistory to link to Purchase
-          await tx.stockHistory.updateMany({
+          // Update StockHistory to link to Purchase using the record ID we have
+          await tx.stockHistory.update({
             where: {
-              productId,
-              changeType: 'purchase',
-              createdAt: {
-                gte: new Date(Date.now() - 1000), // Within last second
-              },
+              id: stockHistory.id,
             },
             data: {
               referenceId: purchase.id,

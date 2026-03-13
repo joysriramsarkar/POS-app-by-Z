@@ -154,7 +154,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Today's Sales */}
-            <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
+            <Card className="bg-linear-to-br from-green-50 to-green-100/50 border-green-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-green-700">Today's Sales</CardTitle>
                 <IndianRupee className="h-4 w-4 text-green-600" />
@@ -173,7 +173,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Card>
 
             {/* Today's Orders */}
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
+            <Card className="bg-linear-to-br from-blue-50 to-blue-100/50 border-blue-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-blue-700">Today's Orders</CardTitle>
                 <ShoppingCart className="h-4 w-4 text-blue-600" />
@@ -192,7 +192,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Card>
 
             {/* Low Stock Items */}
-            <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200">
+            <Card className="bg-linear-to-br from-amber-50 to-amber-100/50 border-amber-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-amber-700">Low Stock</CardTitle>
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
@@ -204,7 +204,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Card>
 
             {/* Due Payments */}
-            <Card className="bg-gradient-to-br from-red-50 to-red-100/50 border-red-200">
+            <Card className="bg-linear-to-br from-red-50 to-red-100/50 border-red-200">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-red-700">Due Payments</CardTitle>
                 <Clock className="h-4 w-4 text-red-600" />
@@ -265,7 +265,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[240px]">
+                <ScrollArea className="h-60">
                   <div className="px-6 pb-4 space-y-2">
                     {lowStockProducts.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-8">All items are well stocked!</p>
@@ -308,7 +308,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[240px]">
+                <ScrollArea className="h-60">
                   <div className="px-6 pb-4 space-y-2">
                     {transactions.map((txn) => (
                       <div

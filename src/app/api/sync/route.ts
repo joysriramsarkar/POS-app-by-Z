@@ -155,6 +155,49 @@ async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: strin
 
     // Create sale with items
     return db.$transaction(async (tx) => {
+      // VALIDATION PHASE: Check all prerequisites before creating anything
+      
+      // 1. Validate all products exist and check current stock levels
+      const productsToValidate = [];
+      for (const item of saleData.items) {
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+        });
+        
+        if (!product) {
+          throw new Error(`Product ${item.productId} not found during sync validation`);
+        }
+        
+        // Note: During offline sync, we may not have exact stock levels, so we log warnings but allow the sync
+        // This prevents losing sales data. Stock discrepancies should be reconciled via inventory management
+        if (product.currentStock < item.quantity) {
+          console.warn(`Warning: Product ${product.name} has insufficient stock (have: ${product.currentStock}, need: ${item.quantity}) during sync. Sale will be recorded but may cause stock issues.`);
+        }
+        
+        productsToValidate.push({ product, item });
+      }
+
+      // 2. Validate customer exists if specified
+      if (saleData.customerId) {
+        const customer = await tx.customer.findUnique({
+          where: { id: saleData.customerId },
+        });
+        
+        if (!customer) {
+          throw new Error(`Customer ${saleData.customerId} not found during sync validation`);
+        }
+      }
+
+      // 3. Validate basic sale data
+      if (!saleData.items || saleData.items.length === 0) {
+        throw new Error('Sale must have at least one item');
+      }
+
+      if ((saleData.totalAmount || 0) < 0) {
+        throw new Error('Total amount cannot be negative');
+      }
+
+      // CREATE PHASE: Now that validation passed, create records
       const sale = await tx.sale.create({
         data: {
           id: saleData.id,
@@ -183,13 +226,27 @@ async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: strin
         include: { items: true },
       });
 
-      // Update stock
+      // Update stock for all products
       for (const item of saleData.items) {
-        await tx.product.update({
-          where: { id: item.productId },
+        const updateResult = await tx.$executeRaw`
+          UPDATE products 
+          SET "current_stock" = "current_stock" - ${item.quantity},
+              "updated_at" = NOW()
+          WHERE id = ${item.productId}
+        `;
+
+        if (updateResult === 0) {
+          console.warn(`Warning during sync: Could not update stock for product ${item.productId}`);
+        }
+
+        // Create stock history for audit trail
+        await tx.stockHistory.create({
           data: {
-            currentStock: { decrement: item.quantity },
-            updatedAt: new Date(),
+            productId: item.productId,
+            changeType: 'sale',
+            quantity: -item.quantity,
+            reason: `Offline sync sale: ${saleData.invoiceNumber}`,
+            referenceId: sale.id,
           },
         });
       }
@@ -200,28 +257,32 @@ async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: strin
 
       if (saleData.customerId && amountPaid < totalAmount) {
         const dueAmount = totalAmount - amountPaid;
-        await tx.customer.update({
-          where: { id: saleData.customerId },
-          data: {
-            totalDue: { increment: dueAmount },
-            updatedAt: new Date(),
-          },
-        });
-
-        // Add ledger entries for double-entry bookkeeping tracking
+        
+        // Fetch customer BEFORE updating for correct balance calculation
         const customer = await tx.customer.findUnique({
           where: { id: saleData.customerId },
         });
 
         if (customer) {
+          const newTotalDue = customer.totalDue + dueAmount;
+
+          await tx.customer.update({
+            where: { id: saleData.customerId },
+            data: {
+              totalDue: { increment: dueAmount },
+              updatedAt: new Date(),
+            },
+          });
+
+          // Add ledger entries for double-entry bookkeeping tracking
           // Add credit for the total amount
           await tx.ledgerEntry.create({
             data: {
               customerId: saleData.customerId,
               entryType: 'credit',
               amount: totalAmount,
-              balanceAfter: customer.totalDue + totalAmount,
-              description: `Credit purchase: ${saleData.invoiceNumber}`,
+              balanceAfter: newTotalDue,
+              description: `Offline sync credit purchase: ${saleData.invoiceNumber}`,
               referenceId: sale.id,
             },
           });
@@ -233,8 +294,8 @@ async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: strin
                 customerId: saleData.customerId,
                 entryType: 'debit',
                 amount: amountPaid,
-                balanceAfter: customer.totalDue + totalAmount - amountPaid,
-                description: `Payment for purchase: ${saleData.invoiceNumber}`,
+                balanceAfter: newTotalDue - amountPaid,
+                description: `Offline sync payment for: ${saleData.invoiceNumber}`,
                 referenceId: sale.id,
               },
             });

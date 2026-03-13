@@ -35,7 +35,6 @@ import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
-import { generateInvoiceNumber } from '@/lib/invoice';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
@@ -49,6 +48,15 @@ const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
   { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
+
+const generateInvoiceNumber = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `INV-${year}${month}${day}-${random}`;
+};
 
 function POSDashboard() {
   const [currentPage, setCurrentPage] = useState<PageType>('billing');

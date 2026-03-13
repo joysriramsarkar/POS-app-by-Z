@@ -223,6 +223,10 @@ export function PartiesManagement() {
     const paidAmount = parseFloat(paymentAmount);
     const updatedCustomerData = {
       id: selectedCustomer.id,
+      name: selectedCustomer.name,
+      phone: selectedCustomer.phone,
+      address: selectedCustomer.address,
+      notes: selectedCustomer.notes,
       totalDue: Math.max(0, selectedCustomer.totalDue - paidAmount),
       totalPaid: selectedCustomer.totalPaid + paidAmount,
     };

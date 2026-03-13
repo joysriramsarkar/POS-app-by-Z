@@ -96,7 +96,7 @@ export function ProductCard({ product }: ProductCardProps) {
                     {product.name}
                   </h3>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-[200px]">
+                <TooltipContent side="top" className="max-w-50">
                   <p>{product.name}</p>
                   {product.nameBn && <p className="text-muted-foreground">{product.nameBn}</p>}
                 </TooltipContent>

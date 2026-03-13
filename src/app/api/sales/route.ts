@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { generateInvoiceNumber } from '@/lib/invoice';
+import { generateServerInvoiceNumber } from '@/lib/invoice';
 import { v4 as uuidv4 } from 'uuid';
 import { SaleInputSchema } from '@/schemas';
 
@@ -134,20 +134,35 @@ export async function POST(request: NextRequest) {
     const totalAmount = subtotal - discountAmount + taxAmount;
     const amountPaidValue = Math.max(0, validatedData.amountPaid);
 
-    // Determine payment status
+    // Validate payment status based on customer type
     let paymentStatus = 'Paid';
-    if (amountPaidValue === 0) {
-      paymentStatus = 'Due';
-    } else if (amountPaidValue > 0 && amountPaidValue < totalAmount) {
-      paymentStatus = 'Partial';
+    if (customerId) {
+      // For regular customers, can have partial/due payments
+      if (amountPaidValue === 0) {
+        paymentStatus = 'Due';
+      } else if (amountPaidValue > 0 && amountPaidValue < totalAmount) {
+        paymentStatus = 'Partial';
+      }
+    } else {
+      // Walk-in customers must pay full amount
+      if (amountPaidValue < totalAmount) {
+        return NextResponse.json(
+          { success: false, error: 'Walk-in customers must pay the full amount' },
+          { status: 400 }
+        );
+      }
+      paymentStatus = 'Paid';
     }
+
+    // Generate invoice number (now async, must be done before transaction)
+    const invoiceNumber = await generateServerInvoiceNumber();
 
     // Create sale with items in transaction
     const sale = await db.$transaction(async (tx) => {
       // Create sale with proper Prisma syntax
       const newSale = await tx.sale.create({
         data: {
-          invoiceNumber: generateInvoiceNumber(),
+          invoiceNumber,
           subtotal,
           discount: discountAmount,
           tax: taxAmount,
@@ -179,28 +194,47 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Update stock for each item
-      for (const item of validatedItems) {
-        // Find product with locking or latest state in tx
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
-        });
+      // Validate and update stock for each item BEFORE using customer data
+      // First pass: validate all stock is available using raw SQL to ensure atomicity
+      const stockCheckResults = await Promise.all(
+        validatedItems.map(item =>
+          tx.$queryRaw`
+            SELECT id, "current_stock" as currentStock, name 
+            FROM products 
+            WHERE id = ${item.productId} AND "current_stock" >= ${item.quantity}
+          ` as Promise<Array<{ id: string; currentStock: number; name: string }>>
+        )
+      );
 
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`);
-        }
-
-        if (product.currentStock < item.quantity) {
+      // Check if all items passed stock validation
+      for (let i = 0; i < validatedItems.length; i++) {
+        const item = validatedItems[i];
+        const result = stockCheckResults[i];
+        if (!result || result.length === 0) {
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+          });
+          if (!product) {
+            throw new Error(`Product ${item.productId} not found`);
+          }
           throw new Error(`Insufficient stock for product ${product.name}. Available: ${product.currentStock}, Requested: ${item.quantity}`);
         }
+      }
 
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            currentStock: { decrement: item.quantity },
-            updatedAt: new Date(),
-          },
-        });
+      // Second pass: atomically update stock for all items
+      for (const item of validatedItems) {
+        // Use raw SQL for atomic conditional update to prevent race conditions
+        const updateResult = await tx.$executeRaw`
+          UPDATE products 
+          SET "current_stock" = "current_stock" - ${item.quantity},
+              "updated_at" = NOW()
+          WHERE id = ${item.productId} AND "current_stock" >= ${item.quantity}
+        `;
+
+        if (updateResult === 0) {
+          // This should not happen as we validated above, but just in case
+          throw new Error(`Atomic stock update failed for product ${item.productId}. Another transaction may have depleted stock.`);
+        }
 
         await tx.stockHistory.create({
           data: {
@@ -213,11 +247,11 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // If payment is partially or fully due, update customer's totalDue
+      // If payment is partially or fully due, fetch customer BEFORE updating and use calculated values
       if (customerId && amountPaidValue < totalAmount) {
         const dueAmount = totalAmount - amountPaidValue;
         
-        // Verify customer exists before updating
+        // Fetch customer FIRST before any updates
         const customer = await tx.customer.findUnique({
           where: { id: customerId },
         });
@@ -226,6 +260,10 @@ export async function POST(request: NextRequest) {
           throw new Error(`Customer ${customerId} not found`);
         }
 
+        // Calculate expected balance BEFORE the update
+        const newTotalDue = customer.totalDue + dueAmount;
+
+        // Now update totalDue
         await tx.customer.update({
           where: { id: customerId },
           data: {
@@ -234,13 +272,13 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Create ledger entry
+        // Create ledger entries using calculated values (not stale data)
         await tx.ledgerEntry.create({
           data: {
             customerId,
             entryType: 'credit',
             amount: totalAmount,
-            balanceAfter: customer.totalDue + totalAmount,
+            balanceAfter: newTotalDue,
             description: `Credit purchase: ${newSale.invoiceNumber}`,
             referenceId: newSale.id,
           },
@@ -253,7 +291,7 @@ export async function POST(request: NextRequest) {
               customerId,
               entryType: 'debit',
               amount: amountPaidValue,
-              balanceAfter: customer.totalDue + totalAmount - amountPaidValue,
+              balanceAfter: newTotalDue - amountPaidValue,
               description: `Payment for purchase: ${newSale.invoiceNumber}`,
               referenceId: newSale.id,
             },
@@ -377,6 +415,20 @@ export async function PUT(request: NextRequest) {
       // If sale was partially or fully due, reverse customer's totalDue update
       if (existingSale.customerId && existingSale.amountPaid < existingSale.totalAmount) {
         const dueAmount = existingSale.totalAmount - existingSale.amountPaid;
+        
+        // Fetch customer BEFORE updating to get current balance
+        const customer = await tx.customer.findUnique({
+          where: { id: existingSale.customerId },
+        });
+
+        if (!customer) {
+          throw new Error(`Customer ${existingSale.customerId} not found`);
+        }
+
+        // Calculate expected balance AFTER the decrement
+        const newTotalDue = customer.totalDue - dueAmount;
+
+        // Now update totalDue
         await tx.customer.update({
           where: { id: existingSale.customerId },
           data: {
@@ -385,37 +437,31 @@ export async function PUT(request: NextRequest) {
           },
         });
 
-        // Create ledger entry
-        const customer = await tx.customer.findUnique({
-          where: { id: existingSale.customerId },
+        // Create ledger entries using calculated values (not stale data)
+        // Add debit for the total amount
+        await tx.ledgerEntry.create({
+          data: {
+            customerId: existingSale.customerId,
+            entryType: 'debit',
+            amount: existingSale.totalAmount,
+            balanceAfter: newTotalDue,
+            description: `${status}: reverse credit for ${existingSale.invoiceNumber}`,
+            referenceId: existingSale.id,
+          },
         });
 
-        if (customer) {
-          // Add debit for the total amount
+        // Add credit for the amount paid if partial payment
+        if (existingSale.amountPaid > 0) {
           await tx.ledgerEntry.create({
             data: {
               customerId: existingSale.customerId,
-              entryType: 'debit',
-              amount: existingSale.totalAmount,
-              balanceAfter: customer.totalDue - existingSale.totalAmount,
-              description: `${status}: reverse credit for ${existingSale.invoiceNumber}`,
+              entryType: 'credit',
+              amount: existingSale.amountPaid,
+              balanceAfter: newTotalDue + existingSale.amountPaid,
+              description: `${status}: reverse payment for ${existingSale.invoiceNumber}`,
               referenceId: existingSale.id,
             },
           });
-
-          // Add credit for the amount paid if partial payment
-          if (existingSale.amountPaid > 0) {
-            await tx.ledgerEntry.create({
-              data: {
-                customerId: existingSale.customerId,
-                entryType: 'credit',
-                amount: existingSale.amountPaid,
-                balanceAfter: customer.totalDue - existingSale.totalAmount + existingSale.amountPaid,
-                description: `${status}: reverse payment for ${existingSale.invoiceNumber}`,
-                referenceId: existingSale.id,
-              },
-            });
-          }
         }
       }
 
