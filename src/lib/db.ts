@@ -32,10 +32,10 @@ function createPrismaClient(): PrismaClient {
   // Enable WAL (Write-Ahead Logging) mode for concurrent read/write support
   client.$connect().then(async () => {
     try {
-      // Enable WAL mode for better concurrent access
-      await client.$executeRawUnsafe('PRAGMA journal_mode = WAL;')
+      // Enable WAL mode for better concurrent access (use $queryRawUnsafe for PRAGMA statements that return results)
+      await client.$queryRawUnsafe('PRAGMA journal_mode = WAL;')
       // Set synchronous mode to NORMAL for better performance with WAL
-      await client.$executeRawUnsafe('PRAGMA synchronous = NORMAL;')
+      await client.$queryRawUnsafe('PRAGMA synchronous = NORMAL;')
       console.log('[PrismaClient] WAL mode enabled and synchronous set to NORMAL')
     } catch (error) {
       console.error('[PrismaClient] Failed to enable WAL mode:', error)
