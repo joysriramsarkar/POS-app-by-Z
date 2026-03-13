@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateInvoiceNumber } from '@/lib/invoice';
 import { v4 as uuidv4 } from 'uuid';
+import { SaleInputSchema } from '@/schemas';
 
 // GET /api/sales - Fetch sales
 export async function GET(request: NextRequest) {
@@ -111,60 +112,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { items, customerId, paymentMethod, amountPaid, discount, tax, notes } = body;
-
-    // Validate items
-    if (!items || !Array.isArray(items) || items.length === 0) {
+    // Validate with Zod
+    const result = SaleInputSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, error: 'Items must be a non-empty array' },
+        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
         { status: 400 }
       );
     }
 
-    // Validate and convert item structure - ensure all numeric values are actual numbers
-    const validatedItems = [];
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item.productId || !item.productName) {
-        return NextResponse.json(
-          { success: false, error: `Invalid item at index ${i}: missing productId or productName` },
-          { status: 400 }
-        );
-      }
-
-      const quantity = parseFloat(item.quantity);
-      const unitPrice = parseFloat(item.unitPrice);
-      const totalPrice = parseFloat(item.totalPrice);
-
-      if (isNaN(quantity) || isNaN(unitPrice) || isNaN(totalPrice)) {
-        return NextResponse.json(
-          { success: false, error: `Invalid numeric values for item at index ${i}` },
-          { status: 400 }
-        );
-      }
-
-      if (quantity <= 0 || unitPrice < 0 || totalPrice < 0) {
-        return NextResponse.json(
-          { success: false, error: `Invalid item values at index ${i}: quantity must be > 0, prices must be >= 0` },
-          { status: 400 }
-        );
-      }
-
-      validatedItems.push({
-        productId: item.productId,
-        productName: item.productName,
-        quantity,
-        unitPrice,
-        totalPrice,
-      });
-    }
+    const validatedData = result.data;
+    const { items: validatedItems, customerId, paymentMethod, notes } = validatedData;
 
     // Calculate totals with validated numeric values
     const subtotal = validatedItems.reduce((sum: number, item: { totalPrice: number }) => sum + item.totalPrice, 0);
-    const discountAmount = Math.max(0, parseFloat(discount as any) || 0);
-    const taxAmount = Math.max(0, parseFloat(tax as any) || 0);
+    const discountAmount = Math.max(0, validatedData.discount);
+    const taxAmount = Math.max(0, validatedData.tax);
     const totalAmount = subtotal - discountAmount + taxAmount;
-    const amountPaidValue = Math.max(0, parseFloat(amountPaid as any) || 0);
+    const amountPaidValue = Math.max(0, validatedData.amountPaid);
 
     // Determine payment status
     let paymentStatus = 'Paid';

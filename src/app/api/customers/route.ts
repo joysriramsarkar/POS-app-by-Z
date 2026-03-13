@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { CustomerInputSchema } from '@/schemas';
 
 // GET /api/customers - Fetch customers
 export async function GET(request: NextRequest) {
@@ -88,19 +89,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, phone, address, notes } = body;
 
-    if (!name) {
+    const result = CustomerInputSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, error: 'Customer name is required' },
+        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
         { status: 400 }
       );
     }
 
+    const validatedData = result.data;
+
     // Check if customer with same phone exists
-    if (phone) {
+    if (validatedData.phone) {
       const existing = await db.customer.findUnique({
-        where: { phone },
+        where: { phone: validatedData.phone },
       });
 
       if (existing) {
@@ -113,12 +116,12 @@ export async function POST(request: NextRequest) {
 
     const customer = await db.customer.create({
       data: {
-        name,
-        phone: phone || null,
-        address: address || null,
-        notes: notes || null,
-        totalDue: 0,
-        totalPaid: 0,
+        name: validatedData.name,
+        phone: validatedData.phone || null,
+        address: validatedData.address || null,
+        notes: validatedData.notes || null,
+        totalDue: validatedData.totalDue || 0,
+        totalPaid: validatedData.totalPaid || 0,
         isActive: true,
       },
     });
@@ -141,19 +144,28 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, ...data } = body;
 
-    if (!id) {
+    if (!body.id) {
       return NextResponse.json(
         { success: false, error: 'Customer ID is required' },
         { status: 400 }
       );
     }
 
+    const result = CustomerInputSchema.safeParse(body);
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, error: result.error.errors.map(e => e.message).join(', ') },
+        { status: 400 }
+      );
+    }
+
+    const { id, ...validatedData } = result.data;
+
     const customer = await db.customer.update({
-      where: { id },
+      where: { id: body.id },
       data: {
-        ...data,
+        ...validatedData,
         updatedAt: new Date(),
       },
     });
