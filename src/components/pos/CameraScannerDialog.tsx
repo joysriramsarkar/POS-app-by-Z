@@ -54,17 +54,17 @@ export function CameraScannerDialog({
   });
 
   const handleCloseIntent = useCallback(() => {
-    // This is now the single entry point for triggering a close.
-    // It will not immediately unmount the component.
-    startShutdown();
-  }, [startShutdown]);
+    if (!isShuttingDown) {
+      startShutdown();
+    }
+  }, [isShuttingDown, startShutdown]);
 
   const handleDialogInteraction = useCallback((newOpen: boolean) => {
     if (newOpen) {
       onOpenChange(true);
       setError(null);
     } else {
-      // User initiated close via ESC or overlay click
+      // User initiated close - trigger shutdown
       handleCloseIntent();
     }
   }, [onOpenChange, handleCloseIntent]);

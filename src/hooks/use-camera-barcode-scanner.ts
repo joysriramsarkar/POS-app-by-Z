@@ -60,46 +60,79 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
   const lastScannedRef = useRef<string>('');
   const lastScannedTimeRef = useRef<number>(0);
 
-  // --- Strict, Blocking Shutdown ---
+  // --- Strict, Blocking Shutdown with Timeout ---
   const startShutdown = useCallback(async () => {
     // If already shutting down, or no scanner exists, just ensure close is called.
     if (isShuttingDown || !scannerRef.current) {
-      if (!isShuttingDown) { // Prevent calling onClose multiple times
-        onClose();
-      }
-      return;
+      return; // Don't call onClose multiple times
     }
 
     setIsShuttingDown(true);
     console.log('[Scanner] Starting blocking shutdown...');
 
+    // Create a timeout promise that resolves after 3 seconds (more aggressive)
+    const timeoutPromise = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        console.warn('[Scanner] Shutdown timeout reached (3s) - forcing close');
+        resolve();
+      }, 3000);
+    });
+
     try {
-      // Await the scanner cleanup promise to complete fully.
-      const state = scannerRef.current.getState();
-      if (state === 2) { // Html5QrcodeScannerState.SCANNING = 2
-        await scannerRef.current.stop();
-      }
-      scannerRef.current.clear();
-      console.log('[Scanner] Scanner cleared successfully.');
-    } catch (error) {
-      console.error('[Scanner] Error during scanner.clear(), but proceeding with close:', error);
-      // Even if cleanup fails, we must proceed to unmount to avoid getting stuck.
+      // Race between actual cleanup and timeout
+      await Promise.race([
+        (async () => {
+          try {
+            const scanner = scannerRef.current;
+            if (!scanner) return;
+
+            try {
+              const state = scanner.getState();
+              console.log(`[Scanner] Current state before stop: ${state}`);
+              if (state === 2) { // Html5QrcodeScannerState.SCANNING = 2
+                console.log('[Scanner] Attempting to stop scanner...');
+                await scanner.stop();
+              }
+            } catch (stopError) {
+              console.warn('[Scanner] Stop failed (might be in transition):', stopError);
+              // Continue with clear even if stop fails
+            }
+
+            try {
+              console.log('[Scanner] Clearing scanner...');
+              scanner.clear();
+            } catch (clearError) {
+              console.warn('[Scanner] Clear failed:', clearError);
+            }
+
+            console.log('[Scanner] Scanner cleanup completed.');
+          } catch (error) {
+            console.error('[Scanner] Unexpected error during cleanup:', error);
+          }
+        })(),
+        timeoutPromise
+      ]);
     } finally {
       if (isMountedRef.current) {
         scannerRef.current = null;
         setIsInitialized(false);
+        setIsShuttingDown(false);
       }
       console.log('[Scanner] Shutdown complete. Calling onClose().');
       onClose(); // Triggers the parent component to unmount.
     }
-  }, [isShuttingDown, onClose]);
+  }, [onClose]);
 
 
   // --- Scanner Initialization ---
   const initializeScanner = useCallback(async () => {
-    // Strict Mode Protection: Prevent double initialization.
-    if (isInitializingRef.current || scannerRef.current) {
-      console.log('[Scanner] Initialization skipped: already initializing or initialized.');
+    // Strict Mode Protection: Prevent initialization if already shutting down or initializing
+    if (isInitializingRef.current || scannerRef.current || isShuttingDown) {
+      if (isShuttingDown) {
+        console.log('[Scanner] Initialization skipped: scanner is shutting down.');
+      } else {
+        console.log('[Scanner] Initialization skipped: already initializing or initialized.');
+      }
       return;
     }
     isInitializingRef.current = true;
@@ -121,8 +154,13 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
       await scanner.start(
         { facingMode: facingMode },
         {
-          fps: 10,
-          qrbox: (w, h) => { const size = Math.min(w, h) * 0.75; return { width: size, height: size }; },
+          fps: 5, // Reduced FPS for better quality processing on low-end cameras
+          qrbox: (w, h) => { 
+            // Use larger scanning area (90%) for better barcode detection on laptop cameras
+            const size = Math.min(w, h) * 0.9; 
+            return { width: size, height: size }; 
+          },
+          aspectRatio: 1.0,
         },
         (decodedText: string) => {
           const normalizedText = convertBengaliToEnglishNumerals(decodedText);
@@ -132,6 +170,7 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
           }
           lastScannedRef.current = normalizedText;
           lastScannedTimeRef.current = now;
+          console.log('[Scanner] ✅ Barcode detected:', normalizedText);
           onBarcodeDetected(normalizedText);
         },
         (error: any) => {
@@ -168,7 +207,7 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
     } finally {
       isInitializingRef.current = false;
     }
-  }, [facingMode, onBarcodeDetected, onError]);
+  }, [facingMode, onBarcodeDetected, onError, isShuttingDown]);
 
 
   // --- Lifecycle Effects ---
