@@ -60,7 +60,7 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
   const lastScannedRef = useRef<string>('');
   const lastScannedTimeRef = useRef<number>(0);
 
-  // --- Strict, Blocking Shutdown with Timeout ---
+  // --- Strict, Blocking Shutdown ---
   const startShutdown = useCallback(async () => {
     // If already shutting down, or no scanner exists, just ensure close is called.
     if (isShuttingDown || !scannerRef.current) {
@@ -70,48 +70,32 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
     setIsShuttingDown(true);
     console.log('[Scanner] Starting blocking shutdown...');
 
-    // Create a timeout promise that resolves after 3 seconds (more aggressive)
-    const timeoutPromise = new Promise<void>((resolve) => {
-      setTimeout(() => {
-        console.warn('[Scanner] Shutdown timeout reached (3s) - forcing close');
-        resolve();
-      }, 3000);
-    });
-
     try {
-      // Race between actual cleanup and timeout
-      await Promise.race([
-        (async () => {
-          try {
-            const scanner = scannerRef.current;
-            if (!scanner) return;
+      const scanner = scannerRef.current;
+      if (!scanner) return;
 
-            try {
-              const state = scanner.getState();
-              console.log(`[Scanner] Current state before stop: ${state}`);
-              if (state === 2) { // Html5QrcodeScannerState.SCANNING = 2
-                console.log('[Scanner] Attempting to stop scanner...');
-                await scanner.stop();
-              }
-            } catch (stopError) {
-              console.warn('[Scanner] Stop failed (might be in transition):', stopError);
-              // Continue with clear even if stop fails
-            }
+      try {
+        const state = scanner.getState();
+        console.log(`[Scanner] Current state before stop: ${state}`);
+        if (state === 2) { // Html5QrcodeScannerState.SCANNING = 2
+          console.log('[Scanner] Attempting to stop scanner...');
+          await scanner.stop();
+        }
+      } catch (stopError) {
+        console.warn('[Scanner] Stop failed (might be in transition):', stopError);
+        // Continue with clear even if stop fails
+      }
 
-            try {
-              console.log('[Scanner] Clearing scanner...');
-              scanner.clear();
-            } catch (clearError) {
-              console.warn('[Scanner] Clear failed:', clearError);
-            }
+      try {
+        console.log('[Scanner] Clearing scanner...');
+        scanner.clear();
+      } catch (clearError) {
+        console.warn('[Scanner] Clear failed:', clearError);
+      }
 
-            console.log('[Scanner] Scanner cleanup completed.');
-          } catch (error) {
-            console.error('[Scanner] Unexpected error during cleanup:', error);
-          }
-        })(),
-        timeoutPromise
-      ]);
+      console.log('[Scanner] Scanner cleanup completed.');
+    } catch (error) {
+      console.error('[Scanner] Unexpected error during cleanup:', error);
     } finally {
       if (isMountedRef.current) {
         scannerRef.current = null;
@@ -154,13 +138,17 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
       await scanner.start(
         { facingMode: facingMode },
         {
-          fps: 5, // Reduced FPS for better quality processing on low-end cameras
+          fps: 20, // Increased FPS for real-time mobile scanning
           qrbox: (w, h) => { 
-            // Use larger scanning area (90%) for better barcode detection on laptop cameras
-            const size = Math.min(w, h) * 0.9; 
-            return { width: size, height: size }; 
+            // Rectangular box optimal for standard EAN/UPC barcodes
+            return { width: w * 0.8, height: h * 0.5 }; 
           },
           aspectRatio: 1.0,
+          videoConstraints: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            advanced: [{ focusMode: "continuous" }]
+          },
         },
         (decodedText: string) => {
           const normalizedText = convertBengaliToEnglishNumerals(decodedText);
