@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, useMemo } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
 import { CameraScannerDialog } from '@/components/pos/CameraScannerDialog';
@@ -233,17 +233,19 @@ function POSDashboard() {
         setPendingCount(remaining.length);
 
         // refresh caches after sync
-        const [prods, custs] = await Promise.all([
+        const [prodsResult, custsResult] = await Promise.allSettled([
           fetch('/api/products?limit=50'),
           fetch('/api/customers'),
         ]);
-        if (prods.ok) {
-          const { data, nextCursor } = await prods.json();
+
+        if (prodsResult.status === 'fulfilled' && prodsResult.value.ok) {
+          const { data, nextCursor } = await prodsResult.value.json();
           const hasMore = !!nextCursor;
           setProducts(data, hasMore, nextCursor);
         }
-        if (custs.ok) {
-          const { data } = await custs.json();
+
+        if (custsResult.status === 'fulfilled' && custsResult.value.ok) {
+          const { data } = await custsResult.value.json();
           setCustomers(data);
         }
       } finally {
@@ -255,8 +257,18 @@ function POSDashboard() {
   }, [isOnline, setSyncing, setPendingCount, setProducts, setCustomers]);
 
   // Barcode scanner handler
+  const lastScannedRef = useRef<{ barcode: string; time: number }>({ barcode: '', time: 0 });
+
   const handleBarcodeDetected = useCallback(
     (barcode: string) => {
+      const now = Date.now();
+
+      // Debounce logic: prevent the same barcode from being scanned multiple times within 1000ms
+      if (lastScannedRef.current.barcode === barcode && now - lastScannedRef.current.time < 1000) {
+        return;
+      }
+
+      lastScannedRef.current = { barcode, time: now };
       const product = getProductByBarcode(barcode);
       if (product) {
         addItem(product, 1);
@@ -334,18 +346,18 @@ function POSDashboard() {
           clearCart();
 
           // refresh products and customers from server
-          const [productsRes, customersRes] = await Promise.all([
+          const [productsResult, customersResult] = await Promise.allSettled([
             fetch('/api/products?limit=50'),
             fetch('/api/customers'),
           ]);
 
-          if (productsRes.ok) {
-            const { data: updatedProducts, nextCursor } = await productsRes.json();
+          if (productsResult.status === 'fulfilled' && productsResult.value.ok) {
+            const { data: updatedProducts, nextCursor } = await productsResult.value.json();
             const hasMore = !!nextCursor;
             setProducts(updatedProducts, hasMore, nextCursor);
           }
 
-          if (customersRes.ok && paymentData.customerId) {
+          if (customersResult.status === 'fulfilled' && customersResult.value.ok && paymentData.customerId) {
             // we know how much due to add
             const dueAmount = paymentData.total - paymentData.amountPaid;
             if (dueAmount > 0) {

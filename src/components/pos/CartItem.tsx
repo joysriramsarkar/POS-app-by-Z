@@ -6,6 +6,7 @@ import { Minus, Plus, Trash2, GripVertical } from 'lucide-react';
 import type { CartItem as CartItemType } from '@/types/pos';
 import { useCartStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
+import Decimal from 'decimal.js';
 
 interface CartItemProps {
   item: CartItemType;
@@ -50,8 +51,8 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
 
   const handleQuantityChange = useCallback(
     (newQuantity: number) => {
-      // Ensure we don't go below 0
-      const validatedQuantity = Math.max(0, newQuantity);
+      // Ensure we don't go below 0 and not above availableStock
+      const validatedQuantity = Math.max(0, Math.min(newQuantity, item.availableStock));
       if (validatedQuantity === 0) {
         // If quantity becomes 0, remove the item
         removeItem(item.id);
@@ -59,19 +60,19 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
         updateQuantity(item.id, validatedQuantity);
       }
     },
-    [item.id, updateQuantity, removeItem]
+    [item.id, item.availableStock, updateQuantity, removeItem]
   );
 
   const handleIncrement = useCallback(() => {
     const step = getStep(item.unit);
-    // Use Number/toFixed to avoid floating point math issues like 0.1 + 0.2 = 0.30000000000000004
-    const newQty = Number((item.quantity + step).toFixed(3));
-    updateQuantity(item.id, newQty);
-  }, [item.id, item.quantity, item.unit, updateQuantity]);
+    const newQty = new Decimal(item.quantity).plus(new Decimal(step)).toNumber();
+    const validatedQuantity = Math.min(newQty, item.availableStock);
+    updateQuantity(item.id, validatedQuantity);
+  }, [item.id, item.quantity, item.unit, item.availableStock, updateQuantity]);
 
   const handleDecrement = useCallback(() => {
     const step = getStep(item.unit);
-    const newQty = Number((item.quantity - step).toFixed(3));
+    const newQty = new Decimal(item.quantity).minus(new Decimal(step)).toNumber();
     if (newQty > 0) {
       updateQuantity(item.id, newQty);
     } else {

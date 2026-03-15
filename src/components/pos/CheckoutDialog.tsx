@@ -260,7 +260,7 @@ export function CheckoutDialog({
 
     const customer: Customer | undefined = customerId ? {
       id: customerId,
-      name: customerName || 'Walk-in',
+      name: customerName ?? 'Walk-in',
       totalDue: 0,
       totalPaid: 0,
       isActive: true,
