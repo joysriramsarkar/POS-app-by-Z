@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Camera, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { Camera, AlertCircle, Loader2 } from 'lucide-react';
 import useCameraBarcodeScanner from '@/hooks/use-camera-barcode-scanner';
 
 interface CameraScannerDialogProps {
@@ -31,6 +31,13 @@ export function CameraScannerDialog({
 }: CameraScannerDialogProps) {
   const [cameraMode, setCameraMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      setCameraMode(isMobile ? 'environment' : 'user');
+    }
+  }, [open]);
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -68,11 +75,6 @@ export function CameraScannerDialog({
       handleCloseIntent();
     }
   }, [onOpenChange, handleCloseIntent]);
-  
-  const toggleCamera = useCallback(() => {
-    setCameraMode(prev => (prev === 'environment' ? 'user' : 'environment'));
-    setError(null); // Clear errors when toggling
-  }, []);
 
   return (
     <Dialog open={open} onOpenChange={handleDialogInteraction}>
@@ -110,17 +112,8 @@ export function CameraScannerDialog({
 
         <DialogFooter className="flex gap-2">
           <Button
-            variant="outline"
-            onClick={toggleCamera}
-            className="flex-1"
-            disabled={!isInitialized || isShuttingDown}
-          >
-            <RefreshCw className="w-4 h-4 mr-2" />
-            <span>{cameraMode === 'environment' ? 'Front Cam' : 'Back Cam'}</span>
-          </Button>
-          <Button
             onClick={handleCloseIntent}
-            className="flex-1"
+            className="w-full"
             disabled={isShuttingDown}
           >
             {isShuttingDown ? 'Closing...' : 'Close'}
