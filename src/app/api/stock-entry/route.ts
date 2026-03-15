@@ -9,7 +9,15 @@ import { StockEntryInputSchema } from '@/schemas';
 // POST /api/stock-entry - Create stock entry (purchase)
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid request body: JSON parsing failed' },
+        { status: 400 }
+      );
+    }
 
     // Validate with Zod
     const result = StockEntryInputSchema.safeParse(body);
