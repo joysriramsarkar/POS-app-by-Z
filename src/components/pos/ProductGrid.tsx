@@ -11,6 +11,8 @@ import { CameraScannerDialog } from './CameraScannerDialog';
 import type { Product } from '@/types/pos';
 import { useProductsStore, useUIStore, useCartStore } from '@/stores/pos-store';
 import { cn, convertBengaliToEnglishNumerals } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = 'grid' | 'compact';
 
@@ -44,7 +46,25 @@ export function ProductGrid({
   const selectedCategoryId = useUIStore((state) => state.selectedCategoryId);
   const setSearchQuery = useUIStore((state) => state.setSearchQuery);
   const setSelectedCategoryId = useUIStore((state) => state.setSelectedCategoryId);
+
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const cartItems = useCartStore((state) => state.items);
+  const getTotal = useCartStore((state) => state.getTotal);
+  const getItemCount = useCartStore((state) => state.getItemCount);
   const addItem = useCartStore((state) => state.addItem);
+
+  const total = getTotal();
+  const itemCount = getItemCount();
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(price);
+  };
 
   // Use external products if provided, otherwise use store products
   const products = externalProducts || storeProducts;
@@ -111,15 +131,23 @@ export function ProductGrid({
   const handleCameraBarcode = useCallback(
     (barcode: string) => {
       const normalizedBarcode = convertBengaliToEnglishNumerals(barcode);
-      const matchedProduct = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedBarcode);
-      
+      const matchedProduct = products.find(
+        (p) => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedBarcode
+      );
+
       if (matchedProduct) {
         if (externalProducts) {
           onProductSelect?.(matchedProduct);
         } else {
           addItem(matchedProduct, 1);
         }
-        setIsCameraScannerOpen(false);
+
+        // Give the user quick feedback without closing the scanner.
+        toast({
+          title: 'Scanned',
+          description: matchedProduct.name,
+        });
+        if (navigator?.vibrate) navigator.vibrate(50);
       } else {
         // Product not found - show in search to let user know
         if (externalProducts) {
@@ -127,10 +155,13 @@ export function ProductGrid({
         } else {
           setSearchQuery(barcode);
         }
-        setIsCameraScannerOpen(false);
+        toast({
+          title: 'Unknown barcode',
+          description: 'No product found for this barcode.',
+        });
       }
     },
-    [products, externalProducts, onProductSelect, addItem, setSearchQuery]
+    [products, externalProducts, onProductSelect, addItem, setSearchQuery, toast]
   );
 
   const handleCategorySelect = useCallback(
@@ -218,17 +249,19 @@ export function ProductGrid({
               </Button>
             )}
             </div>
-            {/* Camera Scanner Button - Mobile friendly */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsCameraScannerOpen(true)}
-              className="w-full md:w-auto"
-              title="Scan barcode with camera"
-            >
-              <Camera className="w-4 h-4 mr-2" />
-              Scan
-            </Button>
+            {/* Camera Scanner Button - Mobile only */}
+            {isMobile && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setIsCameraScannerOpen(true)}
+                className="w-full md:w-auto md:hidden"
+                title="Scan barcode with camera"
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Scan
+              </Button>
+            )}
           </div>
 
           {/* Category Chips */}

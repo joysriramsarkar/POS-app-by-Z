@@ -40,6 +40,32 @@ function getErrorMessage(error: any): string {
   return error?.message || 'An unknown camera error occurred. Please try again.';
 }
 
+function playSuccessBeep() {
+  if (typeof window === 'undefined' || !(window as any).AudioContext) return;
+
+  try {
+    const AudioCtx = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const ctx = new AudioCtx();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880;
+    gainNode.gain.value = 0.1;
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.start();
+    setTimeout(() => {
+      oscillator.stop();
+      ctx.close();
+    }, 80);
+  } catch {
+    // Ignore audio errors (some browsers restrict autoplay without user interaction)
+  }
+}
+
 export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
   const {
     onBarcodeDetected,
@@ -134,42 +160,120 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
       // Initialize the scanner library.
       const scanner = new Html5Qrcode(SCANNER_ID);
 
-      // Start the scanner. This is an async operation.
-      await scanner.start(
-        { facingMode: facingMode },
-        {
-          fps: 20, // Increased FPS for real-time mobile scanning
-          qrbox: (w, h) => { 
-            // Rectangular box optimal for standard EAN/UPC barcodes
-            return { width: w * 0.8, height: h * 0.5 }; 
-          },
-          aspectRatio: 1.0,
+      // Always prioritize the back camera (environment). If the browser cannot satisfy exact constraints,
+      // retry using a less strict constraint rather than falling back to the front camera.
+      const desiredFacingMode = 'environment';
+
+      const getEnvironmentCameraId = async (): Promise<string | null> => {
+        if (!navigator.mediaDevices?.enumerateDevices) return null;
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+          const match = videoInputs.find((d) => {
+            const label = (d.label || '').toLowerCase();
+            return label.includes('back') || label.includes('rear') || label.includes('environment');
+          });
+          return match?.deviceId || null;
+        } catch {
+          return null;
+        }
+      };
+
+      const commonScanOptions = {
+        fps: 20, // Increased FPS for real-time mobile scanning
+        qrbox: (w: number, h: number) => {
+          // Rectangular box optimal for standard EAN/UPC barcodes
+          return { width: w * 0.8, height: h * 0.5 };
+        },
+        aspectRatio: 1.0,
+        videoConstraints: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      };
+
+      const handleScanSuccess = (decodedText: string) => {
+        const normalizedText = convertBengaliToEnglishNumerals(decodedText);
+        const now = Date.now();
+        if (normalizedText === lastScannedRef.current && now - lastScannedTimeRef.current < 1500) {
+          return; // Debounce duplicate scans
+        }
+        lastScannedRef.current = normalizedText;
+        lastScannedTimeRef.current = now;
+        playSuccessBeep();
+        console.log('[Scanner] ✅ Barcode detected:', normalizedText);
+        onBarcodeDetected(normalizedText);
+      };
+
+      const handleScanFailure = (error: any) => {
+        const errorMsg = typeof error === 'string' ? error : error?.message;
+        // Avoid logging noisy scan failures that happen on every frame.
+        if (
+          errorMsg &&
+          !errorMsg.includes('No MultiFormat Readers were able to detect the code') &&
+          !errorMsg.includes('No barcode or QR code detected')
+        ) {
+          console.warn('[Scanner] Scan error:', errorMsg);
+        }
+      };
+
+      const startScannerWithConstraints = async (constraints: any) => {
+        await scanner.start(constraints, commonScanOptions, handleScanSuccess, handleScanFailure);
+      };
+
+      const environmentDeviceId = await getEnvironmentCameraId();
+      let started = false;
+
+      // 1) Try deviceId-based selection (most reliable on mobile devices).
+      if (environmentDeviceId) {
+        try {
+          await startScannerWithConstraints({
+            ...commonScanOptions,
+            videoConstraints: {
+              ...commonScanOptions.videoConstraints,
+              deviceId: { exact: environmentDeviceId },
+            },
+          });
+          started = true;
+          console.log('[Scanner] Started using detected back camera deviceId.');
+        } catch (deviceIdError) {
+          console.warn('[Scanner] Failed to start using environment deviceId, falling back to facingMode...', deviceIdError);
+        }
+      }
+
+      // 2) Fallback: try facingMode constraints if still not started.
+      if (!started) {
+        const strictFacing = {
+          ...commonScanOptions,
           videoConstraints: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            advanced: [{ focusMode: "continuous" }]
+            ...commonScanOptions.videoConstraints,
+            facingMode: { exact: desiredFacingMode },
           },
-        },
-        (decodedText: string) => {
-          const normalizedText = convertBengaliToEnglishNumerals(decodedText);
-          const now = Date.now();
-          if (normalizedText === lastScannedRef.current && now - lastScannedTimeRef.current < 1500) {
-            return; // Debounce duplicate scans
-          }
-          lastScannedRef.current = normalizedText;
-          lastScannedTimeRef.current = now;
-          console.log('[Scanner] ✅ Barcode detected:', normalizedText);
-          onBarcodeDetected(normalizedText);
-        },
-        (error: any) => {
-          // These errors happen continuously during scanning, ignore them.
-          // Error might be a string or an object depending on the library version
-          const errorMsg = typeof error === 'string' ? error : error?.message;
-          if (errorMsg && !errorMsg.includes('No MultiFormat Readers were able to detect the code') && !errorMsg.includes('No barcode or QR code detected')) {
-            // We usually don't need to log scanning failures to console as they happen on every frame
+        };
+        const relaxedFacing = {
+          ...commonScanOptions,
+          videoConstraints: {
+            ...commonScanOptions.videoConstraints,
+            facingMode: desiredFacingMode,
+          },
+        };
+
+        try {
+          await startScannerWithConstraints(strictFacing);
+          started = true;
+          console.log('[Scanner] Started with strict facingMode=environment.');
+        } catch (strictError) {
+          console.warn('[Scanner] Strict facingMode failed, retrying relaxed facingMode...', strictError);
+          try {
+            await startScannerWithConstraints(relaxedFacing);
+            started = true;
+            console.log('[Scanner] Started with relaxed facingMode=environment.');
+          } catch (relaxedError) {
+            console.error('[Scanner] Failed to start scanner with environment-facing camera.', relaxedError);
+            throw relaxedError;
           }
         }
-      );
+      }
 
       // Check if component is still mounted before setting state.
       if (isMountedRef.current) {

@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo } from 'react';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 import { CartPanel } from '@/components/pos/CartPanel';
+import { CameraScannerDialog } from '@/components/pos/CameraScannerDialog';
 import { CheckoutDialog, type PaymentData } from '@/components/pos/CheckoutDialog';
 import { PrintDialog } from '@/components/pos/PrintDialog';
 import { Dashboard } from '@/components/pos/Dashboard';
@@ -12,7 +13,10 @@ import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDia
 import { PartiesManagement } from '@/components/pos/PartiesManagement';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Input } from '@/components/ui/input';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   Wifi,
   WifiOff,
@@ -25,6 +29,8 @@ import {
   FileText,
   Users,
   Settings,
+  Search,
+  X,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
@@ -33,6 +39,7 @@ import { ProductsDB, SalesDB, SyncQueueDB, CustomersDB } from '@/lib/offline/ind
 import { STORE_CONFIG } from '@/types/pos';
 import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
+import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 
@@ -58,6 +65,15 @@ const generateInvoiceNumber = () => {
   return `INV-${year}${month}${day}-${random}`;
 };
 
+const formatPrice = (price: number) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(price);
+};
+
 function POSDashboard() {
   const [currentPage, setCurrentPage] = useState<PageType>('billing');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -67,6 +83,8 @@ function POSDashboard() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [completedCheckoutSale, setCompletedCheckoutSale] = useState<Sale | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isMobileScannerOpen, setIsMobileScannerOpen] = useState(false);
+  const [mobileSearchQuery, setMobileSearchQuery] = useState('');
 
   // Store hooks
   const products = useProductsStore((state) => state.products);
@@ -88,6 +106,7 @@ function POSDashboard() {
   const clearCart = useCartStore((state) => state.clearCart);
   const setLastScannedBarcode = useCartStore((state) => state.setLastScannedBarcode);
   const getItemCount = useCartStore((state) => state.getItemCount);
+  const getTotal = useCartStore((state) => state.getTotal);
   const cartItems = useCartStore((state) => state.items);
 
   const isOnline = useSyncStore((state) => state.isOnline);
@@ -105,6 +124,22 @@ function POSDashboard() {
   const setCurrentSale = useUIStore((state) => state.setCurrentSale);
 
   const itemCount = getItemCount();
+  const total = getTotal();
+
+  // Mobile product search
+  const filteredMobileProducts = useMemo(() => {
+    if (!mobileSearchQuery) return [];
+    return products.filter((product) => {
+      if (!product.isActive) return false;
+      const lowerQuery = mobileSearchQuery.toLowerCase();
+      const normalizedQuery = convertBengaliToEnglishNumerals(mobileSearchQuery);
+      const matchesName = product.name.toLowerCase().includes(lowerQuery);
+      const matchesBengaliName = product.nameBn?.includes(mobileSearchQuery);
+      const matchesBarcode = product.barcode?.includes(mobileSearchQuery);
+      const matchesBarcodeNormalized = convertBengaliToEnglishNumerals(product.barcode || '').includes(normalizedQuery);
+      return matchesName || matchesBengaliName || matchesBarcode || matchesBarcodeNormalized;
+    });
+  }, [products, mobileSearchQuery]);
 
   // Hydration tracking to prevent mismatches with store-dependent renders
   useEffect(() => {
@@ -236,6 +271,10 @@ function POSDashboard() {
     },
     [getProductByBarcode, addItem, setLastScannedBarcode, currentPage]
   );
+
+  const handleOpenMobileScanner = useCallback(() => {
+    setIsMobileScannerOpen(true);
+  }, []);
 
   // Initialize barcode scanner
   // It should be disabled when any major dialog is open that might interfere or consume input
@@ -674,8 +713,8 @@ function POSDashboard() {
       case 'billing':
         return (
           <div className="flex h-full">
-            {/* Product Grid */}
-            <div className="flex-1 overflow-hidden">
+            {/* Product Grid (desktop only) */}
+            <div className="flex-1 hidden sm:flex flex-col overflow-hidden">
               {isLoading ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
@@ -686,6 +725,83 @@ function POSDashboard() {
               ) : (
                 <ProductGrid />
               )}
+            </div>
+
+            {/* Mobile billing: cart + scan button (no product list) */}
+            <div className="flex-1 flex flex-col min-h-0 sm:hidden">
+              <div className="p-3 border-b bg-background space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold">Cart</h2>
+                    <p className="text-xs text-muted-foreground">Scan or search items to add them</p>
+                  </div>
+                  <Button size="sm" onClick={handleOpenMobileScanner}>
+                    Scan
+                  </Button>
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search products by name or barcode..."
+                    value={mobileSearchQuery}
+                    onChange={(e) => setMobileSearchQuery(e.target.value)}
+                    className="pl-9 h-10"
+                  />
+                  {mobileSearchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                      onClick={() => setMobileSearchQuery('')}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Search Results */}
+              {mobileSearchQuery && (
+                <div className="border-b bg-background max-h-48 overflow-y-auto">
+                  <div className="p-3">
+                    <h3 className="text-sm font-medium mb-2">Search Results ({filteredMobileProducts.length})</h3>
+                    {filteredMobileProducts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No products found</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredMobileProducts.slice(0, 10).map((product) => (
+                          <div
+                            key={product.id}
+                            className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                            onClick={() => {
+                              addItem(product, 1);
+                              setMobileSearchQuery('');
+                            }}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{product.name}</p>
+                              {product.barcode && (
+                                <p className="text-xs text-muted-foreground">{product.barcode}</p>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-sm">{formatPrice(product.sellingPrice)}</p>
+                              {product.currentStock <= 0 && (
+                                <p className="text-xs text-destructive">Out of stock</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} />
+              </div>
             </div>
 
             {/* Desktop Cart Panel */}
@@ -781,25 +897,6 @@ function POSDashboard() {
               </div>
             </div>
 
-            {/* Mobile Cart Button (for billing page) */}
-            {currentPage === 'billing' && (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="relative">
-                    <ShoppingCart className="w-5 h-5" />
-                    {isHydrated && itemCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
-                        {itemCount}
-                      </span>
-                    )}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-full sm:w-96 p-0">
-                  <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} />
-                </SheetContent>
-              </Sheet>
-            )}
-
             {/* Page indicator for non-billing pages */}
             {currentPage !== 'billing' && (
               <Badge variant="secondary" className="text-xs">
@@ -814,6 +911,15 @@ function POSDashboard() {
           {renderPageContent()}
         </main>
       </div>
+
+      {/* Mobile Scanner Dialog */}
+      <CameraScannerDialog
+        open={isMobileScannerOpen}
+        onOpenChange={setIsMobileScannerOpen}
+        onBarcodeScanned={handleBarcodeDetected}
+        title="Scan Barcode"
+        description="Position barcode/QR code in the center of the frame"
+      />
 
       {/* Checkout Dialog */}
       <CheckoutDialog

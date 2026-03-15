@@ -29,15 +29,7 @@ export function CameraScannerDialog({
   title = 'Scan Barcode',
   description = 'Position barcode within the frame',
 }: CameraScannerDialogProps) {
-  const [cameraMode, setCameraMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-      setCameraMode(isMobile ? 'environment' : 'user');
-    }
-  }, [open]);
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -53,11 +45,11 @@ export function CameraScannerDialog({
     enabled: open,
     onBarcodeDetected: (barcode: string) => {
       onBarcodeScanned(barcode);
-      startShutdown();
+      // Keep the scanner open for continuous scanning until the user explicitly closes it.
     },
     onClose: handleClose,
     onError: setError,
-    facingMode: cameraMode,
+    facingMode: 'environment',
   });
 
   const handleCloseIntent = useCallback(() => {
