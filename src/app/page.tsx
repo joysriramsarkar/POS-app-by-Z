@@ -31,6 +31,7 @@ import {
   Settings,
   Search,
   X,
+  ScanLine,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
@@ -741,35 +742,32 @@ function POSDashboard() {
 
             {/* Mobile billing: cart + scan button (no product list) */}
             <div className="flex-1 flex flex-col overflow-hidden w-full sm:hidden min-h-0">
-              <div className="p-2 md:p-3 border-b bg-background space-y-2 md:space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-base md:text-lg font-semibold">Cart</h2>
-                    <p className="text-xs text-muted-foreground">Scan or search items to add them</p>
+              <div className="p-2 md:p-3 border-b bg-background">
+                <div className="flex flex-row items-center gap-2 w-full mb-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Search products by name or barcode..."
+                      value={mobileSearchQuery}
+                      onChange={(e) => setMobileSearchQuery(e.target.value)}
+                      className="pl-9 h-9 md:h-10 text-sm"
+                    />
+                    {mobileSearchQuery && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 md:h-8 md:w-8 p-0"
+                        onClick={() => setMobileSearchQuery('')}
+                      >
+                        <X className="w-3 h-3 md:w-4 md:h-4" />
+                      </Button>
+                    )}
                   </div>
-                  <Button size="sm" className="h-9 md:h-10" onClick={handleOpenMobileScanner}>
-                    Scan
+                  <Button size="sm" className="shrink-0 h-9 w-9 p-0 md:h-10 md:w-auto md:px-4" onClick={handleOpenMobileScanner}>
+                    <ScanLine className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Scan</span>
                   </Button>
-                </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Search products by name or barcode..."
-                    value={mobileSearchQuery}
-                    onChange={(e) => setMobileSearchQuery(e.target.value)}
-                    className="pl-9 h-9 md:h-10 text-sm"
-                  />
-                  {mobileSearchQuery && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 md:h-8 md:w-8 p-0"
-                      onClick={() => setMobileSearchQuery('')}
-                    >
-                      <X className="w-3 h-3 md:w-4 md:h-4" />
-                    </Button>
-                  )}
                 </div>
               </div>
 

@@ -162,7 +162,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
   return (
     <div className="flex flex-col h-full bg-background min-h-0">
       {/* Header */}
-      <div className="flex items-center justify-between p-2 md:p-4 border-b shrink-0">
+      <div className="hidden md:flex items-center justify-between p-2 md:p-4 border-b shrink-0">
         <div className="flex items-center gap-2">
           <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" />
           <h2 className="font-semibold text-base md:text-lg">Cart</h2>
