@@ -438,12 +438,12 @@ function POSDashboard() {
         clearCart();
         toast({ title: 'Offline sale saved', description: 'Will sync when connection is restored.' });
       }
-    } catch (error: any) {
-      const errorMessage = error?.message || 'Unable to complete sale';
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unable to complete sale';
       console.error('Checkout failed:', {
         error: error,
         message: errorMessage,
-        stack: error?.stack,
+        stack: error instanceof Error ? error.stack : undefined,
       });
       
       // Reset checkout state on error
@@ -537,7 +537,11 @@ function POSDashboard() {
       }
     } catch (error) {
       console.error('Stock entry error:', error);
-      toast({ title: 'Stock entry error', description: (error as any)?.message || 'Unknown error', variant: 'destructive' });
+      toast({
+        title: 'Stock entry error',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive'
+      });
     }
   }, [isOnline, updateProductStock, setProducts, pendingCount, toast]);
 
@@ -547,8 +551,32 @@ function POSDashboard() {
       if (!isOnline) {
         // offline: store locally and queue a sync entry
         if (data.id) {
-          updateProduct(data.id, { ...data, updatedAt: new Date() } as any);
-          ProductsDB.upsert({ ...(data as any), updatedAt: new Date(), createdAt: new Date(), currentStock: (data as any).currentStock || 0 });
+          const updatedProductData: Partial<Product> = {
+            ...data,
+            barcode: data.barcode || null,
+            updatedAt: new Date(),
+          };
+          updateProduct(data.id, updatedProductData);
+
+          // Get existing product to preserve createdAt if possible
+          const existingProduct = products.find(p => p.id === data.id);
+          const fullProduct: Product = {
+            id: data.id,
+            name: data.name,
+            nameBn: data.nameBn,
+            barcode: data.barcode || null,
+            category: data.category,
+            buyingPrice: data.buyingPrice,
+            sellingPrice: data.sellingPrice,
+            unit: data.unit,
+            currentStock: data.currentStock,
+            minStockLevel: data.minStockLevel,
+            isActive: data.isActive,
+            createdAt: existingProduct?.createdAt || new Date(),
+            updatedAt: new Date(),
+          };
+          ProductsDB.upsert(fullProduct);
+
           await SyncQueueDB.add({
             id: uuidv4(),
             entityType: 'Product',
@@ -560,14 +588,15 @@ function POSDashboard() {
             createdAt: new Date(),
           });
         } else {
-          const newProduct = {
+          const newProduct: Product = {
             ...data,
             id: uuidv4(),
+            barcode: data.barcode || null,
             currentStock: 0,
             isActive: true,
             createdAt: new Date(),
             updatedAt: new Date(),
-          } as any;
+          };
           addProduct(newProduct);
           ProductsDB.upsert(newProduct);
           await SyncQueueDB.add({
@@ -620,9 +649,13 @@ function POSDashboard() {
       }
     } catch (error) {
       console.error("Failed to save product:", error);
-      toast({ title: 'Product save error', description: (error as any)?.message || 'Unexpected error', variant: 'destructive' });
+      toast({
+        title: 'Product save error',
+        description: error instanceof Error ? error.message : 'Unexpected error',
+        variant: 'destructive'
+      });
     }
-  }, [updateProduct, addProduct, isOnline, toast]);
+  }, [updateProduct, addProduct, isOnline, toast, products]);
 
   // Handle navigation
   const handleNavigate = useCallback((page: string) => {
