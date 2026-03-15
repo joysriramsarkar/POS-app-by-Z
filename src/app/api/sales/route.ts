@@ -222,6 +222,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Second pass: atomically update stock for all items
+      // We must do updates one-by-one to ensure atomic conditional check for each product
       for (const item of validatedItems) {
         // Use raw SQL for atomic conditional update to prevent race conditions
         const updateResult = await tx.$executeRaw`
@@ -235,17 +236,18 @@ export async function POST(request: NextRequest) {
           // This should not happen as we validated above, but just in case
           throw new Error(`Atomic stock update failed for product ${item.productId}. Another transaction may have depleted stock.`);
         }
-
-        await tx.stockHistory.create({
-          data: {
-            productId: item.productId,
-            changeType: 'sale',
-            quantity: -item.quantity,
-            reason: `Sale: ${newSale.invoiceNumber}`,
-            referenceId: newSale.id,
-          },
-        });
       }
+
+      // Third pass: Create all stock history entries in a single batch to minimize round-trips
+      await tx.stockHistory.createMany({
+        data: validatedItems.map((item) => ({
+          productId: item.productId,
+          changeType: 'sale',
+          quantity: -item.quantity,
+          reason: `Sale: ${newSale.invoiceNumber}`,
+          referenceId: newSale.id,
+        })),
+      });
 
       // If payment is partially or fully due, fetch customer BEFORE updating and use calculated values
       if (customerId && amountPaidValue < totalAmount) {
