@@ -181,10 +181,10 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
           }
 
           // If no back camera found by label, try to find any video input device
-          // Html5Qrcode.getCameras() returns all available cameras, so we'll use the second one as fallback
+          // Html5Qrcode.getCameras() returns all available cameras, so we'll use the last one as fallback
           if (devices.length > 0) {
-            // Assume the second camera (if available) is the back camera on mobile devices
-            const backCamera = devices.length > 1 ? devices[1] : devices[0];
+            // Assume the last camera in the array is the back camera
+            const backCamera = devices[devices.length - 1];
             console.log('[Scanner] Using fallback camera (assuming back):', backCamera.label, backCamera.id);
             return backCamera.id;
           }
@@ -254,12 +254,13 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
           started = true;
           console.log('[Scanner] Started using detected back camera deviceId.');
         } catch (deviceIdError) {
-          console.warn('[Scanner] Failed to start using environment deviceId, falling back to facingMode...', deviceIdError);
+          console.warn('[Scanner] Failed to start using environment deviceId...', deviceIdError);
+          throw deviceIdError;
         }
       }
 
       // 2) Fallback: try facingMode constraints if still not started.
-      if (!started) {
+      if (!started && environmentDeviceId === null) {
         const strictFacing = {
           ...commonScanOptions,
           videoConstraints: {
