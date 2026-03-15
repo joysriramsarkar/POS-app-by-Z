@@ -728,14 +728,14 @@ function POSDashboard() {
             </div>
 
             {/* Mobile billing: cart + scan button (no product list) */}
-            <div className="flex-1 flex flex-col min-h-0 sm:hidden">
-              <div className="p-3 border-b bg-background space-y-3">
+            <div className="h-[100dvh] flex flex-col overflow-hidden w-full sm:hidden min-h-0">
+              <div className="p-2 md:p-3 border-b bg-background space-y-2 md:space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold">Cart</h2>
+                    <h2 className="text-base md:text-lg font-semibold">Cart</h2>
                     <p className="text-xs text-muted-foreground">Scan or search items to add them</p>
                   </div>
-                  <Button size="sm" onClick={handleOpenMobileScanner}>
+                  <Button size="sm" className="h-9 md:h-10" onClick={handleOpenMobileScanner}>
                     Scan
                   </Button>
                 </div>
@@ -746,16 +746,16 @@ function POSDashboard() {
                     placeholder="Search products by name or barcode..."
                     value={mobileSearchQuery}
                     onChange={(e) => setMobileSearchQuery(e.target.value)}
-                    className="pl-9 h-10"
+                    className="pl-9 h-9 md:h-10 text-sm"
                   />
                   {mobileSearchQuery && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 md:h-8 md:w-8 p-0"
                       onClick={() => setMobileSearchQuery('')}
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3 h-3 md:w-4 md:h-4" />
                     </Button>
                   )}
                 </div>
@@ -799,7 +799,7 @@ function POSDashboard() {
                 </div>
               )}
 
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="flex-1 min-h-0">
                 <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} />
               </div>
             </div>
@@ -864,14 +864,14 @@ function POSDashboard() {
   };
 
   return (
-    <div className="h-screen flex bg-background">
+    <div className="h-screen flex w-full max-w-[100vw] overflow-x-hidden bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-64 border-r bg-card shrink-0 no-print">
         {renderSidebar()}
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Mobile Header */}
         <header className="lg:hidden shrink-0 border-b bg-card px-4 py-3 no-print">
           <div className="flex items-center justify-between gap-4">

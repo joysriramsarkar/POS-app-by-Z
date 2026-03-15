@@ -165,16 +165,33 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
       const desiredFacingMode = 'environment';
 
       const getEnvironmentCameraId = async (): Promise<string | null> => {
-        if (!navigator.mediaDevices?.enumerateDevices) return null;
         try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const videoInputs = devices.filter((d) => d.kind === 'videoinput');
-          const match = videoInputs.find((d) => {
-            const label = (d.label || '').toLowerCase();
-            return label.includes('back') || label.includes('rear') || label.includes('environment');
-          });
-          return match?.deviceId || null;
-        } catch {
+          // First, explicitly call Html5Qrcode.getCameras() to get the array of available devices
+          const devices = await Html5Qrcode.getCameras();
+          console.log('[Scanner] Available cameras:', devices);
+
+          // Iterate through the devices and explicitly look for a camera where device.label.toLowerCase()
+          // includes "back", "rear", or "environment"
+          for (const device of devices) {
+            const label = (device.label || '').toLowerCase();
+            if (label.includes('back') || label.includes('rear') || label.includes('environment')) {
+              console.log('[Scanner] Found back camera:', device.label, device.id);
+              return device.id;
+            }
+          }
+
+          // If no back camera found by label, try to find any video input device
+          // Html5Qrcode.getCameras() returns all available cameras, so we'll use the second one as fallback
+          if (devices.length > 0) {
+            // Assume the second camera (if available) is the back camera on mobile devices
+            const backCamera = devices.length > 1 ? devices[1] : devices[0];
+            console.log('[Scanner] Using fallback camera (assuming back):', backCamera.label, backCamera.id);
+            return backCamera.id;
+          }
+
+          return null;
+        } catch (error) {
+          console.warn('[Scanner] Failed to enumerate cameras:', error);
           return null;
         }
       };
