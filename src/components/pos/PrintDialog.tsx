@@ -222,7 +222,7 @@ export function PrintDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col print-dialog-content">
+      <DialogContent className="sm:max-w-[95vw] md:max-w-4xl max-h-[95dvh] md:max-h-[90vh] overflow-hidden flex flex-col print-dialog-content p-4 md:p-6">
         <DialogHeader className="no-print">
           <DialogTitle>Print Invoice</DialogTitle>
           <DialogDescription>

@@ -740,7 +740,7 @@ function POSDashboard() {
             </div>
 
             {/* Mobile billing: cart + scan button (no product list) */}
-            <div className="h-[100dvh] flex flex-col overflow-hidden w-full sm:hidden min-h-0">
+            <div className="flex-1 flex flex-col overflow-hidden w-full sm:hidden min-h-0">
               <div className="p-2 md:p-3 border-b bg-background space-y-2 md:space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
@@ -876,7 +876,7 @@ function POSDashboard() {
   };
 
   return (
-    <div className="h-screen flex w-full max-w-[100vw] overflow-x-hidden bg-background">
+    <div className="h-[100dvh] w-full overflow-hidden flex flex-col sm:flex-row bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-64 border-r bg-card shrink-0 no-print">
         {renderSidebar()}
@@ -919,7 +919,7 @@ function POSDashboard() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-hidden">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {renderPageContent()}
         </main>
       </div>

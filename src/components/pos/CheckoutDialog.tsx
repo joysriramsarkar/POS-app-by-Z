@@ -389,7 +389,7 @@ export function CheckoutDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[425px] w-[95vw] max-h-[90dvh] flex flex-col p-4 md:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="w-5 h-5" />
@@ -414,7 +414,7 @@ export function CheckoutDialog({
           )}
 
           {/* Order Summary */}
-          <ScrollArea className="flex-1 min-h-0">
+          <ScrollArea className="flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-2 pr-2">
               {items.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">

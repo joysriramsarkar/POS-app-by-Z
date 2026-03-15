@@ -162,7 +162,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
   return (
     <div className="flex flex-col h-full bg-background min-h-0">
       {/* Header */}
-      <div className="flex items-center justify-between p-3 md:p-4 border-b shrink-0">
+      <div className="flex items-center justify-between p-2 md:p-4 border-b shrink-0">
         <div className="flex items-center gap-2">
           <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" />
           <h2 className="font-semibold text-base md:text-lg">Cart</h2>
@@ -184,7 +184,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
       </div>
 
       {/* Customer Selector */}
-      <div className="p-2 md:p-3 border-b shrink-0">
+      <div className="p-2 md:p-3 border-b shrink-0 py-1.5 md:py-3">
         <Label className="text-xs text-muted-foreground mb-1.5 block">Customer</Label>
         <div className="relative">
           <Button
@@ -278,8 +278,8 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
       </div>
 
       {/* Cart Items - Mobile: flex-1 overflow-y-auto, Desktop: normal */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-24 sm:pb-0">
-        <div className="p-2 md:p-3 space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-2 sm:pb-0">
+        <div className="p-1.5 md:p-3 space-y-1.5 md:space-y-2">
           {isCartEmpty ? (
             <div className="flex flex-col items-center justify-center py-8 md:py-12 text-center">
               <ShoppingCart className="w-10 h-10 md:w-12 md:h-12 text-muted-foreground mb-3 md:mb-4" />
@@ -295,7 +295,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
       </div>
 
       {/* Payment Method & Totals - Mobile: Fixed at bottom, Desktop: In-flow */}
-      <div className="flex-none mt-auto sm:relative fixed bottom-0 left-0 right-0 bg-background border-t p-3 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] z-40 md:p-0 md:shadow-none md:z-auto pb-[env(safe-area-inset-bottom)]">
+      <div className="flex-none mt-auto sm:relative bg-background border-t p-2 md:p-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] md:shadow-none z-40 md:z-auto pb-[env(safe-area-inset-bottom)]">
         {/* Payment Method Selector - Visible Cards */}
         <div className="p-2 md:p-3 border-b md:border-b-0 md:p-3">
           <Label className="text-xs text-muted-foreground mb-2 block">Payment Method</Label>
@@ -391,7 +391,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
             </div>
             <Button
               size="lg"
-              className="h-10 md:h-12 px-4 md:px-6 text-sm md:text-lg font-semibold touch-manipulation"
+              className="h-9 md:h-12 px-3 md:px-6 text-sm md:text-lg font-semibold touch-manipulation"
               disabled={isCartEmpty || total <= 0}
               onClick={handleCheckout}
             >

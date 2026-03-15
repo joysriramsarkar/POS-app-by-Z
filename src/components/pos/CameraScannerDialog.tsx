@@ -70,7 +70,7 @@ export function CameraScannerDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogInteraction}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[425px] w-[95vw] p-4 md:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Camera className="w-5 h-5" />
