@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import {
   Dialog,
   DialogContent,
@@ -34,6 +36,27 @@ export function CameraScannerDialog({
   const handleClose = useCallback(() => {
     onOpenChange(false);
   }, [onOpenChange]);
+
+  const startScan = useCallback(async () => {
+    const { camera } = await BarcodeScanner.requestPermissions();
+    if (camera !== 'granted') {
+      setError('ক্যামেরার পারমিশন ছাড়া স্ক্যান সম্ভব নয়!');
+      return;
+    }
+    document.querySelector('body')?.classList.add('barcode-scanner-active');
+    try {
+      const { barcodes } = await BarcodeScanner.scan();
+      if (barcodes.length > 0) {
+        const scannedCode = barcodes[0].rawValue;
+        console.log("স্ক্যান করা কোড: ", scannedCode);
+        onBarcodeScanned(scannedCode);
+      }
+    } catch (err) {
+      setError('Scan failed: ' + (err as Error).message);
+    } finally {
+      document.querySelector('body')?.classList.remove('barcode-scanner-active');
+    }
+  }, [onBarcodeScanned]);
 
   const {
     isSupported,
@@ -103,6 +126,13 @@ export function CameraScannerDialog({
         </div>
 
         <DialogFooter className="flex gap-2">
+          <Button
+            onClick={startScan}
+            className="w-full"
+            disabled={isShuttingDown || !isSupported}
+          >
+            Scan
+          </Button>
           <Button
             onClick={handleCloseIntent}
             className="w-full"

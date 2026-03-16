@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>POS App</title>
+  <style>
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+    iframe { border: none; width: 100%; height: 100%; }
+  </style>
+  <script>
+    // Detect if running on Android emulator and use correct host
+    const isAndroidEmulator = navigator.userAgent.includes('Android');
+    const host = isAndroidEmulator ? '10.0.2.2' : '192.168.1.7';
+    const appUrl = `http://${host}:3000`;
+    document.documentElement.dataset.appUrl = appUrl;
+  </script>
+</head>
+<body>
+  <iframe id="app"></iframe>
+  <script>
+    const appUrl = document.documentElement.dataset.appUrl;
+    document.getElementById('app').src = appUrl;
+  </script>
+</body>
+</html>

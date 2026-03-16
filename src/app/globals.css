@@ -280,3 +280,9 @@
 .invoice-preview {
   font-family: "Noto Sans Bengali", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
+
+/* Barcode scanner active styles */
+
+.barcode-scanner-active {
+  background: transparent !important;
+}

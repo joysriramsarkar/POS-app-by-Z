@@ -1,8 +1,10 @@
 'use client';
 
+import dynamic from 'next/dynamic';
+
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { ProductGrid } from '@/components/pos/ProductGrid';
-import { CartPanel } from '@/components/pos/CartPanel';
+const CartPanel = dynamic(() => import('@/components/pos/CartPanel'), { ssr: false });
 import { CameraScannerDialog } from '@/components/pos/CameraScannerDialog';
 import { CheckoutDialog, type PaymentData } from '@/components/pos/CheckoutDialog';
 import { PrintDialog } from '@/components/pos/PrintDialog';
