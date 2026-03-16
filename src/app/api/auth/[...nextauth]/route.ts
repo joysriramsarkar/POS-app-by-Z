@@ -68,6 +68,10 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
+if (!authOptions.secret) {
+  throw new Error("NEXTAUTH_SECRET is not defined. Please set it in your environment variables.");
+}
+
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };
