@@ -70,6 +70,20 @@ export function ProductGrid({
   const products = externalProducts || storeProducts;
   const searchQuery = externalProducts ? localSearchQuery : storeSearchQuery;
 
+  // Pre-compute a map for O(1) barcode lookups
+  const barcodeMap = useMemo(() => {
+    const map = new Map<string, Product>();
+    products.forEach((product) => {
+      if (product.barcode) {
+        const normalized = convertBengaliToEnglishNumerals(product.barcode);
+        if (!map.has(normalized)) {
+          map.set(normalized, product);
+        }
+      }
+    });
+    return map;
+  }, [products]);
+
   // Filter products based on search and category
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -131,9 +145,7 @@ export function ProductGrid({
   const handleCameraBarcode = useCallback(
     (barcode: string) => {
       const normalizedBarcode = convertBengaliToEnglishNumerals(barcode);
-      const matchedProduct = products.find(
-        (p) => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedBarcode
-      );
+      const matchedProduct = barcodeMap.get(normalizedBarcode);
 
       if (matchedProduct) {
         if (externalProducts) {
@@ -161,7 +173,7 @@ export function ProductGrid({
         });
       }
     },
-    [products, externalProducts, onProductSelect, addItem, setSearchQuery, toast]
+    [barcodeMap, externalProducts, onProductSelect, addItem, setSearchQuery, toast]
   );
 
   const handleCategorySelect = useCallback(
@@ -216,7 +228,7 @@ export function ProductGrid({
                     e.preventDefault();
                     const scannedValue = e.currentTarget.value.trim();
                     const normalizedScanValue = convertBengaliToEnglishNumerals(scannedValue);
-                    const matchedProduct = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedScanValue);
+                    const matchedProduct = barcodeMap.get(normalizedScanValue);
                     
                     if (matchedProduct) {
                       if (externalProducts) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
 import { ProductsDB, SyncQueueDB } from '@/lib/offline/indexeddb';
 import { v4 as uuidv4 } from 'uuid';
@@ -46,6 +46,21 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { products, updateProductStock, setProducts } = useProductsStore();
+
+  // Pre-compute a map for O(1) barcode lookups
+  const barcodeMap = useMemo(() => {
+    const map = new Map<string, (typeof products)[0]>();
+    products.forEach((product) => {
+      if (product.barcode) {
+        const normalized = convertBengaliToEnglishNumerals(product.barcode);
+        if (!map.has(normalized)) {
+          map.set(normalized, product);
+        }
+      }
+    });
+    return map;
+  }, [products]);
+
   const isOnline = useSyncStore((state) => state.isOnline);
   const pendingCount = useSyncStore((state) => state.pendingCount);
   const setPendingCount = useSyncStore((state) => state.setPendingCount);
@@ -83,7 +98,7 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
           .filter(row => row.quantity_to_add && !isNaN(parseInt(row.quantity_to_add, 10)) && parseInt(row.quantity_to_add, 10) !== 0)
           .map(row => {
             const normalizedRowBarcode = convertBengaliToEnglishNumerals(row.barcode);
-            const product = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedRowBarcode);
+            const product = barcodeMap.get(normalizedRowBarcode);
             return {
                 barcode: row.barcode,
                 name: product?.name || 'Unknown Product',
@@ -142,7 +157,7 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
     // iterate and send each update to backend or handle offline
     for (const item of parsedData) {
       const normalizedItemBarcode = convertBengaliToEnglishNumerals(item.barcode);
-      const product = products.find(p => convertBengaliToEnglishNumerals(p.barcode || '') === normalizedItemBarcode);
+      const product = barcodeMap.get(normalizedItemBarcode);
       if (!product) continue;
 
       if (isOnline) {
