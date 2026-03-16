@@ -83,9 +83,7 @@ function ThermalInvoice({
       <div className="text-center space-y-1 truncate">
         {showLogo && (
           <div className="flex justify-center mb-2">
-            <div className="w-10 h-10 border-2 border-black rounded-full flex items-center justify-center shrink-0">
-              <span className="text-lg font-bold">LB</span>
-            </div>
+            <img src="/favicon.ico" alt="Logo" className="w-10 h-10" />
           </div>
         )}
         <h1 className="font-bold text-sm truncate">{STORE_CONFIG.name}</h1>

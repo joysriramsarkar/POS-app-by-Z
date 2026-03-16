@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   keywords: ["POS", "Point of Sale", "Grocery Store", "Billing", "Inventory", "Lakhan Bhandar"],
   authors: [{ name: "জয়শ্রীরাম সরকার" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "/favicon.ico",
   },
   manifest: "/manifest.json",
 };
