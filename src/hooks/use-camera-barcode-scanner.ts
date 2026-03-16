@@ -234,61 +234,54 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
         }
       };
 
-      const startScannerWithConstraints = async (constraints: any) => {
-        await scanner.start(constraints, commonScanOptions, handleScanSuccess, handleScanFailure);
-      };
-
       const environmentDeviceId = await getEnvironmentCameraId();
       let started = false;
 
       // 1) Try deviceId-based selection (most reliable on mobile devices).
       if (environmentDeviceId) {
         try {
-          await startScannerWithConstraints({
-            ...commonScanOptions,
-            videoConstraints: {
-              ...commonScanOptions.videoConstraints,
-              deviceId: { exact: environmentDeviceId },
-            },
-          });
+          // সরাসরি string ID পাস করতে হবে, কোনো জটিল Object নয়
+          await scanner.start(
+            environmentDeviceId,
+            commonScanOptions,
+            handleScanSuccess,
+            handleScanFailure
+          );
           started = true;
           console.log('[Scanner] Started using detected back camera deviceId.');
         } catch (deviceIdError) {
           console.warn('[Scanner] Failed to start using environment deviceId...', deviceIdError);
-          throw deviceIdError;
+          // এখানে throw করা যাবে না, করলে নিচের fallback কাজ করবে না।
         }
       }
 
       // 2) Fallback: try facingMode constraints if still not started.
-      if (!started && environmentDeviceId === null) {
-        const strictFacing = {
-          ...commonScanOptions,
-          videoConstraints: {
-            ...commonScanOptions.videoConstraints,
-            facingMode: { exact: desiredFacingMode },
-          },
-        };
-        const relaxedFacing = {
-          ...commonScanOptions,
-          videoConstraints: {
-            ...commonScanOptions.videoConstraints,
-            facingMode: desiredFacingMode,
-          },
-        };
-
+      if (!started) {
         try {
-          await startScannerWithConstraints(strictFacing);
+          // Strict facingMode Object
+          await scanner.start(
+            { facingMode: { exact: "environment" } },
+            commonScanOptions,
+            handleScanSuccess,
+            handleScanFailure
+          );
           started = true;
           console.log('[Scanner] Started with strict facingMode=environment.');
         } catch (strictError) {
           console.warn('[Scanner] Strict facingMode failed, retrying relaxed facingMode...', strictError);
           try {
-            await startScannerWithConstraints(relaxedFacing);
+            // Relaxed facingMode Object
+            await scanner.start(
+              { facingMode: "environment" },
+              commonScanOptions,
+              handleScanSuccess,
+              handleScanFailure
+            );
             started = true;
             console.log('[Scanner] Started with relaxed facingMode=environment.');
           } catch (relaxedError) {
             console.error('[Scanner] Failed to start scanner with environment-facing camera.', relaxedError);
-            throw relaxedError;
+            throw relaxedError; // এখানে আর কোনো অপশন নেই, তাই Error Throw করতে হবে
           }
         }
       }
