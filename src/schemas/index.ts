@@ -38,6 +38,8 @@ export const SaleInputSchema = z.object({
   totalAmount: z.coerce.number().nonnegative().optional(),
   paymentStatus: z.string().optional(),
   status: z.string().optional(),
+  usePrepaid: z.boolean().optional().default(false),
+  prepaidAmountUsed: z.coerce.number().nonnegative().optional().default(0),
 });
 
 export type SaleInput = z.infer<typeof SaleInputSchema>;

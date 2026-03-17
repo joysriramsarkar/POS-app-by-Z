@@ -16,6 +16,13 @@ interface PrintInvoiceProps {
   showGst?: boolean;
   footerMessage?: string;
   className?: string;
+  storeConfig?: {
+    name: string;
+    nameBn: string;
+    address: string;
+    phone: string;
+    gstNumber?: string;
+  };
 }
 
 // ============================================================================
@@ -51,6 +58,13 @@ interface ThermalInvoiceProps {
   width: "58mm" | "80mm";
   showLogo?: boolean;
   footerMessage?: string;
+  storeConfig?: {
+    name: string;
+    nameBn: string;
+    address: string;
+    phone: string;
+    gstNumber?: string;
+  };
 }
 
 function ThermalInvoice({
@@ -58,7 +72,10 @@ function ThermalInvoice({
   width,
   showLogo = true,
   footerMessage,
+  storeConfig,
 }: ThermalInvoiceProps) {
+  // Use passed config or fallback to hardcoded defaults
+  const config = storeConfig || STORE_CONFIG;
   const is58mm = width === "58mm";
   const fontSize = is58mm ? "text-[10px]" : "text-xs";
   const padding = is58mm ? "p-2" : "p-3";
@@ -86,10 +103,10 @@ function ThermalInvoice({
             <img src="/favicon.ico" alt="Logo" className="w-10 h-10" />
           </div>
         )}
-        <h1 className="font-bold text-sm truncate">{STORE_CONFIG.name}</h1>
-        <p className={`${fontSize} font-semibold truncate`}>{STORE_CONFIG.nameBn}</p>
-        <p className={`${fontSize} truncate`}>{STORE_CONFIG.address}</p>
-        <p className={`${fontSize} truncate`}>Ph: {STORE_CONFIG.phone}</p>
+        <h1 className="font-bold text-sm truncate">{config.name}</h1>
+        <p className={`${fontSize} font-semibold truncate`}>{config.nameBn}</p>
+        <p className={`${fontSize} truncate`}>{config.address}</p>
+        <p className={`${fontSize} truncate`}>Ph: {config.phone}</p>
       </div>
 
       <Separator className="my-2 bg-black" />
@@ -221,6 +238,13 @@ interface StandardInvoiceProps {
   showLogo?: boolean;
   showGst?: boolean;
   footerMessage?: string;
+  storeConfig?: {
+    name: string;
+    nameBn: string;
+    address: string;
+    phone: string;
+    gstNumber?: string;
+  };
 }
 
 function StandardInvoice({
@@ -229,7 +253,10 @@ function StandardInvoice({
   showLogo = true,
   showGst = false,
   footerMessage,
+  storeConfig,
 }: StandardInvoiceProps) {
+  // Use passed config or fallback to hardcoded defaults
+  const config = storeConfig || STORE_CONFIG;
   const isA4 = size === "A4";
   const paperWidth = isA4 ? "w-[210mm]" : "w-[148mm]";
   const paperHeight = isA4 ? "min-h-[297mm]" : "min-h-[210mm]";
@@ -243,26 +270,34 @@ function StandardInvoice({
       <div className="flex justify-between items-start mb-6">
         <div className="flex items-start gap-4">
           {showLogo && (
-            <div className="w-16 h-16 border-2 border-gray-800 rounded-lg flex items-center justify-center shrink-0">
+            <div 
+              className="border-2 border-gray-800 rounded-lg flex items-center justify-center shrink-0"
+              style={{ 
+                width: '4rem',
+                height: '4rem',
+                minWidth: '4rem',
+                minHeight: '4rem'
+              }}
+            >
               <span className="text-2xl font-bold">LB</span>
             </div>
           )}
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {STORE_CONFIG.name}
+              {config.name}
             </h1>
             <p className="text-lg font-semibold text-gray-700">
-              {STORE_CONFIG.nameBn}
+              {config.nameBn}
             </p>
             <p className="text-sm text-gray-600 mt-1">
-              {STORE_CONFIG.address}
+              {config.address}
             </p>
             <p className="text-sm text-gray-600">
-              Phone: {STORE_CONFIG.phone}
+              Phone: {config.phone}
             </p>
-            {showGst && STORE_CONFIG.gstNumber && (
+            {showGst && config.gstNumber && (
               <p className="text-sm text-gray-600">
-                GST: {STORE_CONFIG.gstNumber}
+                GST: {config.gstNumber}
               </p>
             )}
           </div>
@@ -447,6 +482,7 @@ export function PrintInvoice({
   showGst = false,
   footerMessage = "This is a computer generated invoice.",
   className = "",
+  storeConfig,
 }: PrintInvoiceProps) {
   const invoiceRef = React.useRef<HTMLDivElement>(null);
 
@@ -459,6 +495,7 @@ export function PrintInvoice({
             width="58mm"
             showLogo={showLogo}
             footerMessage={footerMessage}
+            storeConfig={storeConfig}
           />
         );
       case "thermal-80":
@@ -468,6 +505,7 @@ export function PrintInvoice({
             width="80mm"
             showLogo={showLogo}
             footerMessage={footerMessage}
+            storeConfig={storeConfig}
           />
         );
       case "a4":
@@ -478,6 +516,7 @@ export function PrintInvoice({
             showLogo={showLogo}
             showGst={showGst}
             footerMessage={footerMessage}
+            storeConfig={storeConfig}
           />
         );
       case "a5":
@@ -488,6 +527,7 @@ export function PrintInvoice({
             showLogo={showLogo}
             showGst={showGst}
             footerMessage={footerMessage}
+            storeConfig={storeConfig}
           />
         );
       default:
@@ -516,6 +556,13 @@ interface InvoicePreviewProps {
   showLogo?: boolean;
   showGst?: boolean;
   footerMessage?: string;
+  storeConfig?: {
+    name: string;
+    nameBn: string;
+    address: string;
+    phone: string;
+    gstNumber?: string;
+  };
 }
 
 export function InvoicePreview({
@@ -524,6 +571,7 @@ export function InvoicePreview({
   showLogo = true,
   showGst = false,
   footerMessage,
+  storeConfig,
 }: InvoicePreviewProps) {
   const isThermal = format.startsWith("thermal");
   const previewScale = isThermal ? 1 : 0.5;
@@ -543,6 +591,7 @@ export function InvoicePreview({
           showLogo={showLogo}
           showGst={showGst}
           footerMessage={footerMessage}
+          storeConfig={storeConfig}
         />
       </div>
     </div>

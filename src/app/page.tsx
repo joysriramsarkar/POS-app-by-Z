@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useSession } from 'next-auth/react';
 
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { ProductGrid } from '@/components/pos/ProductGrid';
@@ -13,6 +14,7 @@ import { StockManagement } from '@/components/pos/StockManagement';
 import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDialog';
 import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDialog';
 import { PartiesManagement } from '@/components/pos/PartiesManagement';
+import { UsersManagement } from '@/components/pos/UsersManagement';
 import { Reports } from '@/components/pos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -35,6 +37,7 @@ import {
   Search,
   X,
   ScanLine,
+  UserCog,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
@@ -52,7 +55,7 @@ import { generateInvoiceNumber } from '@/lib/invoice';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
-type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'settings';
+type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'settings' | 'users';
 
 const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -60,6 +63,7 @@ const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
   { id: 'stock', label: 'Stock / Items', icon: <Package className="w-5 h-5" /> },
   { id: 'parties', label: 'Parties', icon: <Users className="w-5 h-5" /> },
   { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
+  { id: 'users', label: 'Users', icon: <UserCog className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
 
@@ -76,6 +80,10 @@ function POSDashboard() {
   const [currentPage, setCurrentPage] = useState<PageType>('billing');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Auth
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role;
 
   // Settings store
   const { settings } = useSettingsStore();
@@ -128,6 +136,23 @@ function POSDashboard() {
 
   const itemCount = getItemCount();
   const total = getTotal();
+
+  // Filter nav items based on user role
+  const filteredNavItems = useMemo(() => {
+    if (userRole === 'ADMIN') {
+      return navItems; // Admin can see all items
+    } else if (userRole === 'MANAGER') {
+      return navItems.filter(item => item.id !== 'users' && item.id !== 'settings');
+    } else {
+      // Cashier and Viewer - limit access
+      return navItems.filter(item => 
+        item.id === 'dashboard' || 
+        item.id === 'billing' || 
+        item.id === 'parties' || 
+        item.id === 'reports'
+      );
+    }
+  }, [userRole]);
 
   // Mobile product search
   const filteredMobileProducts = useMemo(() => {
@@ -330,6 +355,8 @@ function POSDashboard() {
         amountPaid: paymentData.amountPaid,
         discount: paymentData.discount,
         tax: paymentData.tax,
+        usePrepaid: paymentData.usePrepaid,
+        prepaidAmountUsed: paymentData.prepaidAmountUsed,
       };
 
       if (isOnline) {
@@ -701,8 +728,8 @@ function POSDashboard() {
     <nav className="flex flex-col h-full">
       <div className="p-4 border-b">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Store className="w-6 h-6 text-primary" />
+          <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+            <Store className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
             <h1 className="font-bold text-sm">{storeName}</h1>
@@ -712,14 +739,14 @@ function POSDashboard() {
       </div>
 
       <div className="flex-1 p-2 space-y-1">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <button
             key={item.id}
             onClick={() => handleNavigate(item.id)}
             className={cn(
-              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors',
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors font-medium',
               currentPage === item.id
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
                 : 'hover:bg-muted text-foreground'
             )}
           >
@@ -879,6 +906,8 @@ function POSDashboard() {
         return <PartiesManagement />;
       case 'reports':
         return <Reports />;
+      case 'users':
+        return <UsersManagement />;
       case 'settings':
         return <SettingsManagement />;
       default:
@@ -912,8 +941,8 @@ function POSDashboard() {
 
             {/* Store Name */}
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Store className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                <Store className="w-5 h-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
                 <h1 className="font-bold text-sm">{storeName}</h1>

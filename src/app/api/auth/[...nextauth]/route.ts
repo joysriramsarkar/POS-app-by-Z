@@ -26,6 +26,10 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        if (!user.isActive) {
+          return null;
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
@@ -39,6 +43,8 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.name,
           username: user.username,
+          email: user.email,
+          role: user.role,
         };
       }
     })
@@ -51,6 +57,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.username = (user as any).username;
+        token.role = (user as any).role;
+        token.email = (user as any).email;
       }
       return token;
     },
@@ -58,6 +66,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).username = token.username;
+        (session.user as any).role = token.role;
+        (session.user as any).email = token.email;
       }
       return session;
     }

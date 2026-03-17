@@ -41,6 +41,7 @@ import {
   FileText,
   X,
   Edit,
+  PlusCircle, // Added for Prepayment
 } from 'lucide-react';
 import type { Customer, Supplier, LedgerEntry } from '@/types/pos';
 import { cn } from '@/lib/utils';
@@ -56,10 +57,13 @@ export function PartiesManagement() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showLedger, setShowLedger] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showPrepaymentDialog, setShowPrepaymentDialog] = useState(false); // New state for prepayment
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [prepaymentAmount, setPrepaymentAmount] = useState(''); // New state for prepayment amount
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editingParty, setEditingParty] = useState<Customer | null>(null);
+  const [editingParty, setEditingParty] = useState<Customer | Supplier | null>(null);
+  const [editingPartyType, setEditingPartyType] = useState<PartyType>('customer');
   const [newParty, setNewParty] = useState({
     name: '',
     phone: '',
@@ -93,23 +97,35 @@ export function PartiesManagement() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [customersRes, suppliersRes] = await Promise.all([
+        const [customersResult, suppliersResult] = await Promise.allSettled([
           fetch('/api/customers'),
           fetch('/api/suppliers'),
         ]);
 
-        if (customersRes.ok) {
-          const { data } = await customersRes.json();
-          setCustomers(data);
+        if (customersResult.status === 'fulfilled' && customersResult.value.ok) {
+          try {
+            const { data } = await customersResult.value.json();
+            setCustomers(data);
+          } catch (parseErr) {
+            console.error('Failed to parse customers response:', parseErr);
+          }
+        } else if (customersResult.status === 'fulfilled') {
+          console.error('Failed to fetch customers. Status:', customersResult.value.status);
         } else {
-          console.error('Failed to fetch customers');
+          console.error('Customers API fetch failed:', customersResult.reason);
         }
 
-        if (suppliersRes.ok) {
-          const { data } = await suppliersRes.json();
-          setSuppliers(data);
+        if (suppliersResult.status === 'fulfilled' && suppliersResult.value.ok) {
+          try {
+            const { data } = await suppliersResult.value.json();
+            setSuppliers(data);
+          } catch (parseErr) {
+            console.error('Failed to parse suppliers response:', parseErr);
+          }
+        } else if (suppliersResult.status === 'fulfilled') {
+          console.error('Failed to fetch suppliers. Status:', suppliersResult.value.status);
         } else {
-          console.error('Failed to fetch suppliers');
+          console.error('Suppliers API fetch failed:', suppliersResult.reason);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -172,8 +188,15 @@ export function PartiesManagement() {
     setShowPaymentDialog(true);
   };
 
-  const handleEditParty = (party: Customer) => {
+  const handleRecordPrepayment = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setPrepaymentAmount('');
+    setShowPrepaymentDialog(true);
+  };
+
+  const handleEditParty = (party: Customer | Supplier) => {
     setEditingParty(party);
+    setEditingPartyType(activeTab);
     setNewParty({
       name: party.name,
       phone: party.phone || '',
@@ -193,27 +216,51 @@ export function PartiesManagement() {
     }
 
     try {
-      const response = await fetch('/api/customers', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: editingParty.id,
-          ...newParty,
-        }),
-      });
+      if (editingPartyType === 'customer') {
+        const response = await fetch('/api/customers', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingParty.id,
+            ...newParty,
+          }),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update customer');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update customer');
+        }
+
+        const { data: updatedCustomer } = await response.json();
+        updateCustomer(editingParty.id, updatedCustomer);
+      } else {
+        // Update supplier
+        const response = await fetch('/api/suppliers', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: editingParty.id,
+            ...newParty,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update supplier');
+        }
+
+        const { data: updatedSupplier } = await response.json();
+        setSuppliers(prev => 
+          prev.map(s => s.id === editingParty.id ? updatedSupplier : s)
+        );
       }
 
-      const { data: updatedCustomer } = await response.json();
-      updateCustomer(editingParty.id, updatedCustomer);
       setShowEditDialog(false);
       setEditingParty(null);
+      setEditingPartyType('customer');
       setNewParty({ name: '', phone: '', address: '', notes: '' });
     } catch (error) {
-      console.error('Failed to update customer:', error);
+      console.error('Failed to update party:', error);
     }
   };
 
@@ -248,6 +295,42 @@ export function PartiesManagement() {
 
     } catch (error) {
       console.error("Failed to record payment:", error);
+    }
+  };
+
+  const handlePrepaymentSubmit = async () => {
+    if (!selectedCustomer || !prepaymentAmount) return;
+
+    const amount = parseFloat(prepaymentAmount);
+    if (amount <= 0) {
+      toast({ title: 'Invalid Amount', description: 'Please enter a positive amount.', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/prepayment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId: selectedCustomer.id,
+          amount: amount,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to add prepayment');
+      }
+
+      const { data: updatedCustomer } = await response.json();
+      updateCustomer(selectedCustomer.id, updatedCustomer);
+      toast({ title: 'Success', description: 'Prepayment added successfully.' });
+      setShowPrepaymentDialog(false);
+
+    } catch (error) {
+      console.error("Failed to add prepayment:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
     }
   };
 
@@ -323,7 +406,7 @@ export function PartiesManagement() {
               Customers & Suppliers
             </p>
           </div>
-          <Button onClick={() => setShowAddDialog(true)}>
+          <Button onClick={() => setShowAddDialog(true)} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
             <UserPlus className="w-4 h-4 mr-2" />
             Add {activeTab === 'customer' ? 'Customer' : 'Supplier'}
           </Button>
@@ -398,7 +481,7 @@ export function PartiesManagement() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead className="text-right">Total Paid</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
                 <TableHead className="text-right">Due</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -433,7 +516,13 @@ export function PartiesManagement() {
                         </p>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">{formatPrice(customer.totalPaid)}</TableCell>
+                    <TableCell className="text-right">
+                      {customer.prepaidBalance > 0 ? (
+                        <Badge variant="secondary" className="text-green-600">{formatPrice(customer.prepaidBalance)}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       {customer.totalDue > 0 ? (
                         <Badge variant="destructive">{formatPrice(customer.totalDue)}</Badge>
@@ -461,11 +550,20 @@ export function PartiesManagement() {
                           <FileText className="w-4 h-4 md:mr-1" />
                           <span className="hidden md:inline">Ledger</span>
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-blue-600 hover:bg-blue-100 hover:text-blue-700"
+                          onClick={() => handleRecordPrepayment(customer)}
+                        >
+                          <PlusCircle className="w-4 h-4 md:mr-1" />
+                          <span className="hidden md:inline">Prepayment</span>
+                        </Button>
                         {customer.totalDue > 0 && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-green-600 hover:text-green-700"
+                          className="h-8 text-green-600 hover:bg-green-100 hover:text-green-700"
                             onClick={() => handleRecordPayment(customer)}
                           >
                             <IndianRupee className="w-4 h-4 md:mr-1" />
@@ -486,19 +584,20 @@ export function PartiesManagement() {
                 <TableHead>Name</TableHead>
                 <TableHead>Contact</TableHead>
                 <TableHead>Address</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSuppliers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-12">
+                  <TableCell colSpan={4} className="text-center py-12">
                     <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground">No suppliers found</p>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
+                  <TableRow key={supplier.id} className="group">
                     <TableCell className="font-medium">{supplier.name}</TableCell>
                     <TableCell>
                       {supplier.phone && (
@@ -515,6 +614,19 @@ export function PartiesManagement() {
                           {supplier.address}
                         </p>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => handleEditParty(supplier)}
+                        >
+                          <Edit className="w-4 h-4 md:mr-1" />
+                          <span className="hidden md:inline">Edit</span>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -545,6 +657,12 @@ export function PartiesManagement() {
                   <span className="text-muted-foreground">Current Due</span>
                   <span className="text-2xl font-bold text-red-600">
                     {formatPrice(selectedCustomer?.totalDue || 0)}
+                  </span>
+                </div>
+                 <div className="flex justify-between items-center mt-2">
+                  <span className="text-muted-foreground">Prepaid Balance</span>
+                  <span className="text-2xl font-bold text-green-600">
+                    {formatPrice(selectedCustomer?.prepaidBalance || 0)}
                   </span>
                 </div>
               </CardContent>
@@ -663,8 +781,69 @@ export function PartiesManagement() {
             <Button
               onClick={handlePaymentSubmit}
               disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
+              className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
               Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Prepayment Dialog */}
+      <Dialog open={showPrepaymentDialog} onOpenChange={setShowPrepaymentDialog}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add Prepayment</DialogTitle>
+            <DialogDescription>
+              Add prepaid balance for {selectedCustomer?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Current Prepaid Balance</span>
+                <span className="font-bold text-green-600">
+                  {formatPrice(selectedCustomer?.prepaidBalance || 0)}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="prepayment-dialog-amount">Amount to Add</Label>
+              <div className="relative">
+                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="prepayment-dialog-amount"
+                  type="number"
+                  value={prepaymentAmount}
+                  onChange={(e) => setPrepaymentAmount(e.target.value)}
+                  placeholder="0"
+                  className="pl-9"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[100, 200, 500, 1000].map((amount) => (
+                <Button
+                  key={amount}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPrepaymentAmount(amount.toString())}
+                >
+                  ₹{amount}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowPrepaymentDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePrepaymentSubmit}
+              disabled={!prepaymentAmount || parseFloat(prepaymentAmount) <= 0}
+              className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+            >
+              Add Prepayment
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -676,10 +855,10 @@ export function PartiesManagement() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit className="w-5 h-5" />
-              Edit {activeTab === 'customer' ? 'Customer' : 'Supplier'}
+              Edit {editingPartyType === 'customer' ? 'Customer' : 'Supplier'}
             </DialogTitle>
             <DialogDescription>
-              Update {activeTab === 'customer' ? 'customer' : 'supplier'} details
+              Update {editingPartyType === 'customer' ? 'customer' : 'supplier'} details
             </DialogDescription>
           </DialogHeader>
 
@@ -738,8 +917,8 @@ export function PartiesManagement() {
             <Button variant="outline" onClick={() => { setShowEditDialog(false); setEditingParty(null); setNewParty({ name: '', phone: '', address: '', notes: '' }); }}>
               Cancel
             </Button>
-            <Button onClick={handleUpdateParty} disabled={!newParty.name}>
-              Update {activeTab === 'customer' ? 'Customer' : 'Supplier'}
+            <Button onClick={handleUpdateParty} disabled={!newParty.name} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+              Update {editingPartyType === 'customer' ? 'Customer' : 'Supplier'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -809,7 +988,7 @@ export function PartiesManagement() {
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAddParty} disabled={!newParty.name}>
+            <Button onClick={handleAddParty} disabled={!newParty.name} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
               Add {activeTab === 'customer' ? 'Customer' : 'Supplier'}
             </Button>
           </DialogFooter>

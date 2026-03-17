@@ -1,6 +1,11 @@
-const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcryptjs');
-const path = require('path');
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get __dirname in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // SQLite ডাটাবেসের পাথ তৈরি করা হচ্ছে (src/lib/db.ts এর মতো)
 const dbPath = path.resolve(__dirname, 'data', 'pos.db');

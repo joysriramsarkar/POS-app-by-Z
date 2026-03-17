@@ -391,7 +391,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
             </div>
             <Button
               size="lg"
-              className="h-9 md:h-12 px-3 md:px-6 text-sm md:text-lg font-semibold touch-manipulation"
+              className="h-9 md:h-12 px-3 md:px-6 text-sm md:text-lg font-semibold touch-manipulation bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
               disabled={isCartEmpty || total <= 0}
               onClick={handleCheckout}
             >

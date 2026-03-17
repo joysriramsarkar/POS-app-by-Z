@@ -289,7 +289,7 @@ export function AddStockDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!isValid || isSubmitting}>
+          <Button onClick={handleSubmit} disabled={!isValid || isSubmitting} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
             {isSubmitting ? 'Saving...' : 'Add Stock'}
           </Button>
         </DialogFooter>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle
 } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BarChart,
@@ -17,9 +18,7 @@ import {
   CartesianGrid,
   Tooltip as RechartsTooltip,
   Legend,
-  ResponsiveContainer,
-  LineChart,
-  Line
+  ResponsiveContainer
 } from 'recharts';
 import {
   Table,
@@ -36,61 +35,84 @@ import {
   DollarSign,
   Package,
   Users,
-  Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from 'lucide-react';
-import { format } from 'date-fns';
 
-export default function Reports() {
+const Reports: React.FC = () => {
   const [salesData, setSalesData] = useState<any[]>([]);
   const [summaryData, setSummaryData] = useState<any>(null);
   const [stockData, setStockData] = useState<any[]>([]);
   const [dueData, setDueData] = useState<any[]>([]);
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-    useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      try {
-        const [salesRes, stockRes, duesRes, productsRes] = await Promise.all([
-          fetch('/api/reports/sales?days=30'),
-          fetch('/api/reports/stock'),
-          fetch('/api/reports/dues'),
-          fetch('/api/reports/products?days=30')
-        ]);
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const [salesResult, stockResult, duesResult, productsResult] = await Promise.allSettled([
+        fetch('/api/reports/sales?days=30'),
+        fetch('/api/reports/stock'),
+        fetch('/api/reports/dues'),
+        fetch('/api/reports/products?days=30')
+      ]);
 
-        if (salesRes.ok) {
-          const salesJson = await salesRes.json();
-          setSummaryData(salesJson.summary);
-          setSalesData(salesJson.chartData);
-        }
-
-        if (stockRes.ok) {
-          const stockJson = await stockRes.json();
-          setStockData(stockJson.lowStockItems);
-        }
-
-        if (duesRes.ok) {
-          const duesJson = await duesRes.json();
-          setDueData(duesJson.customersWithDues);
-        }
-
-        if (productsRes.ok) {
-          const productsJson = await productsRes.json();
-          // Adding products to a new state if needed, but for now we can just log or store in state
-          // Need to add topProducts state
-          setTopProducts(productsJson.topProducts);
-        }
-      } catch (error) {
-        console.error("Failed to fetch report data", error);
-      } finally {
-        setIsLoading(false);
+      if (salesResult.status === 'fulfilled' && salesResult.value.ok) {
+        const salesJson = await salesResult.value.json();
+        setSummaryData(salesJson.summary);
+        setSalesData(salesJson.chartData);
+      } else {
+        console.warn('Sales API failed:', salesResult.status === 'fulfilled' ? salesResult.value.status : salesResult.reason);
       }
-    }
 
-    fetchData();
+      if (stockResult.status === 'fulfilled' && stockResult.value.ok) {
+        const stockJson = await stockResult.value.json();
+        setStockData(stockJson.lowStockItems);
+      } else {
+        console.warn('Stock API failed:', stockResult.status === 'fulfilled' ? stockResult.value.status : stockResult.reason);
+      }
+
+      if (duesResult.status === 'fulfilled' && duesResult.value.ok) {
+        const duesJson = await duesResult.value.json();
+        setDueData(duesJson.customersWithDues);
+      } else {
+        console.warn('Dues API failed:', duesResult.status === 'fulfilled' ? duesResult.value.status : duesResult.reason);
+      }
+
+      if (productsResult.status === 'fulfilled' && productsResult.value.ok) {
+        const productsJson = await productsResult.value.json();
+        setTopProducts(productsJson.topProducts);
+      } else {
+        console.warn('Products API failed:', productsResult.status === 'fulfilled' ? productsResult.value.status : productsResult.reason);
+      }
+
+      const allFailed = [salesResult, stockResult, duesResult, productsResult].every(
+        r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
+      );
+      if (allFailed) {
+        setErrorMessage('Failed to load report data. Please refresh the page and try again.');
+      }
+    } catch (error) {
+      console.error("Unexpected error fetching report data", error);
+      setErrorMessage('An unexpected error occurred while loading reports.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleDownloadReport = useCallback(() => {
+    window.print();
+  }, []);
+
+  const outstandingDues = useMemo(() => {
+    return dueData?.reduce((acc, curr) => acc + curr.totalDue, 0).toFixed(2) || '0.00';
+  }, [dueData]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-muted/20">
@@ -102,10 +124,30 @@ export default function Reports() {
           </h1>
           <p className="text-sm text-muted-foreground">Comprehensive overview of your business</p>
         </div>
+        <Button variant="outline" onClick={handleDownloadReport} className="gap-2 border-primary/20 hover:bg-primary/5">
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Download PDF</span>
+        </Button>
       </div>
 
+      {errorMessage && (
+        <div className="shrink-0 bg-destructive/10 border-b border-destructive/30 p-4 flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-destructive">{errorMessage}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={fetchData}
+            className="text-destructive hover:text-destructive"
+          >
+            Retry
+          </Button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -120,7 +162,6 @@ export default function Reports() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Net Profit</CardTitle>
@@ -133,7 +174,6 @@ export default function Reports() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Sales</CardTitle>
@@ -146,14 +186,13 @@ export default function Reports() {
               </p>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Dues</CardTitle>
               <Users className="w-4 h-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-amber-600">{`₹${dueData?.reduce((acc, curr) => acc + curr.totalDue, 0).toFixed(2) || '0.00'}`}</div>
+              <div className="text-2xl font-bold text-amber-600">{`₹${outstandingDues}`}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 To be collected
               </p>
@@ -168,16 +207,13 @@ export default function Reports() {
             <TabsTrigger value="dues">Customer Dues</TabsTrigger>
             <TabsTrigger value="products">Top Products</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="sales" className="space-y-4">
+          <TabsContent value="sales">
             <Card>
               <CardHeader>
                 <CardTitle>Sales Trend</CardTitle>
                 <CardDescription>Daily sales and profit for the last 30 days</CardDescription>
               </CardHeader>
               <CardContent className="h-[400px]">
-                {/* Chart will go here */}
-
                 <div className="w-full h-full min-h-[350px]">
                   {isLoading ? (
                     <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
@@ -219,11 +255,9 @@ export default function Reports() {
                     </div>
                   )}
                 </div>
-
               </CardContent>
             </Card>
           </TabsContent>
-
           <TabsContent value="stock">
             <Card>
               <CardHeader>
@@ -241,7 +275,6 @@ export default function Reports() {
                       <TableHead className="text-right">Status</TableHead>
                     </TableRow>
                   </TableHeader>
-
                   <TableBody>
                     {stockData && stockData.length > 0 ? (
                       stockData.map((item: any) => (
@@ -268,12 +301,10 @@ export default function Reports() {
                       </TableRow>
                     )}
                   </TableBody>
-
                 </Table>
               </CardContent>
             </Card>
           </TabsContent>
-
           <TabsContent value="dues">
             <Card>
               <CardHeader>
@@ -291,7 +322,6 @@ export default function Reports() {
                       <TableHead className="text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>
-
                   <TableBody>
                     {dueData && dueData.length > 0 ? (
                       dueData.map((customer: any) => (
@@ -313,12 +343,10 @@ export default function Reports() {
                       </TableRow>
                     )}
                   </TableBody>
-
                 </Table>
               </CardContent>
             </Card>
           </TabsContent>
-
           <TabsContent value="products">
             <Card>
               <CardHeader>
@@ -335,7 +363,6 @@ export default function Reports() {
                       <TableHead className="text-right">Profit</TableHead>
                     </TableRow>
                   </TableHeader>
-
                   <TableBody>
                     {topProducts && topProducts.length > 0 ? (
                       topProducts.map((product: any) => (
@@ -359,7 +386,6 @@ export default function Reports() {
                       </TableRow>
                     )}
                   </TableBody>
-
                 </Table>
               </CardContent>
             </Card>
@@ -369,3 +395,5 @@ export default function Reports() {
     </div>
   );
 }
+
+export default React.memo(Reports);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { signOut } from 'next-auth/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRight,
+  LogOut,
 } from 'lucide-react';
 import { useProductsStore, useCartStore } from '@/stores/pos-store';
 import { STORE_CONFIG } from '@/types/pos';
@@ -24,7 +26,6 @@ import { cn } from '@/lib/utils';
 interface DashboardStats {
   todaySales: number;
   todayOrders: number;
-  lowStockCount: number;
   duePayments: number;
   salesComparison?: string;
   ordersComparison?: string;
@@ -49,7 +50,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [stats, setStats] = useState<DashboardStats>({
     todaySales: 0,
     todayOrders: 0,
-    lowStockCount: 0,
     duePayments: 0,
     salesComparison: 'N/A',
     ordersComparison: 'N/A',
@@ -59,35 +59,53 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const products = useProductsStore((state) => state.products);
   const lowStockProducts = products.filter(p => p.currentStock <= p.minStockLevel && p.isActive);
 
+
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [salesRes, statsRes] = await Promise.all([
+        const [salesResult, statsResult] = await Promise.allSettled([
           fetch('/api/sales?limit=5'),
           fetch('/api/stats'),
         ]);
 
-        if (salesRes.ok) {
-          const { data: sales } = await salesRes.json();
-          if (sales) {
-            const recentTransactions = sales.map((sale: any) => ({
-              id: sale.id,
-              invoiceNumber: sale.invoiceNumber,
-              customerName: sale.customer?.name,
-              totalAmount: sale.totalAmount,
-              paymentMethod: sale.paymentMethod,
-              createdAt: new Date(sale.createdAt),
-            }));
-            setTransactions(recentTransactions);
+        if (salesResult.status === 'fulfilled' && salesResult.value.ok) {
+          try {
+            const { data: sales } = await salesResult.value.json();
+            if (sales) {
+              const recentTransactions = sales.map((sale: any) => ({
+                id: sale.id,
+                invoiceNumber: sale.invoiceNumber,
+                customerName: sale.customer?.name,
+                totalAmount: sale.totalAmount,
+                paymentMethod: sale.paymentMethod,
+                createdAt: new Date(sale.createdAt),
+              }));
+              setTransactions(recentTransactions);
+            }
+          } catch (parseErr) {
+            console.error('Failed to parse sales response:', parseErr);
           }
+        } else if (salesResult.status === 'fulfilled') {
+          console.warn('Sales API returned non-OK status:', salesResult.value.status);
+        } else {
+          console.error('Sales API fetch failed:', salesResult.reason);
         }
 
-        if (statsRes.ok) {
-          const { data: apiStats } = await statsRes.json();
-          setStats(prevStats => ({
-            ...prevStats,
-            ...apiStats,
-          }));
+        if (statsResult.status === 'fulfilled' && statsResult.value.ok) {
+          try {
+            const { data: apiStats } = await statsResult.value.json();
+            setStats(prevStats => ({
+              ...prevStats,
+              ...apiStats,
+            }));
+          } catch (parseErr) {
+            console.error('Failed to parse stats response:', parseErr);
+          }
+        } else if (statsResult.status === 'fulfilled') {
+          console.warn('Stats API returned non-OK status:', statsResult.value.status);
+        } else {
+          console.error('Stats API fetch failed:', statsResult.reason);
         }
 
       } catch (error) {
@@ -96,13 +114,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     };
     fetchDashboardData();
   }, []);
-
-  useEffect(() => {
-    setStats(prevStats => ({
-      ...prevStats,
-      lowStockCount: lowStockProducts.length
-    }));
-  }, [lowStockProducts.length]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -147,7 +158,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <p className="text-sm text-muted-foreground">Today</p>
             <p className="font-semibold">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
-          <Button variant="outline" onClick={() => signOut()}>Logout</Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => signOut()} className="gap-2 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/50">
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">লগ আউট (Logout)</span>
+            </Button>
+          </div>
         </div>
       </div>
 

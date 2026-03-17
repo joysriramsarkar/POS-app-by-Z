@@ -262,11 +262,8 @@ export async function POST(request: NextRequest) {
         })),
       });
 
-      // If payment is partially or fully due, fetch customer BEFORE updating and use calculated values
-      if (customerId && amountPaidValue < totalAmount) {
-        const dueAmount = totalAmount - amountPaidValue;
-        
-        // Fetch customer FIRST before any updates
+      // Handle due, prepaid, and full payments for customers
+      if (customerId) {
         const customer = await tx.customer.findUnique({
           where: { id: customerId },
         });
@@ -274,43 +271,89 @@ export async function POST(request: NextRequest) {
         if (!customer) {
           throw new Error(`Customer ${customerId} not found`);
         }
+        
+        const prepaidToUse = validatedData.prepaidAmountUsed || 0;
 
-        // Calculate expected balance BEFORE the update
-        const newTotalDue = customer.totalDue + dueAmount;
+        // 1. Handle Prepaid Balance Deduction
+        if (prepaidToUse > 0) {
+          if (customer.prepaidBalance < prepaidToUse) {
+            throw new Error(`Insufficient prepaid balance. Available: ${customer.prepaidBalance}, Tried to use: ${prepaidToUse}`);
+          }
+          
+          const newPrepaidBalance = customer.prepaidBalance - prepaidToUse;
 
-        // Now update totalDue
-        await tx.customer.update({
-          where: { id: customerId },
-          data: {
-            totalDue: { increment: dueAmount },
-            updatedAt: new Date(),
-          },
-        });
+          await tx.customer.update({
+            where: { id: customerId },
+            data: { 
+              prepaidBalance: newPrepaidBalance,
+              updatedAt: new Date(),
+            },
+          });
 
-        // Create ledger entries using calculated values (not stale data)
-        await tx.ledgerEntry.create({
-          data: {
-            customerId,
-            entryType: 'credit',
-            amount: totalAmount,
-            balanceAfter: newTotalDue,
-            description: `Credit purchase: ${newSale.invoiceNumber}`,
-            referenceId: newSale.id,
-          },
-        });
-
-        // Add debit for the amount paid if partial payment
-        if (amountPaidValue > 0) {
           await tx.ledgerEntry.create({
             data: {
               customerId,
-              entryType: 'debit',
-              amount: amountPaidValue,
-              balanceAfter: newTotalDue - amountPaidValue,
-              description: `Payment for purchase: ${newSale.invoiceNumber}`,
+              entryType: 'prepayment-used',
+              amount: prepaidToUse,
+              balanceAfter: customer.totalDue, // This doesn't affect the due balance directly
+              description: `Prepaid used for sale: ${newSale.invoiceNumber}`,
               referenceId: newSale.id,
             },
           });
+        }
+
+        // 2. Handle Due Amount Calculation
+        const remainingAmountAfterPrepaid = totalAmount - prepaidToUse;
+        const dueAmount = remainingAmountAfterPrepaid - amountPaidValue;
+
+        if (dueAmount > 0) {
+          const newTotalDue = customer.totalDue + dueAmount;
+          await tx.customer.update({
+            where: { id: customerId },
+            data: {
+              totalDue: { increment: dueAmount },
+              updatedAt: new Date(),
+            },
+          });
+
+          // Create ledger entry for the credit (the sale itself)
+          await tx.ledgerEntry.create({
+            data: {
+              customerId,
+              entryType: 'credit',
+              amount: totalAmount, // The full sale amount is the credit
+              balanceAfter: newTotalDue,
+              description: `Credit purchase: ${newSale.invoiceNumber}`,
+              referenceId: newSale.id,
+            },
+          });
+          
+          // Create ledger entry for the part paid by cash/other methods
+          if (amountPaidValue > 0) {
+            await tx.ledgerEntry.create({
+              data: {
+                customerId,
+                entryType: 'debit',
+                amount: amountPaidValue,
+                balanceAfter: newTotalDue - amountPaidValue,
+                description: `Partial payment for: ${newSale.invoiceNumber}`,
+                referenceId: newSale.id,
+              },
+            });
+          }
+        } else {
+            // Paid in full (or overpaid) with cash/other methods after using prepaid
+            // No new due is created, so we only log the payment.
+            await tx.ledgerEntry.create({
+                data: {
+                    customerId,
+                    entryType: 'debit',
+                    amount: totalAmount, // Log the entire sale value as a debit against the credit of the sale.
+                    balanceAfter: customer.totalDue, // No change in due balance
+                    description: `Full payment for sale: ${newSale.invoiceNumber}`,
+                    referenceId: newSale.id,
+                },
+            });
         }
       }
 

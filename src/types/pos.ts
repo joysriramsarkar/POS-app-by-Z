@@ -49,6 +49,7 @@ export interface Customer {
   address?: string;
   totalDue: number;
   totalPaid: number;
+  prepaidBalance: number;
   notes?: string;
   isActive: boolean;
   createdAt: Date;

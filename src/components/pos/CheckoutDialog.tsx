@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 import {
   Calculator,
   CheckCircle2,
@@ -25,9 +26,10 @@ import {
   Clock,
   Printer,
   Receipt,
+  Wallet,
 } from 'lucide-react';
 import type { PaymentMethod, Sale, SaleItem, Customer } from '@/types/pos';
-import { useCartStore, useUIStore, useProductsStore } from '@/stores/pos-store';
+import { useCartStore, useUIStore, useProductsStore, useCustomersStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
 import { generateInvoiceNumber } from '@/lib/invoice';
 
@@ -52,6 +54,8 @@ export interface PaymentData {
   discount: number;
   tax: number;
   total: number;
+  usePrepaid: boolean;
+  prepaidAmountUsed: number;
 }
 
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000, 2000];
@@ -66,60 +70,59 @@ export function CheckoutDialog({
   onCheckoutError,
   completedSale,
 }: CheckoutDialogProps) {
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [lastSale, setLastSale] = useState<Sale | null>(null);
+  const [usePrepaid, setUsePrepaid] = useState(false);
 
-  // Track previous open state to detect when dialog opens
   const prevOpenRef = useRef(false);
 
-  // When parent confirms checkout succeeded, show success modal
-  useEffect(() => {
-    if (completedSale) {
-      setIsCheckingOut(false);
-      setShowSuccess(true);
-      setLastSale(completedSale);
-    }
-  }, [completedSale]);
+  const showSuccess = !!completedSale && !isProcessing;
+  const lastSale = completedSale;
 
-  // Store state
+  useEffect(() => {
+    if (showSuccess && onCheckoutSuccess && lastSale) {
+      onCheckoutSuccess(lastSale);
+    }
+  }, [showSuccess, lastSale, onCheckoutSuccess]);
+
   const items = useCartStore((state) => state.items);
   const discount = useCartStore((state) => state.discount);
   const tax = useCartStore((state) => state.tax);
   const customerId = useCartStore((state) => state.customerId);
-  const customerName = useCartStore((state) => state.customerName);
   const paymentMethod = useCartStore((state) => state.paymentMethod);
   const getSubtotal = useCartStore((state) => state.getSubtotal);
   const getTotal = useCartStore((state) => state.getTotal);
   const clearCart = useCartStore((state) => state.clearCart);
+  
+  const customer = useCustomersStore((state) => state.customers.find(c => c.id === customerId));
 
-  // Products store - for stock validation
   const products = useProductsStore((state) => state.products);
-
-  // UI store
   const isCheckoutOpen = useUIStore((state) => state.isCheckoutOpen);
   const setCheckoutOpen = useUIStore((state) => state.setCheckoutOpen);
   const setPrintDialogOpen = useUIStore((state) => state.setPrintDialogOpen);
   const setCurrentSale = useUIStore((state) => state.setCurrentSale);
 
-  // Use controlled or internal state
   const isOpen = controlledOpen !== undefined ? controlledOpen : isCheckoutOpen;
   const setOpen = controlledOnOpenChange || setCheckoutOpen;
 
-  // Calculations
   const subtotal = getSubtotal();
   const total = getTotal();
 
-  // Calculate initial amount when dialog opens
-  const getInitialAmount = useCallback(() => {
-    if (paymentMethod === 'Cash') {
-      return Math.ceil(total / 100) * 100;
+  const prepaidAmountToUse = useMemo(() => {
+    if (usePrepaid && customer && customer.prepaidBalance > 0) {
+      return Math.min(total, customer.prepaidBalance);
     }
     return 0;
-  }, [paymentMethod, total]);
+  }, [usePrepaid, customer, total]);
 
-  // State for amount - initialize with empty, will be set when dialog opens
+  const remainingTotal = useMemo(() => total - prepaidAmountToUse, [total, prepaidAmountToUse]);
+
+  const getInitialAmount = useCallback(() => {
+    if (paymentMethod === 'Cash') {
+      return Math.ceil(remainingTotal / 100) * 100;
+    }
+    return 0;
+  }, [paymentMethod, remainingTotal]);
+
   const [amountReceived, setAmountReceived] = useState<string>('');
 
   const parsedAmount = useMemo(() => {
@@ -128,20 +131,15 @@ export function CheckoutDialog({
   }, [amountReceived]);
 
   const change = useMemo(() => {
-    return parsedAmount - total;
-  }, [parsedAmount, total]);
+    return parsedAmount - remainingTotal;
+  }, [parsedAmount, remainingTotal]);
 
   const isValidPayment = useMemo(() => {
-    if (paymentMethod === 'Due') {
-      // Due payments don't require immediate payment
-      return true;
-    }
-    if (customerId && parsedAmount < total) {
-      // Partial payments are allowed if a customer is selected
-      return true;
-    }
-    return parsedAmount >= total;
-  }, [paymentMethod, parsedAmount, total, customerId]);
+    if (remainingTotal === 0) return true; // Fully paid by prepaid balance
+    if (paymentMethod === 'Due') return true;
+    if (customerId && parsedAmount < remainingTotal) return true; // Partial payments
+    return parsedAmount >= remainingTotal;
+  }, [paymentMethod, parsedAmount, remainingTotal, customerId]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -152,36 +150,26 @@ export function CheckoutDialog({
     }).format(price);
   };
 
-  // Handle dialog open state change - initialize values when opening
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      // Dialog is opening
       if (open && !prevOpenRef.current) {
-        // Reset and initialize values
         setInputError(null);
-        setShowSuccess(false);
+        setUsePrepaid(false);
         setAmountReceived(getInitialAmount().toString());
       }
       prevOpenRef.current = open;
       setOpen(open);
-
-      // Sync back to store if closing
-      if (!open) {
-         setCheckoutOpen(false);
-      }
+      if (!open) setCheckoutOpen(false);
     },
     [getInitialAmount, setOpen, setCheckoutOpen]
   );
 
-  // Close handler that also clears cart on success
   const handleClose = useCallback(() => {
     handleOpenChange(false);
-    setShowSuccess(false);
   }, [handleOpenChange]);
 
   const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Allow empty string, numbers, and one decimal point
     if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
       setAmountReceived(value);
       setInputError(null);
@@ -194,30 +182,23 @@ export function CheckoutDialog({
   }, []);
 
   const handleExactAmount = useCallback(() => {
-    setAmountReceived(Math.ceil(total).toString());
+    setAmountReceived(Math.ceil(remainingTotal).toString());
     setInputError(null);
-  }, [total]);
+  }, [remainingTotal]);
 
   const handleComplete = useCallback(() => {
-    // Validate payment for Cash/UPI
-    if (paymentMethod !== 'Due' && parsedAmount < total && !customerId) {
-      setInputError(`Insufficient amount. Need ${formatPrice(total - parsedAmount)} more or select a customer for partial payment.`);
+    if (paymentMethod !== 'Due' && parsedAmount < remainingTotal && !customerId) {
+      setInputError(`Insufficient amount. Need ${formatPrice(remainingTotal - parsedAmount)} more or select a customer for partial payment.`);
       return;
     }
 
-    // ========================================================================
-    // CRITICAL: VALIDATE STOCK BEFORE CHECKOUT
-    // Prevent checkout if any cart item exceeds available stock
-    // ========================================================================
     const insufficientStockItems: Array<{ name: string; qty: number; available: number }> = [];
-    
     for (const cartItem of items) {
       const product = products.find((p) => p.id === cartItem.productId);
       if (!product) {
-        setInputError(`Product "${cartItem.productName}" no longer exists in inventory.`);
+        setInputError(`Product "${cartItem.productName}" no longer exists.`);
         return;
       }
-      
       if (cartItem.quantity > product.currentStock) {
         insufficientStockItems.push({
           name: cartItem.productName,
@@ -227,21 +208,17 @@ export function CheckoutDialog({
       }
     }
 
-    // If any items lack sufficient stock, show error and prevent checkout
     if (insufficientStockItems.length > 0) {
       const itemsText = insufficientStockItems
         .map((item) => `${item.name} (Need: ${item.qty}, Available: ${item.available})`)
         .join('\n');
-      
-      setInputError(
-        `Insufficient stock for:\n${itemsText}\n\nPlease adjust quantities and try again.`
-      );
+      setInputError(`Insufficient stock for:\n${itemsText}`);
       return;
     }
 
     const saleItems: SaleItem[] = items.map((item) => ({
       id: uuidv4(),
-      saleId: '', // To be filled by backend/process
+      saleId: '',
       productId: item.productId,
       productName: item.productName,
       quantity: item.quantity,
@@ -250,75 +227,47 @@ export function CheckoutDialog({
       createdAt: new Date(),
     }));
 
-    const customer: Customer | undefined = customerId ? {
-      id: customerId,
-      name: customerName ?? 'Walk-in',
-      totalDue: 0,
-      totalPaid: 0,
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    } : undefined;
+    const finalPaymentMethod = remainingTotal === 0 ? 'Prepaid' : paymentMethod;
 
-    const sale: Sale = {
-      id: uuidv4(),
-      invoiceNumber: generateInvoiceNumber(),
-      customerId,
-      customer,
-      items: saleItems,
-      subtotal,
-      discount,
-      tax,
-      totalAmount: total,
-      amountPaid: paymentMethod === 'Due' ? 0 : (customerId && parsedAmount < total ? parsedAmount : total),
-      paymentMethod,
-      paymentStatus: paymentMethod === 'Due' ? 'Due' : (customerId && parsedAmount < total ? 'Partial' : 'Paid'),
-      status: 'Completed',
-      offlineSynced: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setLastSale(sale);
-    setIsCheckingOut(true);
-
-    let amountPaidForSale = 0;
-    if (paymentMethod === 'Due') {
-      amountPaidForSale = 0; // Pure due
-    } else if (customerId && parsedAmount < total) {
-      amountPaidForSale = parsedAmount; // Partial payment
-    } else {
-      amountPaidForSale = total; // Full payment
+    let amountPaidForSale = prepaidAmountToUse;
+    if (finalPaymentMethod !== 'Due') {
+        if (customerId && parsedAmount < remainingTotal) {
+            amountPaidForSale += parsedAmount; // Partial payment
+        } else {
+            amountPaidForSale += remainingTotal;
+        }
     }
 
     const paymentData: PaymentData = {
-      amountReceived: paymentMethod === 'Due' ? 0 : parsedAmount,
+      amountReceived: parsedAmount,
       amountPaid: amountPaidForSale,
-      change: paymentMethod === 'Due' ? 0 : Math.max(0, change),
-      paymentMethod,
+      change: finalPaymentMethod === 'Due' ? 0 : Math.max(0, change),
+      paymentMethod: finalPaymentMethod,
       customerId,
       subtotal,
       discount,
       tax,
       total,
+      usePrepaid,
+      prepaidAmountUsed: prepaidAmountToUse,
     };
-
-    // Call parent to handle API request
-    // Parent will call onCheckoutSuccess/onCheckoutError when done
+    
     onComplete(paymentData);
   }, [
     paymentMethod,
     parsedAmount,
     total,
+    remainingTotal,
     items,
     products,
     customerId,
-    customerName,
     subtotal,
     discount,
     tax,
     onComplete,
     change,
+    usePrepaid,
+    prepaidAmountToUse,
   ]);
 
   const handlePrint = useCallback(() => {
@@ -329,15 +278,15 @@ export function CheckoutDialog({
   }, [lastSale, setCurrentSale, setPrintDialogOpen]);
 
   const paymentMethodIcon = useMemo(() => {
-    switch (paymentMethod) {
-      case 'Cash':
-        return <Banknote className="w-4 h-4" />;
-      case 'UPI':
-        return <Smartphone className="w-4 h-4" />;
-      case 'Due':
-        return <Clock className="w-4 h-4" />;
+    const finalPaymentMethod = remainingTotal === 0 ? 'Prepaid' : paymentMethod;
+    switch (finalPaymentMethod) {
+      case 'Cash': return <Banknote className="w-4 h-4" />;
+      case 'UPI': return <Smartphone className="w-4 h-4" />;
+      case 'Due': return <Clock className="w-4 h-4" />;
+      case 'Prepaid': return <Wallet className="w-4 h-4 text-green-600" />;
+      default: return null;
     }
-  }, [paymentMethod]);
+  }, [paymentMethod, remainingTotal]);
 
   if (showSuccess) {
     return (
@@ -345,7 +294,6 @@ export function CheckoutDialog({
         <DialogContent className="sm:max-w-md no-print">
           <DialogHeader>
             <DialogTitle className="sr-only">Payment Success</DialogTitle>
-            <DialogDescription className="sr-only">Payment has been successfully processed</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center py-6">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
@@ -368,7 +316,7 @@ export function CheckoutDialog({
                 <Printer className="w-4 h-4 mr-2" />
                 Print
               </Button>
-              <Button className="flex-1" onClick={handleClose}>
+              <Button className="flex-1 bg-blue-600 text-white hover:bg-blue-700" onClick={handleClose}>
                 <Receipt className="w-4 h-4 mr-2" />
                 New Sale
               </Button>
@@ -387,85 +335,68 @@ export function CheckoutDialog({
             <Calculator className="w-5 h-5" />
             Checkout
           </DialogTitle>
-          <DialogDescription>
-            Review order and complete payment
-          </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4">
-          {/* Customer Info */}
-          {customerName && (
+          {customer && (
             <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded-lg">
-              <Badge variant="secondary">{customerName}</Badge>
-              {paymentMethod === 'Due' && (
-                <Badge variant="outline" className="text-amber-600">
-                  Due Payment
-                </Badge>
-              )}
+              <Badge variant="secondary">{customer.name}</Badge>
+              {paymentMethod === 'Due' && <Badge variant="outline" className="text-amber-600">Due Payment</Badge>}
             </div>
           )}
 
-          {/* Order Summary */}
           <ScrollArea className="flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-2 pr-2">
               {items.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">
-                  <span className="truncate flex-1">
-                    {item.productName}
-                    <span className="text-muted-foreground ml-1">
-                      ×{item.quantity}
-                    </span>
-                  </span>
-                  <span className="font-medium ml-2">
-                    {formatPrice(item.totalPrice)}
-                  </span>
+                  <span className="truncate flex-1">{item.productName}<span className="text-muted-foreground ml-1">×{item.quantity}</span></span>
+                  <span className="font-medium ml-2">{formatPrice(item.totalPrice)}</span>
                 </div>
               ))}
             </div>
           </ScrollArea>
 
-          {/* Totals */}
           <div className="space-y-1.5 border-t pt-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Subtotal</span>
-              <span>{formatPrice(subtotal)}</span>
-            </div>
-            {discount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Discount</span>
-                <span>-{formatPrice(discount)}</span>
-              </div>
-            )}
-            {tax > 0 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Tax</span>
-                <span>{formatPrice(tax)}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>{formatPrice(subtotal)}</span></div>
+            {discount > 0 && <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>-{formatPrice(discount)}</span></div>}
+            {tax > 0 && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Tax</span><span>{formatPrice(tax)}</span></div>}
             <Separator className="my-2" />
-            <div className="flex justify-between font-semibold text-lg">
-              <span>Total</span>
-              <span className="text-primary">{formatPrice(total)}</span>
-            </div>
+            <div className="flex justify-between font-semibold text-lg"><span>Total</span><span className="text-primary">{formatPrice(total)}</span></div>
           </div>
+          
+          {customer && customer.prepaidBalance > 0 && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <Label htmlFor="use-prepaid" className="font-medium flex items-center gap-2">
+                            <Wallet className="w-5 h-5 text-green-600" />
+                            Use Prepaid Balance
+                        </Label>
+                        <p className="text-xs text-muted-foreground">Available: {formatPrice(customer.prepaidBalance)}</p>
+                    </div>
+                    <Switch id="use-prepaid" checked={usePrepaid} onCheckedChange={setUsePrepaid} />
+                </div>
+                {usePrepaid && (
+                    <p className="text-sm text-green-700 font-medium text-center pt-1">
+                        Applying {formatPrice(prepaidAmountToUse)} from balance.
+                    </p>
+                )}
+            </div>
+          )}
 
-          {/* Payment Method Display */}
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <span className="text-sm font-medium">Payment Method</span>
             <Badge variant="secondary" className="gap-1">
               {paymentMethodIcon}
-              {paymentMethod}
+              {remainingTotal === 0 ? 'Prepaid' : paymentMethod}
             </Badge>
           </div>
 
-          {/* Amount Input (for Cash/UPI) */}
-          {paymentMethod !== 'Due' && (
+          {remainingTotal > 0 && paymentMethod !== 'Due' && (
             <div className="space-y-3">
-              <Label htmlFor="amount-received">Amount Received</Label>
+              <Label htmlFor="amount-received">Amount to Pay</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                  ₹
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                 <Input
                   id="amount-received"
                   type="text"
@@ -477,95 +408,46 @@ export function CheckoutDialog({
                 />
               </div>
 
-              {/* Quick Amount Buttons */}
               <div className="grid grid-cols-4 gap-2">
                 {QUICK_AMOUNTS.map((amount) => (
-                  <Button
-                    key={amount}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleQuickAmount(amount)}
-                    disabled={isProcessing}
-                    className="h-9"
-                  >
-                    ₹{amount}
-                  </Button>
+                  <Button key={amount} variant="outline" size="sm" onClick={() => handleQuickAmount(amount)} disabled={isProcessing} className="h-9">₹{amount}</Button>
                 ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExactAmount}
-                  disabled={isProcessing}
-                  className="h-9"
-                >
-                  Exact
-                </Button>
+                <Button variant="outline" size="sm" onClick={handleExactAmount} disabled={isProcessing} className="h-9">Exact</Button>
               </div>
 
-              {/* Change Calculation */}
               {parsedAmount > 0 && (
-                <div
-                  className={cn(
-                    'p-3 rounded-lg text-center',
-                    change >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                  )}
-                >
+                <div className={cn('p-3 rounded-lg text-center', change >= 0 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700')}>
                   {change >= 0 ? (
-                    <>
-                      <p className="text-sm">Change</p>
-                      <p className="text-xl font-bold">{formatPrice(change)}</p>
-                    </>
+                    <><p className="text-sm">Change</p><p className="text-xl font-bold">{formatPrice(change)}</p></>
                   ) : (
-                    <>
-                      <p className="text-sm flex items-center justify-center gap-1">
-                        <AlertCircle className="w-4 h-4" />
-                        Balance Due
-                      </p>
-                      <p className="text-xl font-bold">{formatPrice(Math.abs(change))}</p>
-                    </>
+                    <><p className="text-sm flex items-center justify-center gap-1"><AlertCircle className="w-4 h-4" />Balance Due</p><p className="text-xl font-bold">{formatPrice(Math.abs(change))}</p></>
                   )}
                 </div>
-              )}
-
-              {/* Error Message */}
-              {inputError && (
-                <p className="text-sm text-destructive flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" />
-                  {inputError}
-                </p>
               )}
             </div>
           )}
 
-          {/* Due Payment Warning */}
-          {paymentMethod === 'Due' && (
+          {inputError && <p className="text-sm text-destructive flex items-center gap-1"><AlertCircle className="w-4 h-4" />{inputError}</p>}
+
+          {paymentMethod === 'Due' && remainingTotal > 0 && (
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-sm text-amber-700 flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                Amount will be added to customer's due balance
+                {formatPrice(remainingTotal)} will be added to customer's due balance.
               </p>
             </div>
           )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isProcessing || isCheckingOut}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isProcessing}>Cancel</Button>
           <Button
             onClick={handleComplete}
-            disabled={!isValidPayment || isProcessing || isCheckingOut}
-            className="min-w-30"
+            disabled={!isValidPayment || isProcessing}
+            className="min-w-30 bg-blue-600 text-white hover:bg-blue-700"
           >
-            {isCheckingOut ? (
-              'Processing Payment...'
-            ) : isProcessing ? (
-              'Processing...'
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Complete Sale
-              </>
+            {isProcessing ? 'Processing...' : (
+              <><CheckCircle2 className="w-4 h-4 mr-2" />Complete Sale</>
             )}
           </Button>
         </DialogFooter>

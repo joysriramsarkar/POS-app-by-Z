@@ -18,20 +18,12 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
   const removeItem = useCartStore((state) => state.removeItem);
   const itemRef = useRef<HTMLDivElement>(null);
 
-  // Local state for the input to allow for smoother editing
-  const [inputValue, setInputValue] = useState(item.quantity.toString());
-
   // Scroll into view and highlight when newly added
   useEffect(() => {
     if (isHighlighted && itemRef.current) {
       itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [isHighlighted]);
-
-  // Sync local state when the item quantity changes from the store (e.g., via +/- buttons)
-  useEffect(() => {
-    setInputValue(item.quantity.toString());
-  }, [item.quantity]);
 
 
   const formatPrice = (price: number) => {
@@ -84,19 +76,14 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
     removeItem(item.id);
   }, [item.id, removeItem]);
 
-  // Update local state as user types
+  // Update global store on input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-  };
-  
-  // Update global store on blur or Enter
-  const handleInputBlur = () => {
-    const value = parseFloat(inputValue);
-    if (!isNaN(value) && value > 0) {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value)) {
       handleQuantityChange(value);
-    } else {
-      // If input is empty or invalid, revert to original quantity
-      setInputValue(item.quantity.toString());
+    } else if (e.target.value === '') {
+      // Allow clearing the input, which will be handled by handleQuantityChange (removes item if 0)
+      handleQuantityChange(0);
     }
   };
 
@@ -116,7 +103,6 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
   
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      handleInputBlur();
       (e.target as HTMLInputElement).blur(); // Lose focus
     }
   };
@@ -178,7 +164,7 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
               size="sm"
               className="h-8 w-8 md:h-8 md:w-8 p-0 touch-manipulation"
               onClick={handleDecrement}
-              disabled={item.quantity <= 1}
+              disabled={item.quantity <= 1 && item.unit === 'piece'}
               aria-label="Decrease quantity"
             >
               <Minus className="w-3 h-3 md:w-4 md:h-4" />
@@ -188,11 +174,10 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
             <Input
               id={`quantity-${item.id}`}
               name={`quantity-${item.id}`}
-              type="text" // Use text to allow empty state
+              type="number"
               inputMode="decimal" // Hint for mobile keyboards
-              value={inputValue}
+              value={item.quantity}
               onChange={handleInputChange}
-              onBlur={handleInputBlur}
               onKeyDown={handleInputKeyDown}
               className="w-12 md:w-16 h-8 md:h-8 text-center px-1 touch-manipulation text-sm"
               aria-label="Quantity"
@@ -232,5 +217,6 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
     </div>
   );
 }
+
 
 export default CartItem;

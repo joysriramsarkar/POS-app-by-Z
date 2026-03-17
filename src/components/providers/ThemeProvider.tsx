@@ -38,33 +38,15 @@ function hexToHsl(hex: string): string {
 
 function DynamicColorProvider({ children }: { children: React.ReactNode }) {
   const { settings } = useSettingsStore();
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (settings.primary_color) {
+      const primaryHsl = hexToHsl(settings.primary_color);
+      document.documentElement.style.setProperty('--primary', primaryHsl);
+    }
+  }, [settings.primary_color]);
 
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
-  const primaryHsl = settings.primary_color ? hexToHsl(settings.primary_color) : "142.1 76.2% 36.3%";
-
-  return (
-    <>
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          :root {
-            --primary: ${primaryHsl};
-          }
-          .dark {
-            --primary: ${primaryHsl};
-          }
-        `
-      }} />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }
 
 export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {

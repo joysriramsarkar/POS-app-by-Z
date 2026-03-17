@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { InvoicePreview, PrintInvoice } from "./PrintInvoice";
 import type { Sale, PrintFormat } from "@/types/pos";
 import { printToIframe } from "@/lib/printUtility";
+import { useSettingsStore } from "@/stores/settings-store";
 
 // ============================================================================
 // TYPES
@@ -133,6 +134,7 @@ export function PrintDialog({
   sale,
   onPrint,
 }: PrintDialogProps) {
+  const { settings } = useSettingsStore();
   const [selectedFormat, setSelectedFormat] = React.useState<PrintFormat>("thermal-80");
   const [showLogo, setShowLogo] = React.useState(true);
   const [showGst, setShowGst] = React.useState(false);
@@ -140,6 +142,15 @@ export function PrintDialog({
   const [footerMessage, setFooterMessage] = React.useState(
     "This is a computer generated invoice."
   );
+
+  // Create store config from settings
+  const storeConfig = {
+    name: settings.store_name || "Lakhan Bhandar",
+    nameBn: settings.store_name_bn || "লক্ষ্মণ ভাণ্ডার",
+    address: settings.store_address || "",
+    phone: settings.store_phone || "",
+    gstNumber: settings.store_gst || "",
+  };
 
   // Reset preview when dialog closes and show on open
   React.useEffect(() => {
@@ -166,6 +177,7 @@ export function PrintDialog({
         showLogo={showLogo}
         showGst={showGst}
         footerMessage={footerMessage}
+        storeConfig={storeConfig}
       />
     );
     printContainer.innerHTML = invoiceHtml;
@@ -328,6 +340,7 @@ export function PrintDialog({
                   showLogo={showLogo}
                   showGst={showGst}
                   footerMessage={footerMessage}
+                  storeConfig={storeConfig}
                 />
               </ScrollArea>
             ) : (
@@ -360,7 +373,7 @@ export function PrintDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handlePrint} className="gap-2">
+          <Button onClick={handlePrint} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 gap-2">
             <svg
               className="w-4 h-4"
               fill="none"

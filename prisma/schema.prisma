@@ -16,50 +16,50 @@ datasource db {
 // ============================================================================
 
 model Product {
-  id              String    @id @default(cuid())
-  barcode         String?   @unique // Nullable for non-barcoded items (vegetables, loose items)
-  name            String
-  nameBn          String?   @map("name_bn") // Bengali name
-  category        String    @default("General")
-  buyingPrice     Float     @default(0) @map("buying_price")
-  sellingPrice    Float     @default(0) @map("selling_price")
-  unit            String    @default("piece") // piece, kg, gram, liter, packet
-  currentStock    Float     @default(0) @map("current_stock")
-  minStockLevel   Float     @default(5) @map("min_stock_level")
-  isActive        Boolean   @default(true) @map("is_active") // Soft delete
-  imageUrl        String?   @map("image_url")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  barcode       String?  @unique // Nullable for non-barcoded items (vegetables, loose items)
+  name          String
+  nameBn        String?  @map("name_bn") // Bengali name
+  category      String   @default("General")
+  buyingPrice   Float    @default(0) @map("buying_price")
+  sellingPrice  Float    @default(0) @map("selling_price")
+  unit          String   @default("piece") // piece, kg, gram, liter, packet
+  currentStock  Float    @default(0) @map("current_stock")
+  minStockLevel Float    @default(5) @map("min_stock_level")
+  isActive      Boolean  @default(true) @map("is_active") // Soft delete
+  imageUrl      String?  @map("image_url")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  saleItems       SaleItem[]
-  purchaseItems   PurchaseItem[]
-  stockHistory    StockHistory[]
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+  stockHistory  StockHistory[]
 
   @@map("products")
 }
 
 model Category {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  nameBn      String?   @map("name_bn")
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameBn      String?  @map("name_bn")
   description String?
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("categories")
 }
 
 model StockHistory {
-  id          String    @id @default(cuid())
-  productId   String    @map("product_id")
-  changeType  String    // "purchase", "sale", "adjustment", "return"
-  quantity    Float     // Positive for addition, negative for deduction
+  id          String   @id @default(cuid())
+  productId   String   @map("product_id")
+  changeType  String // "purchase", "sale", "adjustment", "return"
+  quantity    Float // Positive for addition, negative for deduction
   reason      String?
-  referenceId String?   @map("reference_id") // Sale ID or Purchase ID
-  createdAt   DateTime  @default(now()) @map("created_at")
+  referenceId String?  @map("reference_id") // Sale ID or Purchase ID
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
   @@index([createdAt])
@@ -71,36 +71,37 @@ model StockHistory {
 // ============================================================================
 
 model Customer {
-  id          String    @id @default(cuid())
-  name        String
-  phone       String?   @unique
-  address     String?
-  totalDue    Float     @default(0) @map("total_due") // Running total of outstanding balance
-  totalPaid   Float     @default(0) @map("total_paid") // Total amount paid historically
-  notes       String?
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id             String   @id @default(cuid())
+  name           String
+  phone          String?  @unique
+  address        String?
+  totalDue       Float    @default(0) @map("total_due") // Running total of outstanding balance (owes store)
+  totalPaid      Float    @default(0) @map("total_paid") // Total amount paid historically
+  prepaidBalance Float    @default(0) @map("prepaid_balance") // Prepaid/credit balance (store owes customer)
+  notes          String?
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
-  ledgerEntries  LedgerEntry[]
-  sales          Sale[]
+  ledgerEntries LedgerEntry[]
+  sales         Sale[]
 
   @@index([phone])
   @@map("customers")
 }
 
 model LedgerEntry {
-  id           String    @id @default(cuid())
-  customerId   String    @map("customer_id")
-  entryType    String    // "credit" (customer owes more), "debit" (customer paid)
+  id           String   @id @default(cuid())
+  customerId   String   @map("customer_id")
+  entryType    String // "credit" (customer owes more), "debit" (customer paid)
   amount       Float
-  balanceAfter Float     @map("balance_after") // Balance after this transaction
+  balanceAfter Float    @map("balance_after") // Balance after this transaction
   description  String?
-  referenceId  String?   @map("reference_id") // Sale ID or Payment ID
-  createdAt    DateTime  @default(now()) @map("created_at")
+  referenceId  String?  @map("reference_id") // Sale ID or Payment ID
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  customer     Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@index([createdAt])
@@ -112,25 +113,25 @@ model LedgerEntry {
 // ============================================================================
 
 model Sale {
-  id              String      @id @default(cuid())
-  invoiceNumber   String      @unique @map("invoice_number")
-  customerId      String?     @map("customer_id")
-  subtotal        Float       @default(0)
-  discount        Float       @default(0)
-  tax             Float       @default(0)
-  totalAmount     Float       @default(0) @map("total_amount")
-  amountPaid      Float       @default(0) @map("amount_paid")
-  paymentMethod   String      @default("Cash") @map("payment_method") // Cash, UPI, Due
-  paymentStatus   String      @default("Paid") @map("payment_status") // Paid, Partial, Due
-  status          String      @default("Completed") // Completed, Cancelled, Refunded
-  notes           String?
-  offlineSynced   Boolean     @default(true) @map("offline_synced") // For offline-first
-  createdAt       DateTime    @default(now()) @map("created_at")
-  updatedAt       DateTime    @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique @map("invoice_number")
+  customerId    String?  @map("customer_id")
+  subtotal      Float    @default(0)
+  discount      Float    @default(0)
+  tax           Float    @default(0)
+  totalAmount   Float    @default(0) @map("total_amount")
+  amountPaid    Float    @default(0) @map("amount_paid")
+  paymentMethod String   @default("Cash") @map("payment_method") // Cash, UPI, Due
+  paymentStatus String   @default("Paid") @map("payment_status") // Paid, Partial, Due
+  status        String   @default("Completed") // Completed, Cancelled, Refunded
+  notes         String?
+  offlineSynced Boolean  @default(true) @map("offline_synced") // For offline-first
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  customer        Customer?   @relation(fields: [customerId], references: [id])
-  items           SaleItem[]
+  customer Customer?  @relation(fields: [customerId], references: [id])
+  items    SaleItem[]
 
   @@index([customerId])
   @@index([createdAt])
@@ -139,17 +140,17 @@ model Sale {
 }
 
 model SaleItem {
-  id            String    @id @default(cuid())
-  saleId        String    @map("sale_id")
-  productId     String    @map("product_id")
-  productName   String    @map("product_name") // Snapshot at time of sale
-  quantity      Float
-  unitPrice     Float     @map("unit_price") // Price at time of sale
-  totalPrice    Float     @map("total_price")
-  createdAt     DateTime  @default(now()) @map("created_at")
+  id          String   @id @default(cuid())
+  saleId      String   @map("sale_id")
+  productId   String   @map("product_id")
+  productName String   @map("product_name") // Snapshot at time of sale
+  quantity    Float
+  unitPrice   Float    @map("unit_price") // Price at time of sale
+  totalPrice  Float    @map("total_price")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  sale          Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product       Product   @relation(fields: [productId], references: [id])
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
 
   @@index([saleId])
   @@index([productId])
@@ -161,34 +162,34 @@ model SaleItem {
 // ============================================================================
 
 model Supplier {
-  id          String    @id @default(cuid())
-  name        String
-  phone       String?
-  address     String?
-  email       String?
-  gstNumber   String?   @map("gst_number")
-  notes       String?
-  isActive    Boolean   @default(true) @map("is_active")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  email     String?
+  gstNumber String?  @map("gst_number")
+  notes     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  purchases   Purchase[]
+  purchases Purchase[]
 
   @@map("suppliers")
 }
 
 model Purchase {
-  id              String        @id @default(cuid())
-  supplierId      String?       @map("supplier_id")
-  invoiceNumber   String?       @map("invoice_number")
-  totalAmount     Float         @default(0) @map("total_amount")
-  paymentStatus   String        @default("Pending") @map("payment_status") // Paid, Pending, Partial
-  notes           String?
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  supplierId    String?  @map("supplier_id")
+  invoiceNumber String?  @map("invoice_number")
+  totalAmount   Float    @default(0) @map("total_amount")
+  paymentStatus String   @default("Pending") @map("payment_status") // Paid, Pending, Partial
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  supplier        Supplier?     @relation(fields: [supplierId], references: [id])
-  items           PurchaseItem[]
+  supplier Supplier?      @relation(fields: [supplierId], references: [id])
+  items    PurchaseItem[]
 
   @@index([supplierId])
   @@index([createdAt])
@@ -196,17 +197,17 @@ model Purchase {
 }
 
 model PurchaseItem {
-  id            String    @id @default(cuid())
-  purchaseId    String    @map("purchase_id")
-  productId     String    @map("product_id")
-  productName   String    @map("product_name")
-  quantity      Float
-  buyingPrice   Float     @map("buying_price")
-  totalPrice    Float     @map("total_price")
-  createdAt     DateTime  @default(now()) @map("created_at")
+  id          String   @id @default(cuid())
+  purchaseId  String   @map("purchase_id")
+  productId   String   @map("product_id")
+  productName String   @map("product_name")
+  quantity    Float
+  buyingPrice Float    @map("buying_price")
+  totalPrice  Float    @map("total_price")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  purchase      Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  product       Product   @relation(fields: [productId], references: [id])
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
 
   @@index([purchaseId])
   @@index([productId])
@@ -218,18 +219,18 @@ model PurchaseItem {
 // ============================================================================
 
 model SyncQueue {
-  id               String    @id @default(cuid())
-  idempotencyKey   String    @unique @map("idempotency_key") // UUID v4 - CRITICAL for preventing duplicates
-  entityType       String    @map("entity_type") // sale:create, customer:update, etc.
-  entityId         String?   @map("entity_id")
-  action           String    // sync action type
-  payload          String    // JSON stringified data
-  result           String?   // JSON stringified result (for idempotency cache)
-  synced           Boolean   @default(false)
-  syncedAt         DateTime? @map("synced_at")
-  retryCount       Int       @default(0) @map("retry_count")
-  error            String?
-  createdAt        DateTime  @default(now()) @map("created_at")
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique @map("idempotency_key") // UUID v4 - CRITICAL for preventing duplicates
+  entityType     String    @map("entity_type") // sale:create, customer:update, etc.
+  entityId       String?   @map("entity_id")
+  action         String // sync action type
+  payload        String // JSON stringified data
+  result         String? // JSON stringified result (for idempotency cache)
+  synced         Boolean   @default(false)
+  syncedAt       DateTime? @map("synced_at")
+  retryCount     Int       @default(0) @map("retry_count")
+  error          String?
+  createdAt      DateTime  @default(now()) @map("created_at")
 
   @@index([synced])
   @@index([idempotencyKey])
@@ -242,11 +243,11 @@ model SyncQueue {
 // ============================================================================
 
 model Setting {
-  id          String    @id @default(cuid())
-  key         String    @unique
+  id          String   @id @default(cuid())
+  key         String   @unique
   value       String
   description String?
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
 }
@@ -255,13 +256,54 @@ model Setting {
 // USERS & AUTHENTICATION
 // ============================================================================
 
+enum UserRole {
+  ADMIN
+  MANAGER
+  CASHIER
+  VIEWER
+}
+
 model User {
   id        String   @id @default(cuid())
   username  String   @unique
+  email     String?  @unique
   password  String
-  name      String?
+  name      String
+  phone     String?
+  role      UserRole @default(VIEWER)
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("users")
+}
+
+// ============================================================================
+// ROLE PERMISSIONS
+// ============================================================================
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g., "users.create", "sales.view", "reports.export"
+  description String?
+  category    String // e.g., "users", "sales", "products", "reports", "settings"
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+// Define default role permissions
+model RolePermission {
+  id           String   @id @default(cuid())
+  role         UserRole
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([role, permissionId])
+  @@index([role])
+  @@map("role_permissions")
 }

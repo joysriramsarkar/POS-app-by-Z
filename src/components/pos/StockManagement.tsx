@@ -171,7 +171,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
                 <Upload className="w-4 h-4 mr-2" />
                 Bulk Update
             </Button>
-            <Button onClick={onAddProduct}>
+            <Button onClick={onAddProduct} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Item
             </Button>

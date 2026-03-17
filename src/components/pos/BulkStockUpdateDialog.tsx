@@ -293,7 +293,7 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={parsedData.length === 0}>
+          <Button onClick={handleSave} disabled={parsedData.length === 0} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
             <CheckCircle className="w-4 h-4 mr-2" />
             Save Changes
           </Button>

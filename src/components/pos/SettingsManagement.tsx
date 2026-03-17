@@ -12,8 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Store, Printer, Database, Palette, Users, Globe, Receipt, Download, Upload, Loader2, Save } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { Store, Printer, Database, Palette, Users, Globe, Receipt, Download, Upload, Loader2, Save, LogOut } from "lucide-react";
+import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -188,26 +188,26 @@ export default function SettingsManagement() {
       <div className="flex-1 overflow-auto p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           <Tabs defaultValue="profile" className="flex flex-col md:flex-row gap-6">
-            <TabsList className="flex flex-row md:flex-col h-auto w-full md:w-64 bg-transparent p-0 justify-start overflow-x-auto no-scrollbar border-b md:border-b-0 md:border-r border-border pb-2 md:pb-0 md:pr-4 shrink-0">
-              <TabsTrigger value="profile" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-muted whitespace-nowrap">
+            <TabsList className="flex flex-row md:flex-col h-auto w-full md:w-64 bg-transparent p-0 justify-start md:items-start overflow-x-auto no-scrollbar border-b md:border-b-0 md:border-r border-border pb-2 md:pb-0 md:pr-4 shrink-0 md:sticky md:top-0 md:h-fit md:max-h-screen md:overflow-y-auto">
+              <TabsTrigger value="profile" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
                 <Store className="w-4 h-4" /> স্টোর প্রোফাইল (Profile)
               </TabsTrigger>
-              <TabsTrigger value="printer" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-muted whitespace-nowrap">
+              <TabsTrigger value="printer" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
                 <Printer className="w-4 h-4" /> প্রিন্টার সেটিংস (Printer)
               </TabsTrigger>
-              <TabsTrigger value="backup" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-muted whitespace-nowrap">
+              <TabsTrigger value="backup" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
                 <Database className="w-4 h-4" /> ডাটা ব্যাকআপ (Backup)
               </TabsTrigger>
-              <TabsTrigger value="theme" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-muted whitespace-nowrap">
+              <TabsTrigger value="theme" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
                 <Palette className="w-4 h-4" /> থিম সেটিংস (Theme)
               </TabsTrigger>
-              <TabsTrigger value="users" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-muted whitespace-nowrap">
+              <TabsTrigger value="users" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
                 <Users className="w-4 h-4" /> ইউজার (Users)
               </TabsTrigger>
-              <TabsTrigger value="language" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-muted whitespace-nowrap">
+              <TabsTrigger value="language" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
                 <Globe className="w-4 h-4" /> ভাষা (Language)
               </TabsTrigger>
-              <TabsTrigger value="billing" className="justify-start gap-2 px-3 py-2.5 data-[state=active]:bg-muted whitespace-nowrap">
+              <TabsTrigger value="billing" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
                 <Receipt className="w-4 h-4" /> বিলিং (Billing)
               </TabsTrigger>
             </TabsList>
@@ -264,7 +264,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["store_name", "store_name_bn", "store_address", "store_phone", "store_gst"])} disabled={isSaving}>
+                      <Button onClick={() => handleSave(["store_name", "store_name_bn", "store_address", "store_phone", "store_gst"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -353,7 +353,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["print_paper_size", "print_font_size", "print_header", "print_footer", "auto_print"])} disabled={isSaving}>
+                      <Button onClick={() => handleSave(["print_paper_size", "print_font_size", "print_header", "print_footer", "auto_print"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -461,7 +461,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["theme_mode", "primary_color"])} disabled={isSaving}>
+                      <Button onClick={() => handleSave(["theme_mode", "primary_color"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -478,14 +478,20 @@ export default function SettingsManagement() {
                     <CardDescription>Manage user credentials and authentication.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="flex items-center gap-4 p-4 rounded-lg border bg-muted/20">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="w-6 h-6 text-primary" />
+                    <div className="flex items-center justify-between gap-4 p-4 rounded-lg border bg-muted/20">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Current User</p>
+                          <h3 className="font-semibold text-lg">{session?.user?.name || (session?.user as any)?.username || "Admin"}</h3>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Current User</p>
-                        <h3 className="font-semibold text-lg">{session?.user?.name || (session?.user as any)?.username || "Admin"}</h3>
-                      </div>
+                      <Button variant="outline" onClick={() => signOut()} className="gap-2">
+                        <LogOut className="w-4 h-4" />
+                        লগ আউট (Logout)
+                      </Button>
                     </div>
 
                     <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md border rounded-lg p-4">
@@ -521,7 +527,7 @@ export default function SettingsManagement() {
                         />
                       </div>
 
-                      <Button type="submit" disabled={isChangingPassword || !passwords.current || !passwords.new || !passwords.confirm}>
+                      <Button type="submit" disabled={isChangingPassword || !passwords.current || !passwords.new || !passwords.confirm} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isChangingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         পাসওয়ার্ড পরিবর্তন করুন
                       </Button>
@@ -566,7 +572,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["app_language", "receipt_language"])} disabled={isSaving}>
+                      <Button onClick={() => handleSave(["app_language", "receipt_language"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -625,7 +631,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["default_discount", "tax_rate", "currency_symbol", "round_off"])} disabled={isSaving}>
+                      <Button onClick={() => handleSave(["default_discount", "tax_rate", "currency_symbol", "round_off"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
