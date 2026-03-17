@@ -37,9 +37,11 @@ import {
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
+import { useSettingsStore } from '@/stores/settings-store';
 import { useSimpleBarcodeScanner } from '@/hooks/use-barcode-scanner';
 import { ProductsDB, SalesDB, SyncQueueDB, CustomersDB } from '@/lib/offline/indexeddb';
 import { STORE_CONFIG } from '@/types/pos';
+import SettingsManagement from '@/components/pos/SettingsManagement';
 import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
@@ -81,6 +83,11 @@ function POSDashboard() {
   const [currentPage, setCurrentPage] = useState<PageType>('billing');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Settings store
+  const { settings } = useSettingsStore();
+  const storeName = settings?.store_name || STORE_CONFIG.name;
+  const storeNameBn = settings?.store_name_bn || STORE_CONFIG.nameBn;
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -693,8 +700,8 @@ function POSDashboard() {
             <Store className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-sm">{STORE_CONFIG.name}</h1>
-            <p className="text-xs text-muted-foreground">{STORE_CONFIG.nameBn}</p>
+            <h1 className="font-bold text-sm">{storeName}</h1>
+            <p className="text-xs text-muted-foreground">{storeNameBn}</p>
           </div>
         </div>
       </div>
@@ -885,24 +892,7 @@ function POSDashboard() {
           </div>
         );
       case 'settings':
-        return (
-          <div className="flex flex-col h-full">
-            <div className="shrink-0 border-b bg-background p-4">
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Settings className="w-6 h-6" />
-                Settings
-              </h1>
-              <p className="text-sm text-muted-foreground">Configure your store settings</p>
-            </div>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <Settings className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">Settings Coming Soon</p>
-                <p className="text-sm text-muted-foreground mt-1">Store profile, printer, and more</p>
-              </div>
-            </div>
-          </div>
-        );
+        return <SettingsManagement />;
       default:
         return null;
     }
@@ -938,7 +928,7 @@ function POSDashboard() {
                 <Store className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="font-bold text-sm">{STORE_CONFIG.name}</h1>
+                <h1 className="font-bold text-sm">{storeName}</h1>
               </div>
             </div>
 
