@@ -17,8 +17,16 @@ const ProductSyncPayloadSchema = z.union([
   }),
 ]);
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
 // GET /api/sync - Get pending sync items or sync status
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const action = searchParams.get('action');
@@ -61,78 +69,147 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/sync - Sync offline data
+// POST /api/sync - Sync offline data with idempotency guarantee
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { entityType, entityId, action, payload } = body;
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
 
-    // Validate required fields
-    if (!entityType || !entityId || !action || !payload) {
+  try {
+    // CRITICAL: Extract idempotency key from header
+    const idempotencyKey = request.headers.get('X-Idempotency-Key');
+    if (!idempotencyKey) {
       return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
+        { success: false, error: 'Missing X-Idempotency-Key header' },
         { status: 400 }
       );
     }
 
-    const parsedPayload = JSON.parse(payload);
+    const body = await request.json();
+    const { actionType, payload } = body;
+
+    // Validate required fields
+    if (!actionType || !payload) {
+      return NextResponse.json(
+        { success: false, error: 'Missing actionType or payload' },
+        { status: 400 }
+      );
+    }
+
+    // ===================================================================
+    // IDEMPOTENCY CHECK: If we've already processed this, return cached result
+    // ===================================================================
+    const existingSync = await db.syncQueue.findUnique({
+      where: { idempotencyKey },
+    });
+
+    if (existingSync && existingSync.synced) {
+      console.log(`✅ Idempotency hit: returning cached result for ${idempotencyKey}`);
+      return NextResponse.json({
+        success: true,
+        data: existingSync.result,
+        cached: true,
+        message: 'Result from previous successful sync (idempotency)',
+      });
+    }
+
     let result;
 
-    switch (entityType) {
-      case 'Sale': {
-        const saleResult = SaleInputSchema.safeParse(parsedPayload);
+    // Route based on action type
+    switch (actionType) {
+      case 'sale:create': {
+        const saleResult = SaleInputSchema.safeParse(payload);
         if (!saleResult.success) {
-          return NextResponse.json({ success: false, error: 'Invalid Sale payload' }, { status: 400 });
+          return NextResponse.json(
+            { success: false, error: 'Invalid Sale payload', details: saleResult.error },
+            { status: 400 }
+          );
         }
-        result = await syncSale(saleResult.data, action);
+        result = await syncSale(saleResult.data, 'create');
         break;
       }
-      case 'Customer': {
-        const customerResult = CustomerInputSchema.safeParse(parsedPayload);
+
+      case 'customer:create': {
+        const customerResult = CustomerInputSchema.safeParse(payload);
         if (!customerResult.success) {
-          return NextResponse.json({ success: false, error: 'Invalid Customer payload' }, { status: 400 });
+          return NextResponse.json(
+            { success: false, error: 'Invalid Customer payload', details: customerResult.error },
+            { status: 400 }
+          );
         }
-        result = await syncCustomer(customerResult.data, action);
+        result = await syncCustomer(customerResult.data, 'create');
         break;
       }
-      case 'Product': {
-        const productResult = ProductSyncPayloadSchema.safeParse(parsedPayload);
+
+      case 'customer:update': {
+        const customerResult = CustomerInputSchema.safeParse(payload);
+        if (!customerResult.success) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid Customer payload', details: customerResult.error },
+            { status: 400 }
+          );
+        }
+        result = await syncCustomer(customerResult.data, 'update');
+        break;
+      }
+
+      case 'product:stock:update': {
+        const productResult = ProductSyncPayloadSchema.safeParse(payload);
         if (!productResult.success) {
-          return NextResponse.json({ success: false, error: 'Invalid Product payload' }, { status: 400 });
+          return NextResponse.json(
+            { success: false, error: 'Invalid Product payload', details: productResult.error },
+            { status: 400 }
+          );
         }
-        result = await syncProduct(productResult.data, action);
+        result = await syncProduct(productResult.data, 'update');
         break;
       }
+
       default:
         return NextResponse.json(
-          { success: false, error: 'Unknown entity type' },
+          { success: false, error: `Unknown action type: ${actionType}` },
           { status: 400 }
         );
     }
 
-    // Log sync success
-    await db.syncQueue.create({
-      data: {
+    // ===================================================================
+    // IDEMPOTENCY STORE: Cache this successful result for future retries
+    // ===================================================================
+    await db.syncQueue.upsert({
+      where: { idempotencyKey },
+      update: {
+        synced: true,
+        syncedAt: new Date(),
+        result: JSON.stringify(result),
+      },
+      create: {
         id: uuidv4(),
-        entityType,
-        entityId,
-        action,
-        payload,
+        idempotencyKey,
+        entityType: actionType,
+        action: 'sync',
+        payload: JSON.stringify(payload),
         synced: true,
         syncedAt: new Date(),
         retryCount: 0,
+        result: JSON.stringify(result),
       },
     });
+
+    console.log(`✅ Successfully synced ${actionType} with idempotency key ${idempotencyKey}`);
 
     return NextResponse.json({
       success: true,
       data: result,
-      message: `${entityType} synced successfully`,
+      message: `${actionType} synced successfully`,
     });
   } catch (error) {
     console.error('Error syncing data:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to sync data' },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to sync data',
+      },
       { status: 500 }
     );
   }
@@ -433,6 +510,11 @@ async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>
 
 // PUT /api/sync - Mark sync item as complete
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { id, error } = body;

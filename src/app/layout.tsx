@@ -51,6 +51,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
         style={{ fontFamily: "'Noto Sans Bengali', 'Geist', sans-serif" }}
+        suppressHydrationWarning
       >
         <SessionProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

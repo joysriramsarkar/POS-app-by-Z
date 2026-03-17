@@ -218,19 +218,22 @@ model PurchaseItem {
 // ============================================================================
 
 model SyncQueue {
-  id          String    @id @default(cuid())
-  entityType  String    @map("entity_type") // Sale, Customer, etc.
-  entityId    String    @map("entity_id")
-  action      String    // create, update, delete
-  payload     String    // JSON stringified data
-  synced      Boolean   @default(false)
-  syncedAt    DateTime? @map("synced_at")
-  retryCount  Int       @default(0) @map("retry_count")
-  error       String?
-  createdAt   DateTime  @default(now()) @map("created_at")
+  id               String    @id @default(cuid())
+  idempotencyKey   String    @unique @map("idempotency_key") // UUID v4 - CRITICAL for preventing duplicates
+  entityType       String    @map("entity_type") // sale:create, customer:update, etc.
+  entityId         String?   @map("entity_id")
+  action           String    // sync action type
+  payload          String    // JSON stringified data
+  result           String?   // JSON stringified result (for idempotency cache)
+  synced           Boolean   @default(false)
+  syncedAt         DateTime? @map("synced_at")
+  retryCount       Int       @default(0) @map("retry_count")
+  error            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
 
   @@index([synced])
-  @@index([entityType, entityId])
+  @@index([idempotencyKey])
+  @@index([entityType])
   @@map("sync_queue")
 }
 

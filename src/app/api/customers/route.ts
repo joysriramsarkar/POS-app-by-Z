@@ -6,8 +6,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { CustomerInputSchema } from '@/schemas';
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
 // GET /api/customers - Fetch customers
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -87,6 +95,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/customers - Create new customer
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
 
@@ -145,6 +158,11 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/customers - Update customer
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
 
@@ -192,6 +210,11 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/customers - Soft delete customer
 export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

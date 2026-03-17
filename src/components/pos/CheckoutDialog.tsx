@@ -29,6 +29,7 @@ import {
 import type { PaymentMethod, Sale, SaleItem, Customer } from '@/types/pos';
 import { useCartStore, useUIStore, useProductsStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
+import { generateInvoiceNumber } from '@/lib/invoice';
 
 interface CheckoutDialogProps {
   open?: boolean;
@@ -54,15 +55,6 @@ export interface PaymentData {
 }
 
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000, 2000];
-
-const generateInvoiceNumber = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const random = Math.floor(1000 + Math.random() * 9000);
-  return `INV-${year}${month}${day}-${random}`;
-};
 
 export function CheckoutDialog({
   open: controlledOpen,

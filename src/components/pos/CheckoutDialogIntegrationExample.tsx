@@ -1,0 +1,397 @@
+// ============================================================================
+// CHECKOUT DIALOG INTEGRATION EXAMPLE
+// How to Update Your POS Checkout to Use Local-First Pattern
+// ============================================================================
+
+/*
+
+BEFORE (Network-First, Problematic):
+─────────────────────────────────────
+
+const handleCheckoutComplete = async () => {
+  setIsCheckingOut(true);
+  try {
+    // 1. Wait for network response
+    const response = await fetch('/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({
+        items: cartItems,
+        customerId: customerId,
+        paymentMethod: paymentMethod,
+        amountPaid: amountPaid,
+        // ...
+      })
+    });
+    
+    const sale = await response.json();
+    
+    // 2. Only after network responds, update UI
+    setLastSale(sale);
+    clearCart();  // Cart is now empty
+    showSuccess(); // Show receipt
+    
+  } catch (error) {
+    showError(error);
+  } finally {
+    setIsCheckingOut(false);
+  }
+}
+
+PROBLEMS:
+- If network fails, cart doesn't clear (confusing)
+- User can't see immediately that sale succeeded
+- No offline capability
+- Duplicate detection relies on server-side generation
+
+
+AFTER (Local-First, Enterprise-Grade):
+────────────────────────────────────────
+
+import { LocalFirstCheckout, getNetworkMonitor } from '@/lib/offline';
+import type { Sale } from '@/types/pos';
+
+export function CheckoutDialog({...}) {
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
+  
+  // Get device ID (constant per device)
+  const getDeviceId = () => {
+    let deviceId = localStorage.getItem('device-id');
+    if (!deviceId) {
+      deviceId = uuidv4();
+      localStorage.setItem('device-id', deviceId);
+    }
+    return deviceId;
+  };
+
+  const handleCheckoutComplete = async () => {
+    setIsCheckingOut(true);
+    try {
+      // STEP 1: Execute locally (returns immediately!)
+      const sale = await LocalFirstCheckout.executeSale(
+        items,
+        customerId,
+        paymentMethod,
+        amountPaid,
+        discount,
+        tax,
+        notes,
+        getDeviceId() // Device ID for multi-device tracking
+      );
+      
+      // STEP 2: Update UI immediately (zero network latency!)
+      setLastSale(sale);
+      clearCart(); // Clear cart from Zustand
+      showSuccess(); // Show receipt with local sale ID
+      
+      // STEP 3: Sync happens in background automatically
+      // NetworkMonitor will trigger sync when online
+      // Even if offline, sale is safely stored locally
+      
+    } catch (error) {
+      // Only validation errors reach here (not network errors)
+      // Network errors are handled by retry system
+      showError(error instanceof Error ? error.message : 'Checkout failed');
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {/* ...existing UI... */}
+        
+        <Button 
+          onClick={handleCheckoutComplete}
+          disabled={isCheckingOut || items.length === 0}
+        >
+          {isCheckingOut ? 'Processing...' : 'Complete Sale'}
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+BENEFITS:
+✅ UI updates immediately (no network wait)
+✅ Works completely offline
+✅ Automatic background sync when online
+✅ Guaranteed no duplicate billings (idempotencyKey)
+✅ Cart clears immediately (locally)
+✅ Receipt shows correct sale ID immediately
+✅ Network errors don't affect user experience
+
+*/
+
+// ============================================================================
+// FULL IMPLEMENTATION EXAMPLE
+// ============================================================================
+
+import { useState, useCallback, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  LocalFirstCheckout,
+  getNetworkMonitor,
+  getSyncWorker,
+  type NetworkStatus,
+} from '@/lib/offline';
+import { useCartStore, useUIStore } from '@/stores/pos-store';
+import type { CartItem, PaymentMethod, Customer, Sale } from '@/types/pos';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, Wifi, WifiOff, RotateCw } from 'lucide-react';
+
+interface CheckoutDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  customers?: Customer[];
+  onAddCustomer?: () => void;
+}
+
+export function CheckoutDialogNew({
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  customers = [],
+  onAddCustomer,
+}: CheckoutDialogProps) {
+  // State
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [lastSale, setLastSale] = useState<Sale | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus>('online');
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  // Cart state
+  const items = useCartStore((state) => state.items);
+  const discount = useCartStore((state) => state.discount);
+  const tax = useCartStore((state) => state.tax);
+  const customerId = useCartStore((state) => state.customerId);
+  const customerName = useCartStore((state) => state.customerName);
+  const paymentMethod = useCartStore((state) => state.paymentMethod);
+  const amountPaid = useCartStore((state) => state.amountPaid);
+  const notes = useCartStore((state) => state.notes);
+  const clearCart = useCartStore((state) => state.clearCart);
+
+  // UI state
+  const setCheckoutOpen = useUIStore((state) => state.setCheckoutOpen);
+
+  // Get device ID (stored in localStorage)
+  const getDeviceId = useCallback(() => {
+    let deviceId = localStorage.getItem('device-id');
+    if (!deviceId) {
+      deviceId = uuidv4();
+      localStorage.setItem('device-id', deviceId);
+    }
+    return deviceId;
+  }, []);
+
+  // Monitor network status
+  useEffect(() => {
+    const monitor = getNetworkMonitor();
+    const unsubscribe = monitor.subscribe((status) => {
+      setNetworkStatus(status);
+    });
+
+    // Update pending sync count
+    LocalFirstCheckout.getPendingSyncCount().then(setPendingSyncCount);
+
+    return unsubscribe;
+  }, []);
+
+  // Handle checkout
+  const handleCheckoutComplete = useCallback(async () => {
+    setCheckoutError(null);
+    setIsCheckingOut(true);
+
+    try {
+      // Validation before local save
+      if (!items || items.length === 0) {
+        throw new Error('Cart is empty');
+      }
+
+      const total = items.reduce((sum, item) => sum + item.totalPrice, 0) - discount + tax;
+      if (total < 0) {
+        throw new Error('Invalid total amount');
+      }
+
+      // Execute checkout locally (returns immediately!)
+      const sale = await LocalFirstCheckout.executeSale(
+        items,
+        customerId,
+        paymentMethod,
+        amountPaid,
+        discount,
+        tax,
+        notes,
+        getDeviceId()
+      );
+
+      // Update UI immediately
+      console.log(`✅ Sale created locally: ${sale.invoiceNumber}`);
+      setLastSale(sale);
+      clearCart();
+      setShowSuccess(true);
+
+      // Update pending count
+      const pendingCount = await LocalFirstCheckout.getPendingSyncCount();
+      setPendingSyncCount(pendingCount);
+
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Checkout failed';
+      setCheckoutError(message);
+      console.error('Checkout error:', error);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  }, [items, discount, tax, customerId, paymentMethod, amountPaid, notes, clearCart, getDeviceId]);
+
+  // Calculate totals
+  const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+  const total = subtotal - discount + tax;
+
+  // Controlled open state
+  const [internalOpen, setInternalOpen] = useState(controlledOpen ?? false);
+  const open = controlledOpen ?? internalOpen;
+  const onOpenChange = controlledOnOpenChange ?? setInternalOpen;
+
+  // Success screen
+  if (showSuccess && lastSale) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <div className="flex flex-col items-center justify-center py-8 space-y-4">
+            <div className="text-4xl">✅</div>
+            <h2 className="text-xl font-bold">Sale Completed!</h2>
+            <p className="text-sm text-gray-600 text-center">
+              Invoice: <span className="font-mono font-bold">{lastSale.invoiceNumber}</span>
+            </p>
+            <p className="text-2xl font-bold">₹{lastSale.totalAmount.toFixed(2)}</p>
+
+            {networkStatus === 'offline' && (
+              <Badge variant="secondary" className="gap-1">
+                <WifiOff className="w-3 h-3" />
+                Syncing when online
+              </Badge>
+            )}
+            {networkStatus === 'online' && pendingSyncCount > 0 && (
+              <Badge variant="default" className="gap-1">
+                <RotateCw className="w-3 h-3" />
+                {pendingSyncCount} pending sync
+              </Badge>
+            )}
+
+            <div className="flex gap-2 w-full">
+              <Button
+                onClick={() => {
+                  setShowSuccess(false);
+                  onOpenChange(false);
+                }}
+                className="flex-1"
+              >
+                New Sale
+              </Button>
+              <Button
+                onClick={() => {
+                  // Print receipt
+                  window.print();
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Print
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Main checkout screen
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Checkout</DialogTitle>
+        </DialogHeader>
+
+        {/* Network Status */}
+        <div className="mb-4">
+          <div
+            className={`flex items-center gap-2 p-2 rounded text-sm ${
+              networkStatus === 'online'
+                ? 'bg-green-100 text-green-800'
+                : 'bg-yellow-100 text-yellow-800'
+            }`}
+          >
+            {networkStatus === 'online' ? (
+              <Wifi className="w-4 h-4" />
+            ) : (
+              <WifiOff className="w-4 h-4" />
+            )}
+            {networkStatus === 'online' ? 'Online' : 'Offline Mode'}
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {checkoutError && (
+          <div className="flex gap-2 p-3 bg-red-100 text-red-800 rounded text-sm">
+            <AlertCircle className="w-4 h-4 mt-0.5" />
+            <div>{checkoutError}</div>
+          </div>
+        )}
+
+        {/* Order Summary */}
+        <div className="space-y-2">
+          <div className="font-semibold">Order Summary</div>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>Subtotal:</div>
+            <div className="text-right">₹{subtotal.toFixed(2)}</div>
+            <div>Discount:</div>
+            <div className="text-right">-₹{discount.toFixed(2)}</div>
+            <div>Tax:</div>
+            <div className="text-right">₹{tax.toFixed(2)}</div>
+            <div className="font-bold">Total:</div>
+            <div className="text-right font-bold">₹{total.toFixed(2)}</div>
+          </div>
+        </div>
+
+        {/* Customer Info */}
+        {customerName && (
+          <div className="p-2 bg-blue-50 rounded text-sm">
+            <div className="font-semibold">Customer</div>
+            <div>{customerName}</div>
+          </div>
+        )}
+
+        {/* Checkout Button */}
+        <Button
+          onClick={handleCheckoutComplete}
+          disabled={isCheckingOut || items.length === 0 || total <= 0}
+          size="lg"
+          className="w-full"
+        >
+          {isCheckingOut ? (
+            <>
+              <RotateCw className="w-4 h-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            `Complete Sale (₹${total.toFixed(2)})`
+          )}
+        </Button>
+
+        <Button
+          onClick={() => onOpenChange(false)}
+          variant="outline"
+          className="w-full"
+        >
+          Cancel
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}

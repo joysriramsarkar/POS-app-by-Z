@@ -1,5 +1,3 @@
-import { db } from './db';
-
 /**
  * Generates a temporary, local invoice number for client-side use
  * Used for offline mode and temporary records before sync
@@ -22,6 +20,9 @@ export function generateInvoiceNumber(): string {
  * @throws Error if database is unavailable
  */
 export async function generateServerInvoiceNumber(): Promise<string> {
+  // Lazy import db only when this server function is called
+  const { db } = await import('./db');
+  
   const date = new Date();
   const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
   

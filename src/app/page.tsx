@@ -48,6 +48,7 @@ import { cn } from '@/lib/utils';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
+import { generateInvoiceNumber } from '@/lib/invoice';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
@@ -61,15 +62,6 @@ const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
   { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
-
-const generateInvoiceNumber = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const random = Math.floor(1000 + Math.random() * 9000);
-  return `INV-${year}${month}${day}-${random}`;
-};
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('en-IN', {
@@ -230,8 +222,12 @@ function POSDashboard() {
                 await SalesDB.markSynced(item.entityId);
               }
             } else {
-              const err = await res.json();
-              console.error('Failed to sync item', item, err);
+              try {
+                const err = await res.json();
+                console.error('Failed to sync item', item, err);
+              } catch (parseErr) {
+                console.error('Failed to sync item (non-JSON response):', item, res.statusText);
+              }
               break; // abandon further sync until next attempt
             }
           } catch (err) {
@@ -250,14 +246,22 @@ function POSDashboard() {
         ]);
 
         if (prodsResult.status === 'fulfilled' && prodsResult.value.ok) {
-          const { data, nextCursor } = await prodsResult.value.json();
-          const hasMore = !!nextCursor;
-          setProducts(data, hasMore, nextCursor);
+          try {
+            const { data, nextCursor } = await prodsResult.value.json();
+            const hasMore = !!nextCursor;
+            setProducts(data, hasMore, nextCursor);
+          } catch (parseErr) {
+            console.error('Failed to parse products response:', parseErr);
+          }
         }
 
         if (custsResult.status === 'fulfilled' && custsResult.value.ok) {
-          const { data } = await custsResult.value.json();
-          setCustomers(data);
+          try {
+            const { data } = await custsResult.value.json();
+            setCustomers(data);
+          } catch (parseErr) {
+            console.error('Failed to parse customers response:', parseErr);
+          }
         }
       } finally {
         setSyncing(false);
@@ -942,9 +946,7 @@ function POSDashboard() {
 
       {/* Checkout Dialog */}
       <CheckoutDialog
-        onComplete={handleCheckoutComplete}
-        isProcessing={isProcessingPayment}
-        completedSale={completedCheckoutSale}
+        open={isCheckoutOpen}
         onOpenChange={(open) => {
           setCheckoutOpen(open);
           // Reset completed sale when dialog closes
@@ -952,6 +954,9 @@ function POSDashboard() {
             setCompletedCheckoutSale(null);
           }
         }}
+        onComplete={handleCheckoutComplete}
+        isProcessing={isProcessingPayment}
+        completedSale={completedCheckoutSale}
       />
 
       {/* Add Stock Dialog */}

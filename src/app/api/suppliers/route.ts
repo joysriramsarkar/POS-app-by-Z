@@ -5,8 +5,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
 // GET /api/suppliers - Fetch suppliers
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -76,6 +84,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/suppliers - Create new supplier
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { name, phone, address, email, gstNumber, notes } = body;
@@ -115,6 +128,11 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/suppliers - Update supplier
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { id, ...data } = body;
@@ -150,6 +168,11 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/suppliers - Soft delete supplier
 export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

@@ -5,8 +5,16 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
 // GET /api/stats - Fetch dashboard stats
 export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     // Get the start and end of today in the local timezone
     // Note: This assumes the server runs in the same timezone as the business.

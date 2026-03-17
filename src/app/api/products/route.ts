@@ -7,8 +7,16 @@ import { db } from '@/lib/db';
 import type { Product } from '@/types/pos';
 import { ProductInputSchema } from '@/schemas';
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
 // GET /api/products - Fetch all products
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const barcode = searchParams.get('barcode');
@@ -83,6 +91,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/products - Create new product
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
 
@@ -146,6 +159,11 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/products - Update product
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
 
@@ -202,6 +220,11 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/products - Soft delete product
 export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

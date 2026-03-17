@@ -137,8 +137,8 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
       aria-label={`${item.productName}, quantity ${item.quantity}, ${formatPrice(item.totalPrice)}`}
     >
       {/* Drag Handle (for future reordering) */}
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity cursor-grab touch-none">
-        <GripVertical className="w-4 h-4 text-muted-foreground" />
+      <div className="text-muted-foreground transition-opacity">
+        <GripVertical className="w-4 h-4" />
       </div>
 
       {/* Product Info */}
@@ -221,7 +221,7 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-destructive touch-manipulation opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-8 w-8 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-destructive touch-manipulation"
             onClick={handleRemove}
             aria-label="Remove item"
           >

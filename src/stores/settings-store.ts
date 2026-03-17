@@ -89,6 +89,10 @@ export const useSettingsStore = create<SettingsState>()(
         set({ isLoading: true });
         try {
           const res = await fetch('/api/settings');
+          if (!res.ok) {
+            console.error('Failed to fetch settings:', res.statusText);
+            return;
+          }
           const data = await res.json();
           if (data.success && data.data) {
             // Merge defaults with fetched settings

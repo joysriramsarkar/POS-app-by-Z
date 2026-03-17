@@ -36,43 +36,41 @@ function hexToHsl(hex: string): string {
   return `${h} ${s}% ${l}%`;
 }
 
-export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
-  const { settings, fetchSettings } = useSettingsStore();
+function DynamicColorProvider({ children }: { children: React.ReactNode }) {
+  const { settings } = useSettingsStore();
   const [mounted, setMounted] = useState(false);
 
-  // Initial fetch on mount
   useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
-
-  // Handle client-side mounting
-  useEffect(() => {
-    let timeoutId: any;
-    timeoutId = setTimeout(() => {
-      setMounted(true);
-    }, 0);
-    return () => clearTimeout(timeoutId);
+    setMounted(true);
   }, []);
 
-  // Compute primary color HSL
+  if (!mounted) {
+    return <>{children}</>;
+  }
+
   const primaryHsl = settings.primary_color ? hexToHsl(settings.primary_color) : "142.1 76.2% 36.3%";
 
   return (
-    <NextThemesProvider {...props}>
-      {/* Inject dynamic primary color */}
-      {mounted && (
-        <style dangerouslySetInnerHTML={{
-          __html: `
-            :root {
-              --primary: ${primaryHsl};
-            }
-            .dark {
-              --primary: ${primaryHsl};
-            }
-          `
-        }} />
-      )}
+    <>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          :root {
+            --primary: ${primaryHsl};
+          }
+          .dark {
+            --primary: ${primaryHsl};
+          }
+        `
+      }} />
       {children}
+    </>
+  );
+}
+
+export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
+  return (
+    <NextThemesProvider {...props}>
+      <DynamicColorProvider>{children}</DynamicColorProvider>
     </NextThemesProvider>
   );
 }

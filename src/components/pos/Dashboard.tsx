@@ -141,10 +141,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <h1 className="text-2xl font-bold">{STORE_CONFIG.name}</h1>
             <p className="text-muted-foreground">{STORE_CONFIG.nameBn}</p>
           </div>
+          
+
           <div className="text-right">
             <p className="text-sm text-muted-foreground">Today</p>
             <p className="font-semibold">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
+          <Button variant="outline" onClick={() => signOut()}>Logout</Button>
         </div>
       </div>
 

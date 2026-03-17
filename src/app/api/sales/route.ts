@@ -8,8 +8,16 @@ import { generateServerInvoiceNumber } from '@/lib/invoice';
 import { v4 as uuidv4 } from 'uuid';
 import { SaleInputSchema } from '@/schemas';
 
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+
 // GET /api/sales - Fetch sales
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
@@ -101,6 +109,11 @@ export async function GET(request: NextRequest) {
 
 // POST /api/sales - Create new sale
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     let body;
     try {
@@ -348,6 +361,11 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/sales - Update sale (cancel/refund)
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { id, status, reason } = body;

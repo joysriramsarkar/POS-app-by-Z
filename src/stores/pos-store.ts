@@ -216,6 +216,7 @@ interface UIActions {
   setSelectedCategoryId: (id: string | null) => void;
   setPrintFormat: (format: 'thermal-58' | 'thermal-80' | 'a4' | 'a5') => void;
   setCurrentSale: (sale: Sale | null) => void;
+  reset: () => void;
 }
 
 export const useUIStore = create<UIState & UIActions>((set) => ({
@@ -236,6 +237,16 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   setSelectedCategoryId: (id) => set({ selectedCategoryId: id }),
   setPrintFormat: (format) => set({ printFormat: format }),
   setCurrentSale: (sale) => set({ currentSale: sale }),
+  reset: () => set({
+    isSearchOpen: false,
+    isCheckoutOpen: false,
+    isPrintDialogOpen: false,
+    isCustomerDialogOpen: false,
+    searchQuery: '',
+    selectedCategoryId: null,
+    printFormat: 'thermal-80',
+    currentSale: null,
+  }),
 }));
 
 // ============================================================================
@@ -262,6 +273,7 @@ interface ProductsActions {
   removeProduct: (id: string) => void;
   getProductByBarcode: (barcode: string) => Product | undefined;
   searchProducts: (query: string) => Product[];
+  reset: () => void;
 }
 
 export const useProductsStore = create<ProductsState & ProductsActions>((set, get) => ({
@@ -350,6 +362,14 @@ export const useProductsStore = create<ProductsState & ProductsActions>((set, ge
           convertBengaliToEnglishNumerals(p.barcode || '').includes(normalizedQuery))
     );
   },
+  reset: () => set({
+    products: [],
+    categories: [],
+    isLoading: true,
+    lastUpdated: null,
+    hasMore: false,
+    nextCursor: null,
+  }),
 }));
 
 // ============================================================================
@@ -368,6 +388,7 @@ interface CustomersActions {
   updateCustomerDue: (id: string, amount: number) => void;
   getCustomerByPhone: (phone: string) => Customer | undefined;
   searchCustomers: (query: string) => Customer[];
+  reset: () => void;
 }
 
 export const useCustomersStore = create<CustomersState & CustomersActions>((set, get) => ({
@@ -414,6 +435,10 @@ export const useCustomersStore = create<CustomersState & CustomersActions>((set,
         (c.name.toLowerCase().includes(lowerQuery) || c.phone?.includes(query))
     );
   },
+  reset: () => set({
+    customers: [],
+    isLoading: false,
+  }),
 }));
 
 // ============================================================================
@@ -435,6 +460,7 @@ interface SyncActions {
   setPendingCount: (count: number) => void;
   addSyncError: (error: string) => void;
   clearSyncErrors: () => void;
+  reset: () => void;
 }
 
 export const useSyncStore = create<SyncState & SyncActions>((set) => ({
@@ -450,6 +476,13 @@ export const useSyncStore = create<SyncState & SyncActions>((set) => ({
   setPendingCount: (count) => set({ pendingCount: count }),
   addSyncError: (error) => set((state) => ({ syncErrors: [...state.syncErrors, error] })),
   clearSyncErrors: () => set({ syncErrors: [] }),
+  reset: () => set({
+    isOnline: true,
+    isSyncing: false,
+    lastSyncTime: null,
+    pendingCount: 0,
+    syncErrors: [],
+  }),
 }));
 
 // ============================================================================
