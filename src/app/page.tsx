@@ -13,6 +13,7 @@ import { StockManagement } from '@/components/pos/StockManagement';
 import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDialog';
 import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDialog';
 import { PartiesManagement } from '@/components/pos/PartiesManagement';
+import { Reports } from '@/components/pos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -866,24 +867,7 @@ function POSDashboard() {
       case 'parties':
         return <PartiesManagement />;
       case 'reports':
-        return (
-          <div className="flex flex-col h-full">
-            <div className="shrink-0 border-b bg-background p-4">
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <FileText className="w-6 h-6" />
-                Reports
-              </h1>
-              <p className="text-sm text-muted-foreground">View sales and business reports</p>
-            </div>
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-lg font-medium text-muted-foreground">Reports Coming Soon</p>
-                <p className="text-sm text-muted-foreground mt-1">Sales, profit, and inventory reports</p>
-              </div>
-            </div>
-          </div>
-        );
+        return <Reports />;
       case 'settings':
         return (
           <div className="flex flex-col h-full">

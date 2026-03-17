@@ -19,3 +19,5 @@ export { PartiesManagement } from './PartiesManagement';
 // Print Components
 export { PrintInvoice, InvoicePreview } from './PrintInvoice';
 export { PrintDialog } from './PrintDialog';
+
+export { default as Reports } from './Reports';
