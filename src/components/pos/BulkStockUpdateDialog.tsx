@@ -215,7 +215,7 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl w-[95vw] max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Bulk Stock Update</DialogTitle>
           <DialogDescription>

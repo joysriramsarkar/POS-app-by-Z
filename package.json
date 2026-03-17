@@ -118,8 +118,10 @@
     "@prisma/engines",
     "@swc/core",
     "es5-ext",
+    "esbuild",
     "prisma",
     "sharp",
+    "sqlite3",
     "unrs-resolver"
   ]
 }

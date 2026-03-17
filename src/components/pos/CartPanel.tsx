@@ -404,7 +404,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
 
       {/* Add New Party Dialog */}
       <Dialog open={showAddPartyDialog} onOpenChange={setShowAddPartyDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[95vw] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="w-5 h-5" />

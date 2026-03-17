@@ -474,7 +474,7 @@ export function PartiesManagement() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {activeTab === 'customer' ? (
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
@@ -638,7 +638,7 @@ export function PartiesManagement() {
 
       {/* Ledger Dialog */}
       <Dialog open={showLedger} onOpenChange={setShowLedger}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
@@ -718,7 +718,7 @@ export function PartiesManagement() {
 
       {/* Payment Dialog */}
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm w-[95vw] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
             <DialogDescription>
@@ -791,7 +791,7 @@ export function PartiesManagement() {
 
       {/* Prepayment Dialog */}
       <Dialog open={showPrepaymentDialog} onOpenChange={setShowPrepaymentDialog}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm w-[95vw] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Prepayment</DialogTitle>
             <DialogDescription>
@@ -851,7 +851,7 @@ export function PartiesManagement() {
 
       {/* Edit Party Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[95vw] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit className="w-5 h-5" />
@@ -926,7 +926,7 @@ export function PartiesManagement() {
 
       {/* Add Party Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[95vw] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserPlus className="w-5 h-5" />

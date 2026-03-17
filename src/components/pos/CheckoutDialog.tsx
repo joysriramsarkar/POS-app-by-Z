@@ -291,7 +291,7 @@ export function CheckoutDialog({
   if (showSuccess) {
     return (
       <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md no-print">
+        <DialogContent className="sm:max-w-md w-[95vw] max-h-[90dvh] overflow-y-auto no-print">
           <DialogHeader>
             <DialogTitle className="sr-only">Payment Success</DialogTitle>
           </DialogHeader>

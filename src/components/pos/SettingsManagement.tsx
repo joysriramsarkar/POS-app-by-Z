@@ -185,7 +185,7 @@ export default function SettingsManagement() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-4 md:p-6">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
           <Tabs defaultValue="profile" className="flex flex-col md:flex-row gap-6">
             <TabsList className="flex flex-row md:flex-col h-auto w-full md:w-64 bg-transparent p-0 justify-start md:items-start overflow-x-auto no-scrollbar border-b md:border-b-0 md:border-r border-border pb-2 md:pb-0 md:pr-4 shrink-0 md:sticky md:top-0 md:h-fit md:max-h-screen md:overflow-y-auto">

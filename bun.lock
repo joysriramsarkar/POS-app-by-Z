@@ -104,6 +104,8 @@
   },
   "trustedDependencies": [
     "sharp",
+    "sqlite3",
+    "esbuild",
     "@prisma/engines",
     "@prisma/client",
     "@swc/core",
