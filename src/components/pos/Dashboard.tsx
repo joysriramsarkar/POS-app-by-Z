@@ -173,14 +173,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Today's Sales */}
-            <Card className="bg-linear-to-br from-green-50 to-green-100/50 border-green-200">
+            <Card className="bg-linear-to-br from-green-50 to-green-100/50 dark:from-green-950/40 dark:to-green-900/20 border-green-200 dark:border-green-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-green-700">Today's Sales</CardTitle>
-                <IndianRupee className="h-4 w-4 text-green-600" />
+                <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">Today's Sales</CardTitle>
+                <div className="w-8 h-8 rounded-full bg-green-200/50 dark:bg-green-800/50 flex items-center justify-center">
+                  <IndianRupee className="h-4 w-4 text-green-600 dark:text-green-400" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-700">{formatPrice(stats.todaySales)}</div>
-                <p className="text-xs text-green-600 flex items-center mt-1">
+                <div className="text-2xl font-black text-green-700 dark:text-green-400 tracking-tight">{formatPrice(stats.todaySales)}</div>
+                <p className="text-xs text-green-600 dark:text-green-500 flex items-center mt-1 font-medium">
                   {stats.salesComparison === 'N/A' ? null : stats.salesComparison?.startsWith('-') ? (
                     <TrendingDown className="w-3 h-3 mr-1" />
                   ) : (
@@ -192,14 +194,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Card>
 
             {/* Today's Orders */}
-            <Card className="bg-linear-to-br from-blue-50 to-blue-100/50 border-blue-200">
+            <Card className="bg-linear-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-blue-700">Today's Orders</CardTitle>
-                <ShoppingCart className="h-4 w-4 text-blue-600" />
+                <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">Today's Orders</CardTitle>
+                <div className="w-8 h-8 rounded-full bg-blue-200/50 dark:bg-blue-800/50 flex items-center justify-center">
+                  <ShoppingCart className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-blue-700">{stats.todayOrders}</div>
-                <p className="text-xs text-blue-600 flex items-center mt-1">
+                <div className="text-2xl font-black text-blue-700 dark:text-blue-400 tracking-tight">{stats.todayOrders}</div>
+                <p className="text-xs text-blue-600 dark:text-blue-500 flex items-center mt-1 font-medium">
                   {stats.ordersComparison === 'N/A' ? null : stats.ordersComparison?.startsWith('-') ? (
                     <TrendingDown className="w-3 h-3 mr-1" />
                   ) : (
@@ -211,60 +215,70 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Card>
 
             {/* Low Stock Items */}
-            <Card className="bg-linear-to-br from-amber-50 to-amber-100/50 border-amber-200">
+            <Card className="bg-linear-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/40 dark:to-amber-900/20 border-amber-200 dark:border-amber-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-amber-700">Low Stock</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">Low Stock</CardTitle>
+                <div className="w-8 h-8 rounded-full bg-amber-200/50 dark:bg-amber-800/50 flex items-center justify-center">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-amber-700">{lowStockProducts.length}</div>
-                <p className="text-xs text-amber-600 mt-1">Items need restock</p>
+                <div className="text-2xl font-black text-amber-700 dark:text-amber-400 tracking-tight">{lowStockProducts.length}</div>
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1 font-medium">Items need restock</p>
               </CardContent>
             </Card>
 
             {/* Due Payments */}
-            <Card className="bg-linear-to-br from-red-50 to-red-100/50 border-red-200">
+            <Card className="bg-linear-to-br from-red-50 to-red-100/50 dark:from-red-950/40 dark:to-red-900/20 border-red-200 dark:border-red-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-red-700">Due Payments</CardTitle>
-                <Clock className="h-4 w-4 text-red-600" />
+                <CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">Due Payments</CardTitle>
+                <div className="w-8 h-8 rounded-full bg-red-200/50 dark:bg-red-800/50 flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-red-600 dark:text-red-400" />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-700">{formatPrice(stats.duePayments)}</div>
-                <p className="text-xs text-red-600 mt-1">Total pending dues</p>
+                <div className="text-2xl font-black text-red-700 dark:text-red-400 tracking-tight">{formatPrice(stats.duePayments)}</div>
+                <p className="text-xs text-red-600 dark:text-red-500 mt-1 font-medium">Total pending dues</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Quick Actions */}
-          <Card>
+          <Card className="rounded-2xl shadow-sm border-border/50 bg-gradient-to-br from-card to-muted/20">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Quick Actions</CardTitle>
+              <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-3 md:gap-4">
                 <Button 
                   variant="outline" 
-                  className="h-auto flex-col gap-2 py-4"
+                  className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
                   onClick={() => handleQuickAction('billing')}
                 >
-                  <ShoppingCart className="w-6 h-6 text-primary" />
-                  <span className="text-sm">New Sale</span>
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ShoppingCart className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-sm font-semibold">New Sale</span>
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="h-auto flex-col gap-2 py-4"
+                  className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
                   onClick={() => handleQuickAction('stock')}
                 >
-                  <Package className="w-6 h-6 text-primary" />
-                  <span className="text-sm">Add Stock</span>
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Package className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-sm font-semibold">Add Stock</span>
                 </Button>
                 <Button 
                   variant="outline" 
-                  className="h-auto flex-col gap-2 py-4"
+                  className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
                   onClick={() => handleQuickAction('parties')}
                 >
-                  <Users className="w-6 h-6 text-primary" />
-                  <span className="text-sm">Add Party</span>
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-sm font-semibold">Add Party</span>
                 </Button>
               </div>
             </CardContent>
