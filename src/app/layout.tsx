@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { Analytics } from "@vercel/analytics/next";
 
 import { Noto_Sans_Bengali } from "next/font/google";
 
@@ -60,6 +61,7 @@ export default function RootLayout({
             <Toaster />
           </ThemeProvider>
         </SessionProvider>
+        <Analytics />
       </body>
     </html>
   );
