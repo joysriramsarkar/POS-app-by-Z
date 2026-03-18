@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Check,
   UserPlus,
+  ScanLine,
 } from 'lucide-react';
 import type { PaymentMethod, Customer } from '@/types/pos';
 import { useCartStore, useUIStore } from '@/stores/pos-store';
@@ -36,6 +37,7 @@ interface CartPanelProps {
   onCheckout: () => void;
   customers?: Customer[];
   onAddCustomer?: () => void;
+  onScan?: () => void;
 }
 
 const paymentMethods: { method: PaymentMethod; icon: React.ReactNode; label: string; color: string }[] = [
@@ -44,7 +46,7 @@ const paymentMethods: { method: PaymentMethod; icon: React.ReactNode; label: str
   { method: 'Due', icon: <Clock className="w-5 h-5" />, label: 'Due', color: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' },
 ];
 
-export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPanelProps) {
+export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }: CartPanelProps) {
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -284,9 +286,15 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer }: CartPan
             <div className="flex flex-col items-center justify-center py-8 md:py-12 text-center">
               <ShoppingCart className="w-10 h-10 md:w-12 md:h-12 text-muted-foreground mb-3 md:mb-4" />
               <p className="text-muted-foreground text-sm md:text-base">Cart is empty</p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground mt-1 mb-4">
                 Scan or tap products to add them
               </p>
+              {onScan && (
+                <Button variant="outline" size="sm" onClick={onScan} className="gap-2">
+                  <ScanLine className="w-4 h-4" />
+                  Scan Barcode
+                </Button>
+              )}
             </div>
           ) : (
             items.map((item) => <CartItem key={item.id} item={item} />)
