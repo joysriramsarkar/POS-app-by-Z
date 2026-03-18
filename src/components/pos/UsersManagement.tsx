@@ -156,17 +156,19 @@ export function UsersManagement({ currentUserRole }: UsersManagementProps) {
 
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-amber-50 border border-amber-200 rounded-lg">
-        <AlertCircle className="h-8 w-8 text-amber-600 mb-2" />
-        <p className="text-amber-800">
-          Only administrators can manage users.
-        </p>
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
+        <div className="flex flex-col items-center justify-center p-8 bg-amber-50 border border-amber-200 rounded-lg">
+          <AlertCircle className="h-8 w-8 text-amber-600 mb-2" />
+          <p className="text-amber-800">
+            Only administrators can manage users.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Users Management</h2>

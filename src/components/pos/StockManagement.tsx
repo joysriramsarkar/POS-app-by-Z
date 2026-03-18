@@ -234,7 +234,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
       </div>
 
       {/* Product List */}
-      <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <Table>
           <TableHeader className="sticky top-0 bg-background z-10">
             <TableRow>
