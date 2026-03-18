@@ -52,6 +52,8 @@ import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/hooks/use-toast';
 import { generateInvoiceNumber } from '@/lib/invoice';
+import { Capacitor } from '@capacitor/core';
+import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
@@ -324,9 +326,31 @@ function POSDashboard() {
     [getProductByBarcode, addItem, setLastScannedBarcode, currentPage]
   );
 
-  const handleOpenMobileScanner = useCallback(() => {
-    setIsMobileScannerOpen(true);
-  }, []);
+  const handleOpenMobileScanner = useCallback(async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { camera } = await BarcodeScanner.requestPermissions();
+        if (camera === 'granted' || camera === 'limited') {
+          const { barcodes } = await BarcodeScanner.scan();
+          if (barcodes.length > 0) {
+            handleBarcodeDetected(barcodes[0].rawValue);
+          }
+        } else {
+          toast({
+            title: 'Permission Denied',
+            description: 'Camera permission is required to scan barcodes.',
+            variant: 'destructive',
+          });
+          setIsMobileScannerOpen(true); // Fallback to dialog if they want to try again / see error there
+        }
+      } catch (error) {
+        console.error('Native barcode scan failed:', error);
+        setIsMobileScannerOpen(true); // Fallback to dialog
+      }
+    } else {
+      setIsMobileScannerOpen(true);
+    }
+  }, [handleBarcodeDetected, toast]);
 
   // Initialize barcode scanner
   // It should be disabled when any major dialog is open that might interfere or consume input
@@ -701,9 +725,13 @@ function POSDashboard() {
 
   // Handle navigation
   const handleNavigate = useCallback((page: string) => {
+    if (page === 'scan') {
+      handleOpenMobileScanner();
+      return;
+    }
     setCurrentPage(page as PageType);
     setIsMobileMenuOpen(false);
-  }, []);
+  }, [handleOpenMobileScanner]);
 
   // Open add stock for specific product
   const handleAddStock = useCallback((product: Product) => {
@@ -889,13 +917,13 @@ function POSDashboard() {
               )}
 
               <div className="flex-1 min-h-0">
-                <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} />
+                <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} onScan={handleOpenMobileScanner} />
               </div>
             </div>
 
             {/* Desktop Cart Panel */}
             <aside className="hidden sm:block w-96 border-l bg-card shrink-0">
-              <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} />
+              <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} onScan={handleOpenMobileScanner} />
             </aside>
           </div>
         );

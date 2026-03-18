@@ -18,6 +18,7 @@ import {
   TrendingDown,
   ArrowRight,
   LogOut,
+  ScanLine,
 } from 'lucide-react';
 import { useProductsStore, useCartStore } from '@/stores/pos-store';
 import { STORE_CONFIG } from '@/types/pos';
@@ -249,7 +250,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3 md:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
                 <Button 
                   variant="outline" 
                   className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
@@ -279,6 +280,16 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <Users className="w-5 h-5 text-primary" />
                   </div>
                   <span className="text-sm font-semibold">Add Party</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
+                  onClick={() => handleQuickAction('scan')}
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <ScanLine className="w-5 h-5 text-primary" />
+                  </div>
+                  <span className="text-sm font-semibold">Scan Item</span>
                 </Button>
               </div>
             </CardContent>
