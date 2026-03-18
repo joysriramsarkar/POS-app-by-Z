@@ -725,33 +725,38 @@ function POSDashboard() {
 
   // Render sidebar navigation
   const renderSidebar = () => (
-    <nav className="flex flex-col h-full">
-      <div className="p-4 border-b">
+    <nav className="flex flex-col h-full bg-slate-50 dark:bg-slate-900/50">
+      <div className="p-4 border-b bg-background/50 backdrop-blur-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-            <Store className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shadow-sm">
+            <Store className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h1 className="font-bold text-sm">{storeName}</h1>
+            <h1 className="font-bold text-sm bg-linear-to-r from-primary to-primary/70 bg-clip-text text-transparent">{storeName}</h1>
             <p className="text-xs text-muted-foreground">{storeNameBn}</p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 p-2 space-y-1">
+      <div className="flex-1 p-3 space-y-1.5 overflow-y-auto">
         {filteredNavItems.map((item) => (
           <button
             key={item.id}
             onClick={() => handleNavigate(item.id)}
             className={cn(
-              'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors font-medium',
+              'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 font-medium group',
               currentPage === item.id
-                ? 'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600'
-                : 'hover:bg-muted text-foreground'
+                ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[1.02]'
+                : 'hover:bg-primary/10 text-foreground hover:text-primary hover:scale-[1.01]'
             )}
           >
-            {item.icon}
-            <span className="font-medium">{item.label}</span>
+            <div className={cn(
+              "transition-transform duration-200",
+              currentPage === item.id ? "scale-110" : "group-hover:scale-110"
+            )}>
+              {item.icon}
+            </div>
+            <span className="font-medium tracking-tight">{item.label}</span>
           </button>
         ))}
       </div>
@@ -916,42 +921,42 @@ function POSDashboard() {
   };
 
   return (
-    <div className="h-[100dvh] w-full overflow-hidden flex flex-col sm:flex-row bg-background">
+    <div className="h-[100dvh] w-full overflow-hidden flex flex-col lg:flex-row bg-slate-100/50 dark:bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:block w-64 border-r bg-card shrink-0 no-print">
+      <aside className="hidden lg:block w-64 border-r border-border/50 bg-card shrink-0 no-print shadow-xs z-10 transition-all duration-300">
         {renderSidebar()}
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
         {/* Mobile Header */}
-        <header className="lg:hidden shrink-0 border-b bg-card px-4 py-3 no-print">
+        <header className="lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-4 py-3 no-print sticky top-0 z-20">
           <div className="flex items-center justify-between gap-4">
             {/* Mobile Menu */}
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 w-9 p-0">
+                <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary transition-colors">
                   <Menu className="w-5 h-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
+              <SheetContent side="left" className="w-72 p-0 border-r-0 shadow-2xl">
                 {renderSidebar()}
               </SheetContent>
             </Sheet>
 
             {/* Store Name */}
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Store className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-sm">
+                <Store className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h1 className="font-bold text-sm">{storeName}</h1>
+                <h1 className="font-bold text-sm bg-linear-to-r from-primary to-primary/70 bg-clip-text text-transparent">{storeName}</h1>
               </div>
             </div>
 
             {/* Page indicator for non-billing pages */}
             {currentPage !== 'billing' && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs shadow-sm">
                 {navItems.find(n => n.id === currentPage)?.label}
               </Badge>
             )}
@@ -959,7 +964,7 @@ function POSDashboard() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-background lg:rounded-tl-2xl lg:shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)] lg:border-t lg:border-l lg:border-border/50">
           {renderPageContent()}
         </main>
       </div>

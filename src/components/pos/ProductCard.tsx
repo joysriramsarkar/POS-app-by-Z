@@ -44,10 +44,10 @@ export function ProductCard({ product }: ProductCardProps) {
     <TooltipProvider>
       <Card
         className={cn(
-          'group relative overflow-hidden transition-all duration-200 cursor-pointer',
-          'hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]',
+          'group relative overflow-hidden transition-all duration-300 cursor-pointer rounded-xl border-border/50',
+          'hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]',
           'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-          isOutOfStock && 'opacity-60 grayscale'
+          isOutOfStock && 'opacity-60 grayscale cursor-not-allowed'
         )}
         tabIndex={0}
         onKeyDown={handleKeyDown}
@@ -58,25 +58,25 @@ export function ProductCard({ product }: ProductCardProps) {
       >
         {/* Low Stock Warning Banner */}
         {isLowStock && !isOutOfStock && (
-          <div className="absolute top-0 left-0 right-0 bg-amber-500 text-white text-xs font-medium py-0.5 px-2 text-center z-10">
-            <AlertTriangle className="inline-block w-3 h-3 mr-1" />
+          <div className="absolute top-0 left-0 right-0 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-semibold tracking-wider uppercase py-1 px-2 text-center z-10 shadow-sm flex items-center justify-center gap-1">
+            <AlertTriangle className="w-3 h-3" />
             Low Stock
           </div>
         )}
 
         {/* Out of Stock Overlay */}
         {isOutOfStock && (
-          <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-10">
-            <Badge variant="destructive" className="text-sm">
+          <div className="absolute inset-0 bg-background/60 backdrop-blur-[2px] flex items-center justify-center z-10 transition-opacity">
+            <Badge variant="destructive" className="text-sm shadow-md shadow-red-500/20 px-3 py-1 bg-red-500 text-white">
               Out of Stock
             </Badge>
           </div>
         )}
 
-        <CardContent className={cn('p-3', isLowStock && !isOutOfStock && 'pt-6')}>
+        <CardContent className={cn('p-3', isLowStock && !isOutOfStock && 'pt-7')}>
           <div className="flex flex-col gap-2">
             {/* Product Image or Placeholder */}
-            <div className="aspect-square rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+            <div className="aspect-square rounded-lg bg-muted/50 flex items-center justify-center overflow-hidden relative group-hover:bg-muted transition-colors">
               {product.imageUrl ? (
                 <img
                   src={product.imageUrl}
@@ -89,44 +89,53 @@ export function ProductCard({ product }: ProductCardProps) {
             </div>
 
             {/* Product Info */}
-            <div className="space-y-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <h3 className="font-medium text-sm line-clamp-2 leading-tight">
-                    {product.name}
-                  </h3>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-50">
-                  <p>{product.name}</p>
-                  {product.nameBn && <p className="text-muted-foreground">{product.nameBn}</p>}
-                </TooltipContent>
-              </Tooltip>
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-start justify-between gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <h3 className="font-medium text-sm line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                      {product.name}
+                    </h3>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-50">
+                    <p className="font-medium">{product.name}</p>
+                    {product.nameBn && <p className="text-muted-foreground text-xs mt-1">{product.nameBn}</p>}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
 
               {/* Category Badge */}
-              <Badge variant="secondary" className="text-xs px-1.5 py-0 h-5">
+              <Badge variant="secondary" className="text-[10px] px-2 py-0 h-4 bg-secondary/50 hover:bg-secondary">
                 {product.category}
               </Badge>
 
-              {/* Price */}
-              <p className="text-lg font-bold text-primary">
-                {formatPrice(product.sellingPrice)}
-                <span className="text-xs font-normal text-muted-foreground ml-1">
-                  /{product.unit}
-                </span>
-              </p>
-
-              {/* Stock Info */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>
-                  Stock: {product.currentStock} {product.unit}
-                </span>
+              {/* Price & Stock */}
+              <div className="flex flex-col mt-2">
+                <p className="text-lg font-bold text-primary tracking-tight">
+                  {formatPrice(product.sellingPrice)}
+                  <span className="text-xs font-normal text-muted-foreground ml-1 tracking-normal">
+                    /{product.unit}
+                  </span>
+                </p>
+                <div className="flex items-center justify-between text-xs text-muted-foreground mt-0.5">
+                  <span className={cn(
+                    "font-medium",
+                    isLowStock && !isOutOfStock ? "text-amber-600 dark:text-amber-500" : ""
+                  )}>
+                    Stock: {product.currentStock} {product.unit}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Quick Add Button */}
             <Button
               size="sm"
-              className="w-full mt-1 opacity-0 group-hover:opacity-100 transition-opacity touch-manipulation"
+              className={cn(
+                "w-full mt-2 transition-all duration-300 touch-manipulation shadow-xs",
+                "sm:opacity-0 sm:-translate-y-2 sm:group-hover:opacity-100 sm:group-hover:translate-y-0",
+                "opacity-100 translate-y-0 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
+              )}
               disabled={isOutOfStock}
               onClick={(e) => {
                 e.stopPropagation();
@@ -135,7 +144,7 @@ export function ProductCard({ product }: ProductCardProps) {
               aria-label="Add to cart"
             >
               <Plus className="w-4 h-4 mr-1" />
-              Add
+              Add to Cart
             </Button>
           </div>
         </CardContent>

@@ -206,15 +206,15 @@ export function ProductGrid({
   }, [isLoadingMore, hasMore, nextCursor, externalProducts, appendProducts]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-slate-50/50 dark:bg-background/50">
       {/* Search and Filter Controls */}
       {showSearch && (
-        <div className="flex flex-col gap-3 p-4 border-b bg-background sticky top-0 z-10">
+        <div className="flex flex-col gap-3 p-4 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
           {/* Search Input with Camera Button */}
           <label htmlFor="product-search" className="sr-only">Search products</label>
           <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="relative flex-1 group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
               <Input
                 id="product-search"
                 name="product-search"
@@ -246,7 +246,7 @@ export function ProductGrid({
                   }
                 }
               }}
-              className="pl-9 pr-9 h-10 touch-manipulation"
+              className="pl-9 pr-9 h-11 touch-manipulation rounded-xl shadow-xs transition-shadow focus-visible:ring-primary/20"
               aria-label="Search products"
             />
             {searchQuery && (
@@ -279,10 +279,13 @@ export function ProductGrid({
           {/* Category Chips */}
           {showCategories && storeCategories.length > 0 && (
             <ScrollArea className="w-full whitespace-nowrap">
-              <div className="flex gap-2 pb-1">
+              <div className="flex gap-2 pb-2">
                 <Badge
                   variant={selectedCategoryId === null ? 'default' : 'outline'}
-                  className="cursor-pointer touch-manipulation"
+                  className={cn(
+                    "cursor-pointer touch-manipulation transition-all px-3 py-1 text-xs",
+                    selectedCategoryId === null ? "shadow-md bg-primary" : "hover:bg-primary/10 hover:text-primary"
+                  )}
                   onClick={() => handleCategorySelect(null)}
                 >
                   All
@@ -291,7 +294,10 @@ export function ProductGrid({
                   <Badge
                     key={category}
                     variant={selectedCategoryId === category ? 'default' : 'outline'}
-                    className="cursor-pointer touch-manipulation"
+                    className={cn(
+                      "cursor-pointer touch-manipulation transition-all px-3 py-1 text-xs",
+                      selectedCategoryId === category ? "shadow-md bg-primary" : "hover:bg-primary/10 hover:text-primary border-border/50 bg-background"
+                    )}
                     onClick={() => handleCategorySelect(category)}
                   >
                     {category}
@@ -302,29 +308,29 @@ export function ProductGrid({
           )}
 
           {/* Active Filters & View Toggle */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
               {(searchQuery || selectedCategoryId) && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={clearFilters}
-                  className="h-7 text-xs text-muted-foreground"
+                  className="h-7 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 >
                   Clear filters
                 </Button>
               )}
-              <span className="text-sm text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
                 {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}
               </span>
             </div>
 
             {showViewToggle && (
-              <div className="flex items-center gap-1 border rounded-md p-0.5">
+              <div className="flex items-center gap-1 bg-muted/30 border border-border/50 rounded-lg p-1 shadow-xs">
                 <Button
                   variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="h-7 w-7 p-0"
+                  className={cn("h-7 w-7 p-0 rounded-md transition-all", viewMode === 'grid' && "shadow-sm bg-background")}
                   onClick={() => setViewMode('grid')}
                   aria-label="Grid view"
                 >
@@ -333,7 +339,7 @@ export function ProductGrid({
                 <Button
                   variant={viewMode === 'compact' ? 'secondary' : 'ghost'}
                   size="sm"
-                  className="h-7 w-7 p-0"
+                  className={cn("h-7 w-7 p-0 rounded-md transition-all", viewMode === 'compact' && "shadow-sm bg-background")}
                   onClick={() => setViewMode('compact')}
                   aria-label="Compact view"
                 >
@@ -347,9 +353,9 @@ export function ProductGrid({
 
       {/* Product Grid - Fixed height for proper scrolling */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="p-4">
+        <div className="p-4 md:p-5">
           {filteredProducts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-16 text-center bg-card rounded-2xl border border-dashed border-border/60">
               <Package className="w-12 h-12 text-muted-foreground mb-4" />
               <p className="text-lg font-medium text-muted-foreground">No products found</p>
               <p className="text-sm text-muted-foreground mt-1">
@@ -448,16 +454,17 @@ function CompactProductCard({ product, onSelect }: CompactProductCardProps) {
       onClick={handleClick}
       disabled={isOutOfStock}
       className={cn(
-        'flex flex-col items-center justify-center p-2 rounded-lg border bg-card text-center',
-        'hover:bg-accent hover:border-accent-foreground/20 transition-colors',
-        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
-        'touch-manipulation min-h-[80px]',
-        isOutOfStock && 'opacity-50 cursor-not-allowed'
+        'flex flex-col items-center justify-center p-2.5 rounded-xl border border-border/50 bg-card text-center shadow-xs',
+        'hover:bg-primary/5 hover:border-primary/20 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200',
+        'focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1',
+        'touch-manipulation min-h-[90px]',
+        isOutOfStock && 'opacity-50 grayscale cursor-not-allowed hover:bg-card hover:border-border/50 hover:shadow-xs hover:translate-y-0'
       )}
       aria-label={`${product.name}, ${formatPrice(product.sellingPrice)}`}
     >
-      <span className="text-xs font-medium line-clamp-2 mb-1">{product.name}</span>
-      <span className="text-sm font-bold text-primary">{formatPrice(product.sellingPrice)}</span>
+      <span className="text-[11px] font-medium line-clamp-2 mb-1.5 leading-tight">{product.name}</span>
+      <span className="text-sm font-bold text-primary tracking-tight">{formatPrice(product.sellingPrice)}</span>
+      {isOutOfStock && <span className="text-[9px] text-destructive uppercase font-bold mt-1 tracking-wider">Out</span>}
     </button>
   );
 }
