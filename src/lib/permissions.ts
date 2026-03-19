@@ -14,7 +14,7 @@ export async function hasPermission(
   permissionCode: string
 ): Promise<boolean> {
   try {
-    const user = await (db as any).user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: userId },
     });
 
@@ -23,7 +23,7 @@ export async function hasPermission(
     }
 
     // Check if permission exists for this role
-    const permission = await (db as any).rolePermission.findFirst({
+    const permission = await db.rolePermission.findFirst({
       where: {
         role: user.role,
         permission: {
@@ -78,7 +78,7 @@ export async function hasAnyPermission(
  */
 export async function getUserPermissions(userId: string): Promise<string[]> {
   try {
-    const user = await (db as any).user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: userId },
     });
 
@@ -86,7 +86,7 @@ export async function getUserPermissions(userId: string): Promise<string[]> {
       return [];
     }
 
-    const permissions = await (db as any).rolePermission.findMany({
+    const permissions = await db.rolePermission.findMany({
       where: {
         role: user.role,
       },
@@ -112,7 +112,7 @@ export async function getUserPermissions(userId: string): Promise<string[]> {
  * @returns User role
  */
 export function getUserRole(session: Session | null): UserRole | null {
-  return (session?.user as any)?.role || null;
+  return (session?.user as { id?: string; role?: UserRole; username?: string })?.role || null;
 }
 
 /**
@@ -125,10 +125,10 @@ export async function sessionHasPermission(
   session: Session | null,
   permissionCode: string
 ): Promise<boolean> {
-  if (!session?.user || !(session.user as any)?.id) {
+  if (!session?.user || !(session.user as { id?: string; role?: string; username?: string })?.id) {
     return false;
   }
-  return hasPermission((session.user as any).id, permissionCode);
+  return hasPermission((session.user as { id?: string; role?: string; username?: string }).id as string, permissionCode);
 }
 
 /**

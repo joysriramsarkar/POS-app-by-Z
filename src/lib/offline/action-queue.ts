@@ -210,7 +210,12 @@ export class ActionQueue {
         
         const updateRequest = store.put(action);
         updateRequest.onerror = () => reject(updateRequest.error);
-        updateRequest.onsuccess = () => resolve();
+        updateRequest.onsuccess = () => {
+          if (Math.random() < 0.1) {
+            this.clearCompleted(7).catch(console.error);
+          }
+          resolve();
+        };
       };
 
       getRequest.onerror = () => reject(getRequest.error);

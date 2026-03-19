@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     }
 
     const user = await db.user.findUnique({
-      where: { id: (session.user as any).id },
+      where: { id: (session.user as { id?: string; role?: string; username?: string }).id },
     });
 
     if (!user) {

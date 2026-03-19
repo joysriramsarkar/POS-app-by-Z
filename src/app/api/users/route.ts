@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const users = await (db as any).user.findMany({
+    const users = await db.user.findMany({
       select: {
         id: true,
         username: true,
@@ -79,11 +79,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await (db as any).user.findFirst({
+    const existingUser = await db.user.findFirst({
       where: {
         OR: [
-          { username: { equals: username, mode: "insensitive" } },
-          ...(email ? [{ email: { equals: email, mode: "insensitive" } }] : []),
+          { username: { equals: username, mode: "insensitive" as const } },
+          ...(email ? [{ email: { equals: email, mode: "insensitive" as const } }] : []),
         ],
       },
     });
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create user
-    const newUser = await (db as any).user.create({
+    const newUser = await db.user.create({
       data: {
         username,
         email: email || null,

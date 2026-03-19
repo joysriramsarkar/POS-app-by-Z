@@ -163,8 +163,8 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
   const isCartEmpty = items.length === 0;
   const itemCountDisplay = itemCount === 0 ? 'Empty' : `${itemCount} item${itemCount !== 1 ? 's' : ''}`;
 
-  const platform = typeof Capacitor !== 'undefined' && (Capacitor as any).getPlatform ? (Capacitor as any).getPlatform() : 'web';
-  const isAndroidApp = platform === 'android';
+  const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
+
 
   return (
     <div className="flex flex-col h-full bg-background min-h-0">

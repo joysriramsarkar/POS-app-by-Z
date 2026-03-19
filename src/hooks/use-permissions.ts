@@ -8,7 +8,7 @@ import { UserRole, roleHasPermission } from "@/lib/permissions";
  */
 export function usePermission(permissionCode: string): boolean {
   const { data: session } = useSession();
-  const role = (session?.user as any)?.role as UserRole;
+  const role = (session?.user as { id?: string; role?: string; username?: string })?.role as UserRole;
 
   if (!role) {
     return false;
@@ -24,7 +24,7 @@ export function usePermission(permissionCode: string): boolean {
  */
 export function useAllPermissions(permissionCodes: string[]): boolean {
   const { data: session } = useSession();
-  const role = (session?.user as any)?.role as UserRole;
+  const role = (session?.user as { id?: string; role?: string; username?: string })?.role as UserRole;
 
   if (!role) {
     return false;
@@ -40,7 +40,7 @@ export function useAllPermissions(permissionCodes: string[]): boolean {
  */
 export function useAnyPermission(permissionCodes: string[]): boolean {
   const { data: session } = useSession();
-  const role = (session?.user as any)?.role as UserRole;
+  const role = (session?.user as { id?: string; role?: string; username?: string })?.role as UserRole;
 
   if (!role) {
     return false;
@@ -55,7 +55,7 @@ export function useAnyPermission(permissionCodes: string[]): boolean {
  */
 export function useUserRole(): UserRole | null {
   const { data: session } = useSession();
-  return (session?.user as any)?.role || null;
+  return (session?.user as { id?: string; role?: UserRole; username?: string })?.role || null;
 }
 
 /**

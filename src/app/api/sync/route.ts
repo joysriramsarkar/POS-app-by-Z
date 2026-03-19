@@ -4,6 +4,7 @@
 // ============================================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -77,7 +78,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // CRITICAL: Extract idempotency key from header
     const idempotencyKey = request.headers.get('X-Idempotency-Key');
     if (!idempotencyKey) {
       return NextResponse.json(
@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { actionType, payload } = body;
 
-    // Validate required fields
     if (!actionType || !payload) {
       return NextResponse.json(
         { success: false, error: 'Missing actionType or payload' },
@@ -97,134 +96,89 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ===================================================================
-    // IDEMPOTENCY CHECK: If we've already processed this, return cached result
-    // ===================================================================
-    const existingSync = await db.syncQueue.findUnique({
-      where: { idempotencyKey },
-    });
-
-    if (existingSync && existingSync.synced) {
-      console.log(`✅ Idempotency hit: returning cached result for ${idempotencyKey}`);
-      return NextResponse.json({
-        success: true,
-        data: existingSync.result,
-        cached: true,
-        message: 'Result from previous successful sync (idempotency)',
+    const result = await db.$transaction(async (tx) => {
+      const existingSync = await tx.syncQueue.findUnique({
+        where: { idempotencyKey },
       });
-    }
 
-    let result;
-
-    // Route based on action type
-    switch (actionType) {
-      case 'sale:create': {
-        const saleResult = SaleInputSchema.safeParse(payload);
-        if (!saleResult.success) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid Sale payload', details: saleResult.error },
-            { status: 400 }
-          );
-        }
-        result = await syncSale(saleResult.data, 'create');
-        break;
+      if (existingSync && existingSync.synced) {
+        console.log(`✅ Idempotency hit: returning cached result for ${idempotencyKey}`);
+        return {
+          cached: true,
+          data: JSON.parse(existingSync.result as string)
+        };
       }
 
-      case 'customer:create': {
-        const customerResult = CustomerInputSchema.safeParse(payload);
-        if (!customerResult.success) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid Customer payload', details: customerResult.error },
-            { status: 400 }
-          );
+      let operationResult;
+
+      switch (actionType) {
+        case 'sale:create': {
+          const saleResult = SaleInputSchema.safeParse(payload);
+          if (!saleResult.success) throw new Error('Invalid Sale payload: ' + saleResult.error.message);
+          operationResult = await syncSale(tx, saleResult.data, 'create');
+          break;
         }
-        result = await syncCustomer(customerResult.data, 'create');
-        break;
+        case 'customer:create': {
+          const customerResult = CustomerInputSchema.safeParse(payload);
+          if (!customerResult.success) throw new Error('Invalid Customer payload: ' + customerResult.error.message);
+          operationResult = await syncCustomer(tx, customerResult.data, 'create');
+          break;
+        }
+        case 'customer:update': {
+          const customerResult = CustomerInputSchema.safeParse(payload);
+          if (!customerResult.success) throw new Error('Invalid Customer payload: ' + customerResult.error.message);
+          operationResult = await syncCustomer(tx, customerResult.data, 'update');
+          break;
+        }
+        case 'product:stock:update': {
+          const productResult = ProductSyncPayloadSchema.safeParse(payload);
+          if (!productResult.success) throw new Error('Invalid Product payload: ' + productResult.error.message);
+          operationResult = await syncProduct(tx, productResult.data, 'update');
+          break;
+        }
+        case 'product:create': {
+          const productResult = ProductInputSchema.safeParse(payload);
+          if (!productResult.success) throw new Error('Invalid Product payload: ' + productResult.error.message);
+          operationResult = await syncProduct(tx, productResult.data, 'create');
+          break;
+        }
+        case 'product:update': {
+          const productResult = ProductInputSchema.safeParse(payload);
+          if (!productResult.success) throw new Error('Invalid Product payload: ' + productResult.error.message);
+          operationResult = await syncProduct(tx, productResult.data, 'update');
+          break;
+        }
+        default:
+          throw new Error(`Unknown action type: ${actionType}`);
       }
 
-      case 'customer:update': {
-        const customerResult = CustomerInputSchema.safeParse(payload);
-        if (!customerResult.success) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid Customer payload', details: customerResult.error },
-            { status: 400 }
-          );
-        }
-        result = await syncCustomer(customerResult.data, 'update');
-        break;
-      }
+      await tx.syncQueue.upsert({
+        where: { idempotencyKey },
+        update: {
+          synced: true,
+          syncedAt: new Date(),
+          result: JSON.stringify(operationResult),
+        },
+        create: {
+          id: uuidv4(),
+          idempotencyKey,
+          entityType: actionType,
+          action: 'sync',
+          payload: JSON.stringify(payload),
+          synced: true,
+          syncedAt: new Date(),
+          retryCount: 0,
+          result: JSON.stringify(operationResult),
+        },
+      });
 
-      case 'product:stock:update': {
-        const productResult = ProductSyncPayloadSchema.safeParse(payload);
-        if (!productResult.success) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid Product payload', details: productResult.error },
-            { status: 400 }
-          );
-        }
-        result = await syncProduct(productResult.data, 'update');
-        break;
-      }
-
-      case 'product:create': {
-        const productResult = ProductInputSchema.safeParse(payload);
-        if (!productResult.success) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid Product payload', details: productResult.error },
-            { status: 400 }
-          );
-        }
-        result = await syncProduct(productResult.data, 'create');
-        break;
-      }
-
-      case 'product:update': {
-        const productResult = ProductInputSchema.safeParse(payload);
-        if (!productResult.success) {
-          return NextResponse.json(
-            { success: false, error: 'Invalid Product payload', details: productResult.error },
-            { status: 400 }
-          );
-        }
-        result = await syncProduct(productResult.data, 'update');
-        break;
-      }
-
-      default:
-        return NextResponse.json(
-          { success: false, error: `Unknown action type: ${actionType}` },
-          { status: 400 }
-        );
-    }
-
-    // ===================================================================
-    // IDEMPOTENCY STORE: Cache this successful result for future retries
-    // ===================================================================
-    await db.syncQueue.upsert({
-      where: { idempotencyKey },
-      update: {
-        synced: true,
-        syncedAt: new Date(),
-        result: JSON.stringify(result),
-      },
-      create: {
-        id: uuidv4(),
-        idempotencyKey,
-        entityType: actionType,
-        action: 'sync',
-        payload: JSON.stringify(payload),
-        synced: true,
-        syncedAt: new Date(),
-        retryCount: 0,
-        result: JSON.stringify(result),
-      },
+      return { cached: false, data: operationResult };
     });
-
-    console.log(`✅ Successfully synced ${actionType} with idempotency key ${idempotencyKey}`);
 
     return NextResponse.json({
       success: true,
-      data: result,
+      data: result.data,
+      cached: result.cached,
       message: `${actionType} synced successfully`,
     });
   } catch (error) {
@@ -238,15 +192,14 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 // Sync sale from offline
-async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: string) {
+async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, action: string) {
   if (action === 'create') {
     if (!saleData.invoiceNumber) {
       throw new Error('Invoice number is required for sync');
     }
     // Check if sale already exists (prevent duplicates)
-    const existing = await db.sale.findUnique({
+    const existing = await tx.sale.findUnique({
       where: { invoiceNumber: saleData.invoiceNumber },
     });
 
@@ -255,11 +208,11 @@ async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: strin
     }
 
     // Create sale with items
-    return db.$transaction(async (tx) => {
+    // already in tx
       // VALIDATION PHASE: Check all prerequisites before creating anything
       
       // 1. Validate all products exist and check current stock levels
-      const productsToValidate = [];
+      const productsToValidate: { product: any; item: any }[] = [];
       for (const item of saleData.items) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -405,18 +358,17 @@ async function syncSale(saleData: z.infer<typeof SaleInputSchema>, action: strin
       }
 
       return sale;
-    });
   }
 
   throw new Error(`Unknown action: ${action}`);
 }
 
 // Sync customer from offline
-async function syncCustomer(customerData: z.infer<typeof CustomerInputSchema>, action: string) {
+async function syncCustomer(tx: any, customerData: z.infer<typeof CustomerInputSchema>, action: string) {
   if (action === 'create') {
-    // Check if customer already exists
+    // Check if customer already exists (Server-wins)
     if (customerData.phone) {
-      const existing = await db.customer.findUnique({
+      const existing = await tx.customer.findUnique({
         where: { phone: customerData.phone },
       });
 
@@ -425,7 +377,7 @@ async function syncCustomer(customerData: z.infer<typeof CustomerInputSchema>, a
       }
     }
 
-    return db.customer.create({
+    return tx.customer.create({
       data: {
         id: customerData.id,
         name: customerData.name,
@@ -443,15 +395,14 @@ async function syncCustomer(customerData: z.infer<typeof CustomerInputSchema>, a
     if (!customerData.id) {
       throw new Error('Customer ID is required for update');
     }
-    return db.customer.update({
+
+    return tx.customer.update({
       where: { id: customerData.id },
       data: {
         name: customerData.name,
         phone: customerData.phone || null,
         address: customerData.address || null,
         notes: customerData.notes || null,
-        totalDue: customerData.totalDue || 0,
-        totalPaid: customerData.totalPaid || 0,
         updatedAt: new Date(),
       },
     });
@@ -461,7 +412,7 @@ async function syncCustomer(customerData: z.infer<typeof CustomerInputSchema>, a
 }
 
 // Sync product updates (primarily stock changes) from offline
-async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema> | z.infer<typeof ProductInputSchema>, action: string) {
+async function syncProduct(tx: any, productData: z.infer<typeof ProductSyncPayloadSchema> | z.infer<typeof ProductInputSchema>, action: string) {
   if (action === 'create') {
     // Create a new product from full product data
     if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
@@ -469,13 +420,13 @@ async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>
 
       // Check if product already exists (prevent duplicates)
       if (id) {
-        const existing = await db.product.findUnique({ where: { id } });
+        const existing = await tx.product.findUnique({ where: { id } });
         if (existing) {
           return existing;
         }
       }
 
-      return db.product.create({
+      return tx.product.create({
         data: {
           id,
           barcode: barcode || null,
@@ -497,7 +448,7 @@ async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>
     if ('productId' in productData && 'quantityChange' in productData) {
       const { productId, quantityChange } = productData;
 
-      return db.$transaction(async (tx) => {
+      // already in tx
         const updated = await tx.product.update({
           where: { id: productId },
           data: {
@@ -516,18 +467,17 @@ async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>
         });
 
         return updated;
-      });
     }
 
-    // fallback to upsert entire object if no quantityChange provided
+    // fallback to update entire object if no quantityChange provided
     if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
       const { id, barcode, name, nameBn, category, buyingPrice, sellingPrice, unit, currentStock, minStockLevel, isActive } = productData as any;
 
       if (!id) {
-        throw new Error('Product ID is required for upsert sync');
+        throw new Error('Product ID is required for update sync');
       }
 
-      return db.product.upsert({
+      return tx.product.upsert({
         where: { id },
         create: {
           id,

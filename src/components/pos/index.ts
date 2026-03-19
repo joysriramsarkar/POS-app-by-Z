@@ -18,7 +18,7 @@ export { PartiesManagement } from './PartiesManagement';
 export { UsersManagement } from './UsersManagement';
 export type { User as UserType } from './UsersManagement';
 export { AddUserDialog } from './AddUserDialog';
-export { SettingsManagement } from './SettingsManagement';
+export { default as SettingsManagement } from './SettingsManagement';
 
 // Print Components
 export { PrintInvoice, InvoicePreview } from './PrintInvoice';

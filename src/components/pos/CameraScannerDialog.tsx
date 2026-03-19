@@ -33,8 +33,8 @@ export function CameraScannerDialog({
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
 
-  const platform = typeof Capacitor !== 'undefined' && (Capacitor as any).getPlatform ? (Capacitor as any).getPlatform() : 'web';
-  const isAndroidApp = platform === 'android';
+  const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
+
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
@@ -56,7 +56,7 @@ export function CameraScannerDialog({
     document.querySelector('body')?.classList.add('barcode-scanner-active');
     try {
       const { barcodes } = await BarcodeScanner.scan();
-      if (barcodes.length > 0) {
+      if (barcodes.length > 0 && barcodes[0].rawValue) {
         const scannedCode = barcodes[0].rawValue;
         console.log("স্ক্যান করা কোড: ", scannedCode);
         onBarcodeScanned(scannedCode);

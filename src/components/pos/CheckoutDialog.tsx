@@ -285,7 +285,7 @@ export function CheckoutDialog({
       amountReceived: parsedAmount,
       amountPaid: amountPaidForSale,
       change: finalPaymentMethod === 'Due' ? 0 : Math.max(0, change),
-      paymentMethod: finalPaymentMethod,
+      paymentMethod: finalPaymentMethod as any,
       customerId,
       subtotal,
       discount,

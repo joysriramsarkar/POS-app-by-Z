@@ -1,5 +1,5 @@
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/api-middleware';
@@ -49,7 +49,7 @@ const prepaymentSchema = z.object({
  *       500:
  *         description: Internal server error.
  */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
         const currentUser = await getAuthenticatedUser(req);
         if (!currentUser) {

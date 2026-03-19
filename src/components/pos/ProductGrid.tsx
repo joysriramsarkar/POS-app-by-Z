@@ -49,8 +49,8 @@ export function ProductGrid({
   const setSelectedCategoryId = useUIStore((state) => state.setSelectedCategoryId);
 
   const isMobile = useIsMobile();
-  const platform = typeof Capacitor !== 'undefined' && (Capacitor as any).getPlatform ? (Capacitor as any).getPlatform() : 'web';
-  const isAndroidApp = platform === 'android';
+  const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
+
   const { toast } = useToast();
   const cartItems = useCartStore((state) => state.items);
   const getTotal = useCartStore((state) => state.getTotal);

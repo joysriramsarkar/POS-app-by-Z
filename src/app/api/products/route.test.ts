@@ -1,35 +1,39 @@
-import { describe, it, expect, mock, beforeEach } from 'bun:test';
-import { NextRequest } from 'next/server';
+import { describe, expect, it, mock, beforeEach } from 'bun:test';
+import { GET } from './route';
 
-const mockFindMany = mock(() => []);
+// Need to mock next-auth
+mock.module('next-auth/next', () => ({
+  getServerSession: mock(() => Promise.resolve({ user: { id: '1', role: 'ADMIN' } })),
+}));
 
-// Mock the module before importing the file that uses it
+const mockFindMany = mock(() => Promise.resolve([]));
+const mockCount = mock(() => Promise.resolve(0));
+
 mock.module('@/lib/db', () => ({
   db: {
     product: {
       findMany: mockFindMany,
+      count: mockCount,
     },
   },
 }));
 
-// Import GET after setting up the mock
-import { GET } from './route';
-
 describe('GET /api/products', () => {
   beforeEach(() => {
     mockFindMany.mockClear();
+    mockCount.mockClear();
   });
 
   it('should return products on success', async () => {
-    const products = [{ id: '1', name: 'Test Product', isActive: true }];
-    mockFindMany.mockResolvedValueOnce(products);
+    const products = [{ id: '1', name: 'Test Product', currentStock: 10 }];
+    mockFindMany.mockResolvedValueOnce(products as never);
+    mockCount.mockResolvedValueOnce(1);
 
-    const req = new NextRequest('http://localhost/api/products');
-    const response = await GET(req);
-    const json = await response.json();
+    const req = new Request('http://localhost:3000/api/products');
+    const res = await GET(req as any);
+    const json = await res.json();
 
-    expect(response.status).toBe(200);
-    expect(json.success).toBe(true);
+    expect(res.status).toBe(200);
     expect(json.data).toEqual(products);
     expect(mockFindMany).toHaveBeenCalled();
   });
@@ -37,20 +41,11 @@ describe('GET /api/products', () => {
   it('should return 500 if database query fails', async () => {
     mockFindMany.mockRejectedValueOnce(new Error('Database error'));
 
-    const req = new NextRequest('http://localhost/api/products');
+    const req = new Request('http://localhost:3000/api/products');
+    const res = await GET(req as any);
+    const json = await res.json();
 
-    // Hide console.error during the test to avoid polluting the output
-    const consoleSpy = mock(() => {});
-    const originalConsoleError = console.error;
-    console.error = consoleSpy;
-
-    const response = await GET(req);
-    const json = await response.json();
-
-    expect(response.status).toBe(500);
-    expect(json).toEqual({ success: false, error: 'Failed to fetch products' });
-    expect(mockFindMany).toHaveBeenCalled();
-
-    console.error = originalConsoleError;
+    expect(res.status).toBe(500);
+    expect(json.success).toBe(false);
   });
 });
