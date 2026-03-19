@@ -56,6 +56,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     ordersComparison: 'N/A',
   });
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
+  const [breakdown, setBreakdown] = useState<{ upi: number; cash: number; due: number }>({ upi: 0, cash: 0, due: 0 });
   
   const products = useProductsStore((state) => state.products);
   const lowStockProducts = products.filter(p => p.currentStock <= p.minStockLevel && p.isActive);
@@ -100,6 +101,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               ...prevStats,
               ...apiStats,
             }));
+            // stats API doesn't return per-method payment totals, we'll compute below
           } catch (parseErr) {
             console.error('Failed to parse stats response:', parseErr);
           }
@@ -111,6 +113,49 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
+      }
+
+      // Compute payment breakdown by fetching today's sales (server-side has proper filtering)
+      try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(todayStart);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const salesRes = await fetch(
+          `/api/sales?dateFrom=${encodeURIComponent(todayStart.toISOString())}&dateTo=${encodeURIComponent(tomorrow.toISOString())}&status=Completed&limit=1000`
+        );
+
+        if (salesRes.ok) {
+          const { data: todaySales } = await salesRes.json();
+          let upiTotal = 0;
+          let cashTotal = 0;
+          let dueTotal = 0;
+
+          todaySales.forEach((s: any) => {
+            const amtPaid = Number(s.amountPaid || 0) || 0;
+            const totalAmt = Number(s.totalAmount || 0) || 0;
+            if (s.paymentMethod === 'UPI') {
+              upiTotal += amtPaid;
+            } else if (s.paymentMethod === 'Cash') {
+              cashTotal += amtPaid;
+            } else if (s.paymentMethod === 'Mixed') {
+              // Mixed payments currently stored without per-method split; count the paid amount into cash by default
+              cashTotal += amtPaid;
+            }
+
+            // accumulate any unpaid portion as today's due (fallback)
+            if (amtPaid < totalAmt) {
+              dueTotal += totalAmt - amtPaid;
+            }
+          });
+
+          // Prefer global due from stats if available, otherwise use computed dueTotal
+          const preferDue = (stats && (stats.duePayments || stats.duePayments === 0)) ? stats.duePayments : dueTotal;
+          setBreakdown({ upi: upiTotal, cash: cashTotal, due: preferDue });
+        }
+      } catch (err) {
+        console.error('Failed to compute payment breakdown:', err);
       }
     };
     fetchDashboardData();
@@ -165,6 +210,30 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <span className="hidden sm:inline">লগ আউট (Logout)</span>
             </Button>
           </div>
+        </div>
+        {/* New bottom breakdown section */}
+        <div className="p-4">
+          <Card className="rounded-2xl shadow-sm border-border/50 bg-gradient-to-br from-card to-muted/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold">Today's Payments Breakdown</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-green-50/60 dark:bg-green-900/20 text-center">
+                  <div className="text-xs text-muted-foreground">UPI</div>
+                  <div className="text-xl font-bold text-green-700">{formatPrice(breakdown.upi)}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-blue-50/60 dark:bg-blue-900/20 text-center">
+                  <div className="text-xs text-muted-foreground">Cash</div>
+                  <div className="text-xl font-bold text-blue-700">{formatPrice(breakdown.cash)}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-red-50/60 dark:bg-red-900/20 text-center">
+                  <div className="text-xs text-muted-foreground">Due</div>
+                  <div className="text-xl font-bold text-red-700">{formatPrice(breakdown.due)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

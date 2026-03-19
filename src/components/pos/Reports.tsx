@@ -201,11 +201,11 @@ const Reports: React.FC = () => {
         </div>
 
         <Tabs defaultValue="sales" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl mb-4">
-            <TabsTrigger value="sales">Sales & Profit</TabsTrigger>
-            <TabsTrigger value="stock">Stock Movement</TabsTrigger>
-            <TabsTrigger value="dues">Customer Dues</TabsTrigger>
-            <TabsTrigger value="products">Top Products</TabsTrigger>
+          <TabsList className="w-full mb-4 md:grid md:grid-cols-4 md:max-w-2xl flex gap-2 overflow-x-auto md:overflow-visible">
+            <TabsTrigger className="whitespace-nowrap text-sm px-3 py-2 md:text-base md:px-0 md:py-0" value="sales">Sales & Profit</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap text-sm px-3 py-2 md:text-base md:px-0 md:py-0" value="stock">Stock Movement</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap text-sm px-3 py-2 md:text-base md:px-0 md:py-0" value="dues">Customer Dues</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap text-sm px-3 py-2 md:text-base md:px-0 md:py-0" value="products">Top Products</TabsTrigger>
           </TabsList>
           <TabsContent value="sales">
             <Card>

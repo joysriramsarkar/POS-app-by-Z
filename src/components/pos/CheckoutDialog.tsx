@@ -124,11 +124,20 @@ export function CheckoutDialog({
   }, [paymentMethod, remainingTotal]);
 
   const [amountReceived, setAmountReceived] = useState<string>('');
+  const [cashReceived, setCashReceived] = useState<string>('');
+  const [upiReceived, setUpiReceived] = useState<string>('');
 
   const parsedAmount = useMemo(() => {
+    if (paymentMethod === 'Mixed') {
+      const c = parseFloat(cashReceived);
+      const u = parseFloat(upiReceived);
+      const cv = isNaN(c) ? 0 : c;
+      const uv = isNaN(u) ? 0 : u;
+      return cv + uv;
+    }
     const parsed = parseFloat(amountReceived);
     return isNaN(parsed) ? 0 : parsed;
-  }, [amountReceived]);
+  }, [amountReceived, cashReceived, upiReceived, paymentMethod]);
 
   const change = useMemo(() => {
     return parsedAmount - remainingTotal;
@@ -155,7 +164,15 @@ export function CheckoutDialog({
       if (open && !prevOpenRef.current) {
         setInputError(null);
         setUsePrepaid(false);
-        setAmountReceived(getInitialAmount().toString());
+        if (paymentMethod === 'Mixed') {
+          setCashReceived(getInitialAmount().toString());
+          setUpiReceived('');
+          setAmountReceived('');
+        } else {
+          setAmountReceived(getInitialAmount().toString());
+          setCashReceived('');
+          setUpiReceived('');
+        }
       }
       prevOpenRef.current = open;
       setOpen(open);
@@ -176,15 +193,41 @@ export function CheckoutDialog({
     }
   }, []);
 
-  const handleQuickAmount = useCallback((amount: number) => {
-    setAmountReceived(amount.toString());
-    setInputError(null);
+  const handleCashChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+      setCashReceived(value);
+      setInputError(null);
+    }
   }, []);
 
-  const handleExactAmount = useCallback(() => {
-    setAmountReceived(Math.ceil(remainingTotal).toString());
+  const handleUpiChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '' || /^\d*\.?\d{0,2}$/.test(value)) {
+      setUpiReceived(value);
+      setInputError(null);
+    }
+  }, []);
+
+  const handleQuickAmount = useCallback((amount: number) => {
+    if (paymentMethod === 'Mixed') {
+      setCashReceived(amount.toString());
+      setUpiReceived('');
+    } else {
+      setAmountReceived(amount.toString());
+    }
     setInputError(null);
-  }, [remainingTotal]);
+  }, [paymentMethod]);
+
+  const handleExactAmount = useCallback(() => {
+    if (paymentMethod === 'Mixed') {
+      setCashReceived(Math.ceil(remainingTotal).toString());
+      setUpiReceived('');
+    } else {
+      setAmountReceived(Math.ceil(remainingTotal).toString());
+    }
+    setInputError(null);
+  }, [remainingTotal, paymentMethod]);
 
   const handleComplete = useCallback(() => {
     if (paymentMethod !== 'Due' && parsedAmount < remainingTotal && !customerId) {
@@ -280,8 +323,9 @@ export function CheckoutDialog({
   const paymentMethodIcon = useMemo(() => {
     const finalPaymentMethod = remainingTotal === 0 ? 'Prepaid' : paymentMethod;
     switch (finalPaymentMethod) {
-      case 'Cash': return <Banknote className="w-4 h-4" />;
-      case 'UPI': return <Smartphone className="w-4 h-4" />;
+      case 'Cash': return <Banknote className="w-2 h-2" />;
+      case 'UPI': return <Smartphone className="w-2 h-2" />;
+      case 'Mixed': return (<div className="flex items-center gap-1"><Banknote className="w-2 h-2" /><Smartphone className="w-2 h-2" /></div>);
       case 'Due': return <Clock className="w-4 h-4" />;
       case 'Prepaid': return <Wallet className="w-4 h-4 text-green-600" />;
       default: return null;
@@ -300,16 +344,28 @@ export function CheckoutDialog({
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Payment Successful!</h2>
-            <p className="text-muted-foreground text-center">
-              Sale completed for {formatPrice(total)}
-            </p>
+            {
+              (() => {
+                const displayedTotal = lastSale ? (lastSale.totalAmount ?? total) : total;
+                const displayedPaymentMethod = lastSale ? (lastSale.paymentMethod as string) : paymentMethod;
+                const displayedChange = lastSale
+                  ? Math.max(0, (Number(lastSale.amountPaid || 0) - Number(lastSale.totalAmount || 0)))
+                  : change;
 
-            {paymentMethod === 'Cash' && change > 0 && (
-              <div className="mt-4 p-4 bg-muted rounded-lg w-full text-center">
-                <p className="text-sm text-muted-foreground">Change to return</p>
-                <p className="text-2xl font-bold text-primary">{formatPrice(change)}</p>
-              </div>
-            )}
+                return (
+                  <>
+                    <p className="text-muted-foreground text-center">Sale completed for {formatPrice(displayedTotal)}</p>
+
+                    {(displayedPaymentMethod === 'Cash' || displayedPaymentMethod === 'Mixed') && displayedChange > 0 && (
+                      <div className="mt-4 p-4 bg-muted rounded-lg w-full text-center">
+                        <p className="text-sm text-muted-foreground">Change to return</p>
+                        <p className="text-2xl font-bold text-primary">{formatPrice(displayedChange)}</p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()
+            }
 
             <div className="flex gap-3 mt-6 w-full">
               <Button variant="outline" className="flex-1" onClick={handlePrint}>
@@ -386,7 +442,7 @@ export function CheckoutDialog({
 
           <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
             <span className="text-sm font-medium">Payment Method</span>
-            <Badge variant="secondary" className="gap-1">
+            <Badge variant="secondary" className="gap-1 px-2 py-1">
               {paymentMethodIcon}
               {remainingTotal === 0 ? 'Prepaid' : paymentMethod}
             </Badge>
@@ -395,18 +451,54 @@ export function CheckoutDialog({
           {remainingTotal > 0 && paymentMethod !== 'Due' && (
             <div className="space-y-3">
               <Label htmlFor="amount-received">Amount to Pay</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                <Input
-                  id="amount-received"
-                  type="text"
-                  value={amountReceived}
-                  onChange={handleAmountChange}
-                  placeholder="0"
-                  className="pl-8 text-xl h-12 font-semibold text-right"
-                  disabled={isProcessing}
-                />
-              </div>
+
+              {paymentMethod === 'Mixed' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Cash</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                      <Input
+                        id="cash-received"
+                        type="text"
+                        value={cashReceived}
+                        onChange={handleCashChange}
+                        placeholder="0"
+                        className="pl-8 text-xl h-12 font-semibold text-right"
+                        disabled={isProcessing}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">UPI</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                      <Input
+                        id="upi-received"
+                        type="text"
+                        value={upiReceived}
+                        onChange={handleUpiChange}
+                        placeholder="0"
+                        className="pl-8 text-xl h-12 font-semibold text-right"
+                        disabled={isProcessing}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                  <Input
+                    id="amount-received"
+                    type="text"
+                    value={amountReceived}
+                    onChange={handleAmountChange}
+                    placeholder="0"
+                    className="pl-8 text-xl h-12 font-semibold text-right"
+                    disabled={isProcessing}
+                  />
+                </div>
+              )}
 
               <div className="grid grid-cols-4 gap-2">
                 {QUICK_AMOUNTS.map((amount) => (

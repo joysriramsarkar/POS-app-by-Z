@@ -6,7 +6,7 @@
 // ENUMS
 // ============================================================================
 
-export type PaymentMethod = 'Cash' | 'UPI' | 'Due';
+export type PaymentMethod = 'Cash' | 'UPI' | 'Mixed' | 'Due';
 export type PaymentStatus = 'Paid' | 'Partial' | 'Due';
 export type SaleStatus = 'Completed' | 'Cancelled' | 'Refunded';
 export type EntryType = 'credit' | 'debit';

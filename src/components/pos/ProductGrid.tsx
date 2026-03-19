@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, X, Grid3X3, LayoutGrid, Package, Camera } from 'lucide-react';
 import { ProductCard } from './ProductCard';
 import { CameraScannerDialog } from './CameraScannerDialog';
+import { Capacitor } from '@capacitor/core';
 import type { Product } from '@/types/pos';
 import { useProductsStore, useUIStore, useCartStore } from '@/stores/pos-store';
 import { cn, convertBengaliToEnglishNumerals } from '@/lib/utils';
@@ -48,6 +49,8 @@ export function ProductGrid({
   const setSelectedCategoryId = useUIStore((state) => state.setSelectedCategoryId);
 
   const isMobile = useIsMobile();
+  const platform = typeof Capacitor !== 'undefined' && (Capacitor as any).getPlatform ? (Capacitor as any).getPlatform() : 'web';
+  const isAndroidApp = platform === 'android';
   const { toast } = useToast();
   const cartItems = useCartStore((state) => state.items);
   const getTotal = useCartStore((state) => state.getTotal);
@@ -261,8 +264,8 @@ export function ProductGrid({
               </Button>
             )}
             </div>
-            {/* Camera Scanner Button - Mobile only */}
-            {isMobile && (
+            {/* Camera Scanner Button - Android app only */}
+            {isAndroidApp && (
               <Button
                 size="sm"
                 variant="outline"

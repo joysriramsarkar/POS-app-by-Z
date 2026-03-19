@@ -29,6 +29,7 @@ import {
   UserPlus,
   ScanLine,
 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import type { PaymentMethod, Customer } from '@/types/pos';
 import { useCartStore, useUIStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
@@ -41,8 +42,9 @@ interface CartPanelProps {
 }
 
 const paymentMethods: { method: PaymentMethod; icon: React.ReactNode; label: string; color: string }[] = [
-  { method: 'Cash', icon: <Banknote className="w-5 h-5" />, label: 'Cash', color: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' },
-  { method: 'UPI', icon: <Smartphone className="w-5 h-5" />, label: 'UPI', color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' },
+  { method: 'Cash', icon: <Banknote className="w-2 h-2" />, label: 'Cash', color: 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100' },
+  { method: 'UPI', icon: <Smartphone className="w-2 h-2" />, label: 'UPI', color: 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' },
+  { method: 'Mixed', icon: (<div className="flex items-center gap-1"><Banknote className="w-2 h-2" /><Smartphone className="w-2 h-2" /></div>), label: 'Mixed', color: 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100' },
   { method: 'Due', icon: <Clock className="w-5 h-5" />, label: 'Due', color: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' },
 ];
 
@@ -160,6 +162,9 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
 
   const isCartEmpty = items.length === 0;
   const itemCountDisplay = itemCount === 0 ? 'Empty' : `${itemCount} item${itemCount !== 1 ? 's' : ''}`;
+
+  const platform = typeof Capacitor !== 'undefined' && (Capacitor as any).getPlatform ? (Capacitor as any).getPlatform() : 'web';
+  const isAndroidApp = platform === 'android';
 
   return (
     <div className="flex flex-col h-full bg-background min-h-0">
@@ -289,7 +294,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
               <p className="text-xs text-muted-foreground mt-1 mb-4">
                 Scan or tap products to add them
               </p>
-              {onScan && (
+              {isAndroidApp && onScan && (
                 <Button variant="outline" size="sm" onClick={onScan} className="gap-2">
                   <ScanLine className="w-4 h-4" />
                   Scan Barcode
@@ -316,7 +321,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
                 type="button"
                 onClick={() => setPaymentMethod(method)}
                 className={cn(
-                  'relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 touch-manipulation',
+                  'relative flex flex-col items-center justify-center px-1 py-2 md:px-3 md:py-3 rounded-xl border-2 transition-all duration-200 touch-manipulation',
                   paymentMethod === method
                     ? 'border-primary bg-primary/10 shadow-md shadow-primary/10 scale-[1.02]'
                     : 'border-border/50 bg-background hover:bg-muted/80 hover:border-primary/30'
@@ -328,7 +333,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
                   </div>
                 )}
                 <div className={cn(
-                  'mb-1.5 transition-transform duration-200',
+                  'mb-1 transition-transform duration-200 inline-flex items-center justify-center',
                   paymentMethod === method ? 'text-primary scale-110' : 'text-muted-foreground group-hover:scale-110'
                 )}>
                   {icon}

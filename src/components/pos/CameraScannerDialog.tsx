@@ -13,8 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Camera, AlertCircle, Loader2 } from 'lucide-react';
-import useCameraBarcodeScanner from '@/hooks/use-camera-barcode-scanner';
+import { Camera, AlertCircle } from 'lucide-react';
 
 interface CameraScannerDialogProps {
   open: boolean;
@@ -32,15 +31,26 @@ export function CameraScannerDialog({
   description = 'Position barcode within the frame',
 }: CameraScannerDialogProps) {
   const [error, setError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+
+  const platform = typeof Capacitor !== 'undefined' && (Capacitor as any).getPlatform ? (Capacitor as any).getPlatform() : 'web';
+  const isAndroidApp = platform === 'android';
 
   const handleClose = useCallback(() => {
     onOpenChange(false);
   }, [onOpenChange]);
 
   const startScan = useCallback(async () => {
+    if (!isAndroidApp) {
+      setError('Barcode scanning is available only in the Android app.');
+      return;
+    }
+
+    setIsScanning(true);
     const { camera } = await BarcodeScanner.requestPermissions();
     if (camera !== 'granted') {
       setError('ক্যামেরার পারমিশন ছাড়া স্ক্যান সম্ভব নয়!');
+      setIsScanning(false);
       return;
     }
     document.querySelector('body')?.classList.add('barcode-scanner-active');
@@ -55,44 +65,17 @@ export function CameraScannerDialog({
       setError('Scan failed: ' + (err as Error).message);
     } finally {
       document.querySelector('body')?.classList.remove('barcode-scanner-active');
+      setIsScanning(false);
     }
   }, [onBarcodeScanned]);
 
-  const {
-    isSupported,
-    isInitialized,
-    isShuttingDown,
-    startShutdown,
-    scannerId,
-  } = useCameraBarcodeScanner({
-    enabled: open,
-    onBarcodeDetected: (barcode: string) => {
-      onBarcodeScanned(barcode);
-      // Keep the scanner open for continuous scanning until the user explicitly closes it.
-    },
-    onClose: handleClose,
-    onError: setError,
-    facingMode: 'environment',
-  });
-
   const handleCloseIntent = useCallback(() => {
-    if (!isShuttingDown) {
-      startShutdown();
-    }
-  }, [isShuttingDown, startShutdown]);
-
-  const handleDialogInteraction = useCallback((newOpen: boolean) => {
-    if (newOpen) {
-      onOpenChange(true);
-      setError(null);
-    } else {
-      // User initiated close - trigger shutdown
-      handleCloseIntent();
-    }
-  }, [onOpenChange, handleCloseIntent]);
+    onOpenChange(false);
+    setError(null);
+  }, [onOpenChange]);
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogInteraction}>
+    <Dialog open={open} onOpenChange={handleCloseIntent}>
       <DialogContent className="sm:max-w-[425px] w-[95vw] p-4 md:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -102,43 +85,41 @@ export function CameraScannerDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
-        {error && !isShuttingDown && (
+        {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
           </Alert>
         )}
-
-        {/* Blackboxed container for the scanner */}
-        <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden border-2 border-gray-700">
-          {/* This div is surrendered to the html5-qrcode library. React will not touch its children. */}
-          <div id={scannerId} />
-
-          {/* Loading / Shutdown Overlay */}
-          {(!isInitialized || isShuttingDown) && (
-            <div className="absolute inset-0 bg-black bg-opacity-70 flex flex-col items-center justify-center text-white pointer-events-none">
-              <Loader2 className="w-10 h-10 animate-spin mb-3" />
-              <p className="text-sm font-medium">
-                {isShuttingDown ? 'Closing Camera...' : 'Initializing Camera...'}
-              </p>
+        {/* If not running inside Android app, inform the user and hide scanner UI */}
+        {!isAndroidApp ? (
+          <div className="p-4 text-center">
+            <p className="text-sm text-muted-foreground mb-3">Barcode scanning is available only in the Android app.</p>
+          </div>
+        ) : (
+          <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden border-2 border-gray-700">
+            <div className="flex items-center justify-center h-full">
+              <p className="text-sm text-white/80">Tap Scan to open the camera scanner.</p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <DialogFooter className="flex gap-2">
-          <Button
-            onClick={startScan}
-            className="w-full"
-            disabled={isShuttingDown || !isSupported}
-          >
-            Scan
-          </Button>
+          {isAndroidApp && (
+            <Button
+              onClick={startScan}
+              className="w-full"
+              disabled={isScanning}
+            >
+              {isScanning ? 'Scanning...' : 'Scan'}
+            </Button>
+          )}
           <Button
             onClick={handleCloseIntent}
             className="w-full"
-            disabled={isShuttingDown}
+            disabled={isScanning}
           >
-            {isShuttingDown ? 'Closing...' : 'Close'}
+            Close
           </Button>
         </DialogFooter>
       </DialogContent>
