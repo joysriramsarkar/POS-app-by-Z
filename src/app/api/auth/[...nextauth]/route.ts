@@ -2,6 +2,12 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+
+const rateLimiter = new RateLimiterMemory({
+  points: 5, // 5 attempts
+  duration: 60 * 15, // per 15 minutes
+});
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -16,7 +22,13 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const user = await (db as any).user.findUnique({
+        try {
+          await rateLimiter.consume(credentials.username);
+        } catch (rejRes) {
+          throw new Error("Too many login attempts. Please try again later.");
+        }
+
+        const user = await db.user.findUnique({
           where: {
             username: credentials.username
           }
@@ -43,8 +55,8 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.name,
           username: user.username,
-          email: user.email,
-          role: user.role,
+          email: user.email || undefined,
+          role: user.role as "ADMIN" | "MANAGER" | "CASHIER" | "VIEWER",
         };
       }
     })
@@ -56,18 +68,18 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.username = (user as any).username;
-        token.role = (user as any).role;
-        token.email = (user as any).email;
+        token.username = user.username;
+        token.role = user.role;
+        token.email = user.email;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).username = token.username;
-        (session.user as any).role = token.role;
-        (session.user as any).email = token.email;
+        session.user.id = token.id as string;
+        session.user.username = token.username as string;
+        session.user.role = token.role as "ADMIN" | "MANAGER" | "CASHIER" | "VIEWER";
+        session.user.email = (token.email as string) || undefined;
       }
       return session;
     }

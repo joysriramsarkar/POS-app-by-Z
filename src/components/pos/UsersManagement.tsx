@@ -69,7 +69,7 @@ export function UsersManagement({ currentUserRole }: UsersManagementProps) {
   const [deleteConfirm, setDeleteConfirm] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const isAdmin = (session?.user as any)?.role === "ADMIN";
+  const isAdmin = (session?.user as { id?: string; role?: string; username?: string })?.role === "ADMIN";
 
   // Fetch users
   const fetchUsers = async () => {

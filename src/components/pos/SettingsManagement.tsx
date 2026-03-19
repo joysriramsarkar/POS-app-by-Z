@@ -285,7 +285,7 @@ export default function SettingsManagement() {
                       <Label className="text-base">ডিফল্ট পেপার সাইজ (Default Paper Size)</Label>
                       <RadioGroup
                         value={localSettings.print_paper_size}
-                        onValueChange={(val) => handleChange("print_paper_size", val as any)}
+                        onValueChange={(val) => handleChange("print_paper_size", val as "58mm" | "80mm" | "A4" | "A5")}
                         className="flex flex-wrap gap-4"
                       >
                         <div className="flex items-center space-x-2">
@@ -309,7 +309,7 @@ export default function SettingsManagement() {
 
                     <div className="space-y-2">
                       <Label>ফন্ট সাইজ (Font Size)</Label>
-                      <Select value={localSettings.print_font_size} onValueChange={(val) => handleChange("print_font_size", val as any)}>
+                      <Select value={localSettings.print_font_size} onValueChange={(val) => handleChange("print_font_size", val as "small" | "medium" | "large")}>
                         <SelectTrigger className="w-[200px]">
                           <SelectValue />
                         </SelectTrigger>
@@ -429,7 +429,7 @@ export default function SettingsManagement() {
                       <Label className="text-base">মোড (Mode)</Label>
                       <RadioGroup
                         value={localSettings.theme_mode}
-                        onValueChange={(val) => handleChange("theme_mode", val as any)}
+                        onValueChange={(val) => handleChange("theme_mode", val as "light" | "dark" | "system")}
                         className="flex flex-wrap gap-6"
                       >
                         <div className="flex items-center space-x-2">
@@ -485,7 +485,7 @@ export default function SettingsManagement() {
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Current User</p>
-                          <h3 className="font-semibold text-lg">{session?.user?.name || (session?.user as any)?.username || "Admin"}</h3>
+                          <h3 className="font-semibold text-lg">{session?.user?.name || (session?.user as { id?: string; role?: string; username?: string })?.username || "Admin"}</h3>
                         </div>
                       </div>
                       <Button variant="outline" onClick={() => signOut()} className="gap-2">
@@ -546,7 +546,7 @@ export default function SettingsManagement() {
                   <CardContent className="space-y-6">
                     <div className="space-y-2">
                       <Label>অ্যাপের ভাষা (App Language)</Label>
-                      <Select value={localSettings.app_language} onValueChange={(val) => handleChange("app_language", val as any)}>
+                      <Select value={localSettings.app_language} onValueChange={(val) => handleChange("app_language", val as "en" | "bn")}>
                         <SelectTrigger className="w-full md:w-[300px]">
                           <SelectValue />
                         </SelectTrigger>
@@ -559,7 +559,7 @@ export default function SettingsManagement() {
 
                     <div className="space-y-2">
                       <Label>রিসিপ্টের ভাষা (Receipt Language)</Label>
-                      <Select value={localSettings.receipt_language} onValueChange={(val) => handleChange("receipt_language", val as any)}>
+                      <Select value={localSettings.receipt_language} onValueChange={(val) => handleChange("receipt_language", val as "en" | "bn")}>
                         <SelectTrigger className="w-full md:w-[300px]">
                           <SelectValue />
                         </SelectTrigger>

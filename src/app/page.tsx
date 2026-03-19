@@ -85,7 +85,7 @@ function POSDashboard() {
 
   // Auth
   const { data: session } = useSession();
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as { id?: string; role?: string; username?: string })?.role;
 
   // Settings store
   const { settings } = useSettingsStore();
@@ -468,7 +468,7 @@ function POSDashboard() {
         const { camera } = await BarcodeScanner.requestPermissions();
         if (camera === 'granted' || camera === 'limited') {
           const { barcodes } = await BarcodeScanner.scan();
-          if (barcodes.length > 0) {
+          if (barcodes.length > 0 && barcodes[0].rawValue) {
             handleBarcodeDetected(barcodes[0].rawValue);
           }
         } else {

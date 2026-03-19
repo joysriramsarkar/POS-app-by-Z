@@ -30,7 +30,7 @@ export async function requirePermission(
   }
 
   const session = authResult.session;
-  const userId = (session?.user as any)?.id;
+  const userId = (session?.user as { id?: string; role?: string; username?: string })?.id;
 
   if (!userId) {
     return NextResponse.json({ error: "User not found" }, { status: 401 });
@@ -60,7 +60,7 @@ export async function requireRole(
   }
 
   const session = authResult.session;
-  const userRole = (session?.user as any)?.role;
+  const userRole = (session?.user as { id?: string; role?: string; username?: string })?.role;
 
   if (!userRole || !allowedRoles.includes(userRole)) {
     return NextResponse.json(

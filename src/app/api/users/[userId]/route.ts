@@ -35,7 +35,7 @@ export async function PATCH(
     const { username, email, name, phone, password, role, isActive } = body;
 
     // Check if user exists
-    const user = await (db as any).user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: userId },
     });
 
@@ -45,7 +45,7 @@ export async function PATCH(
 
     // Prevent updating the last admin
     if (user.role === "ADMIN" && role !== "ADMIN") {
-      const adminCount = await (db as any).user.count({
+      const adminCount = await db.user.count({
         where: { role: "ADMIN", isActive: true },
       });
       if (adminCount === 1) {
@@ -58,7 +58,7 @@ export async function PATCH(
 
     // Check for duplicate username/email
     if (username && username !== user.username) {
-      const existingUser = await (db as any).user.findFirst({
+      const existingUser = await db.user.findFirst({
         where: {
           username: { equals: username, mode: "insensitive" },
           NOT: { id: userId },
@@ -73,7 +73,7 @@ export async function PATCH(
     }
 
     if (email && email !== user.email) {
-      const existingEmail = await (db as any).user.findFirst({
+      const existingEmail = await db.user.findFirst({
         where: {
           email: { equals: email, mode: "insensitive" },
           NOT: { id: userId },
@@ -100,7 +100,7 @@ export async function PATCH(
       updateData.password = await bcrypt.hash(password, 10);
     }
 
-    const updatedUser = await (db as any).user.update({
+    const updatedUser = await db.user.update({
       where: { id: userId },
       data: updateData,
       select: {
@@ -146,7 +146,7 @@ export async function DELETE(
     const { userId } = await params;
 
     // Check if user exists
-    const user = await (db as any).user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: userId },
     });
 
@@ -156,7 +156,7 @@ export async function DELETE(
 
     // Prevent deleting the last admin
     if (user.role === "ADMIN") {
-      const adminCount = await (db as any).user.count({
+      const adminCount = await db.user.count({
         where: { role: "ADMIN" },
       });
       if (adminCount === 1) {
@@ -168,7 +168,7 @@ export async function DELETE(
     }
 
     // Prevent deleting current user
-    if (user.id === (session.user as any)?.id) {
+    if (user.id === (session.user as { id?: string; role?: string; username?: string })?.id) {
       return NextResponse.json(
         { error: "Cannot delete your own account" },
         { status: 400 }
@@ -176,7 +176,7 @@ export async function DELETE(
     }
 
     // Delete user (soft delete - deactivate)
-    await (db as any).user.update({
+    await db.user.update({
       where: { id: userId },
       data: { isActive: false },
     });
