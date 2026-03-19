@@ -166,6 +166,30 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'product:create': {
+        const productResult = ProductInputSchema.safeParse(payload);
+        if (!productResult.success) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid Product payload', details: productResult.error },
+            { status: 400 }
+          );
+        }
+        result = await syncProduct(productResult.data, 'create');
+        break;
+      }
+
+      case 'product:update': {
+        const productResult = ProductInputSchema.safeParse(payload);
+        if (!productResult.success) {
+          return NextResponse.json(
+            { success: false, error: 'Invalid Product payload', details: productResult.error },
+            { status: 400 }
+          );
+        }
+        result = await syncProduct(productResult.data, 'update');
+        break;
+      }
+
       default:
         return NextResponse.json(
           { success: false, error: `Unknown action type: ${actionType}` },
@@ -437,8 +461,39 @@ async function syncCustomer(customerData: z.infer<typeof CustomerInputSchema>, a
 }
 
 // Sync product updates (primarily stock changes) from offline
-async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>, action: string) {
-  if (action === 'update') {
+async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema> | z.infer<typeof ProductInputSchema>, action: string) {
+  if (action === 'create') {
+    // Create a new product from full product data
+    if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
+      const { id, barcode, name, nameBn, category, buyingPrice, sellingPrice, unit, currentStock, minStockLevel, isActive } = productData as any;
+
+      // Check if product already exists (prevent duplicates)
+      if (id) {
+        const existing = await db.product.findUnique({ where: { id } });
+        if (existing) {
+          return existing;
+        }
+      }
+
+      return db.product.create({
+        data: {
+          id,
+          barcode: barcode || null,
+          name,
+          nameBn: nameBn || null,
+          category,
+          buyingPrice,
+          sellingPrice,
+          unit,
+          currentStock,
+          minStockLevel,
+          isActive,
+        },
+      });
+    }
+
+    throw new Error('Invalid product data for create action');
+  } else if (action === 'update') {
     if ('productId' in productData && 'quantityChange' in productData) {
       const { productId, quantityChange } = productData;
 
@@ -466,19 +521,19 @@ async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>
 
     // fallback to upsert entire object if no quantityChange provided
     if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
-      if (!productData.id) {
+      const { id, barcode, name, nameBn, category, buyingPrice, sellingPrice, unit, currentStock, minStockLevel, isActive } = productData as any;
+
+      if (!id) {
         throw new Error('Product ID is required for upsert sync');
       }
-
-      const { id, barcode, name, nameBn, category, buyingPrice, sellingPrice, unit, currentStock, minStockLevel, isActive } = productData;
 
       return db.product.upsert({
         where: { id },
         create: {
           id,
-          barcode,
+          barcode: barcode || null,
           name,
-          nameBn,
+          nameBn: nameBn || null,
           category,
           buyingPrice,
           sellingPrice,
@@ -488,9 +543,9 @@ async function syncProduct(productData: z.infer<typeof ProductSyncPayloadSchema>
           isActive,
         },
         update: {
-          barcode,
+          barcode: barcode || null,
           name,
-          nameBn,
+          nameBn: nameBn || null,
           category,
           buyingPrice,
           sellingPrice,

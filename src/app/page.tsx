@@ -182,24 +182,43 @@ function POSDashboard() {
       setLoading(true);
       try {
         // Fetch from API to get actual DB data
-        const res = await fetch('/api/products?limit=50');
-        if (res.ok) {
-          const { data: products, nextCursor } = await res.json();
-          const hasMore = !!nextCursor;
-          setProducts(products, hasMore, nextCursor);
-          // Update cache
-          await ProductsDB.upsertMany(products);
-        } else {
-          // If API fails, try IndexedDB
-          const cachedProducts = await ProductsDB.getAll();
-          setProducts(cachedProducts);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+        
+        try {
+          const res = await fetch('/api/products?limit=50', { signal: controller.signal });
+          clearTimeout(timeoutId);
+          
+          if (res.ok) {
+            const { data: products, nextCursor } = await res.json();
+            const hasMore = !!nextCursor;
+            setProducts(products, hasMore, nextCursor);
+            // Update cache
+            await ProductsDB.upsertMany(products);
+            setOnline(true);
+            return;
+          } else {
+            console.warn('API returned error:', res.status);
+            throw new Error(`API error: ${res.status}`);
+          }
+        } catch (fetchErr) {
+          clearTimeout(timeoutId);
+          throw fetchErr;
         }
       } catch (error) {
-        console.error('Failed to load products from API:', error);
+        console.error('Failed to load products from API:', error instanceof Error ? error.message : String(error));
+        // Mark as offline since API failed
+        setOnline(false);
+        
         try {
           // Fallback to IndexedDB
           const cachedProducts = await ProductsDB.getAll();
-          setProducts(cachedProducts);
+          if (cachedProducts.length > 0) {
+            console.log(`✅ Using ${cachedProducts.length} cached products from offline storage`);
+            setProducts(cachedProducts);
+          } else {
+            console.warn('No cached products available');
+          }
         } catch (dbError) {
           console.error('Failed to load products from cache:', dbError);
         }
@@ -209,17 +228,66 @@ function POSDashboard() {
     };
 
     loadProducts();
-  }, [setProducts, setLoading]);
+  }, [setProducts, setLoading, setOnline]);
 
-  // Monitor online status
+  // Monitor online status - check both navigator.onLine AND actual API connectivity
   useEffect(() => {
-    const handleOnline = () => setOnline(true);
-    const handleOffline = () => setOnline(false);
+    const checkConnectivity = async () => {
+      // First check navigator.onLine
+      if (!navigator.onLine) {
+        console.log('🔴 Offline: navigator.onLine = false');
+        setOnline(false);
+        return;
+      }
+
+      // Try to verify connection by testing a simple API call
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+        
+        try {
+          const response = await fetch('/api/auth/session', {
+            method: 'GET',
+            signal: controller.signal,
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            console.log('🟢 Online: Database connection verified');
+            setOnline(true);
+          } else {
+            console.log('🔴 Offline: API returned error', response.status);
+            setOnline(false);
+          }
+        } catch (fetchErr) {
+          clearTimeout(timeoutId);
+          throw fetchErr;
+        }
+      } catch (error) {
+        console.log('🔴 Offline: API connectivity check failed', error instanceof Error ? error.message : String(error));
+        setOnline(false);
+      }
+    };
+
+    // Check on mount
+    checkConnectivity();
+
+    // Check periodically (every 10 seconds)
+    const interval = setInterval(checkConnectivity, 10000);
+
+    // Listen to navigator online/offline events
+    const handleOnline = () => checkConnectivity();
+    const handleOffline = () => {
+      console.log('🔴 Offline event detected');
+      setOnline(false);
+    };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
     return () => {
+      clearInterval(interval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -235,35 +303,103 @@ function POSDashboard() {
         const unsynced = await SyncQueueDB.getUnsynced();
         setPendingCount(unsynced.length);
 
+        if (unsynced.length === 0) {
+          console.log('No pending items to sync');
+          setSyncing(false);
+          return;
+        }
+
+        console.log(`Found ${unsynced.length} items to sync`);
+
         for (const item of unsynced) {
           try {
+            // Validate sync item
+            if (!item.entityType || !item.action || !item.payload) {
+              console.warn('Invalid sync item, skipping:', {
+                entityType: item.entityType,
+                action: item.action,
+                hasPayload: !!item.payload,
+              });
+              continue;
+            }
+
+            // Convert entity type and action to actionType format expected by API
+            // e.g., 'Sale' + 'create' -> 'sale:create'
+            let actionType = `${item.entityType.toLowerCase()}:${item.action}`;
+            
+            // Parse the payload if it's a JSON string
+            let payloadData;
+            try {
+              payloadData = typeof item.payload === 'string' ? JSON.parse(item.payload) : item.payload;
+            } catch (parseErr) {
+              console.error('Failed to parse payload for sync item:', {
+                id: item.id,
+                entityType: item.entityType,
+                action: item.action,
+                parseError: parseErr instanceof Error ? parseErr.message : String(parseErr),
+              });
+              continue;
+            }
+
+            // Special case: 'Product' + 'update' with quantityChange -> 'product:stock:update'
+            if (item.entityType === 'Product' && item.action === 'update' && payloadData && 'quantityChange' in payloadData) {
+              actionType = 'product:stock:update';
+            }
+
+            console.log(`📤 Syncing ${actionType}:`, { id: item.id, idempotencyKey: item.id });
+
             const res = await fetch('/api/sync', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(item),
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Idempotency-Key': item.id, // Use item.id as idempotency key
+              },
+              body: JSON.stringify({
+                actionType,
+                payload: payloadData,
+              }),
             });
 
             if (res.ok) {
+              console.log(`✅ Successfully synced ${actionType}`, { id: item.id });
               await SyncQueueDB.markSynced(item.id);
               if (item.entityType === 'Sale') {
                 await SalesDB.markSynced(item.entityId);
               }
             } else {
+              // Log detailed error information
+              let errorMessage = `Server error: ${res.status} ${res.statusText}`;
               try {
-                const err = await res.json();
-                console.error('Failed to sync item', item, err);
+                const errorData = await res.json();
+                errorMessage = errorData.error || errorData.message || errorMessage;
+                console.error(`❌ Failed to sync ${actionType}:`, {
+                  id: item.id,
+                  status: res.status,
+                  error: errorMessage,
+                });
               } catch (parseErr) {
-                console.error('Failed to sync item (non-JSON response):', item, res.statusText);
+                console.error(`❌ Failed to sync ${actionType}:`, {
+                  id: item.id,
+                  status: res.status,
+                  statusText: res.statusText,
+                  parseError: 'Non-JSON response',
+                });
               }
               break; // abandon further sync until next attempt
             }
           } catch (err) {
-            console.error('Sync request failed', err);
+            // Network or other error
+            console.error('🔴 Sync request failed with exception:', {
+              message: err instanceof Error ? err.message : String(err),
+              name: err instanceof Error ? err.name : 'Unknown',
+              stack: err instanceof Error ? err.stack : undefined,
+            });
             break;
           }
         }
 
         const remaining = await SyncQueueDB.getUnsynced();
+        console.log(`Remaining items to sync: ${remaining.length}`);
         setPendingCount(remaining.length);
 
         // refresh caches after sync

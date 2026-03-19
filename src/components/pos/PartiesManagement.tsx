@@ -97,11 +97,18 @@ export function PartiesManagement() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Create timeout abortion controller for API calls
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout per request
+        
         const [customersResult, suppliersResult] = await Promise.allSettled([
-          fetch('/api/customers'),
-          fetch('/api/suppliers'),
+          fetch('/api/customers', { signal: controller.signal }),
+          fetch('/api/suppliers', { signal: controller.signal }),
         ]);
 
+        clearTimeout(timeoutId);
+
+        // Handle customers
         if (customersResult.status === 'fulfilled' && customersResult.value.ok) {
           try {
             const { data } = await customersResult.value.json();
@@ -111,21 +118,73 @@ export function PartiesManagement() {
           }
         } else if (customersResult.status === 'fulfilled') {
           console.error('Failed to fetch customers. Status:', customersResult.value.status);
+          // Fallback to IndexedDB
+          try {
+            const { CustomersDB } = await import('@/lib/offline/indexeddb');
+            const cachedCustomers = await CustomersDB.getAll();
+            if (cachedCustomers.length > 0) {
+              console.log(`✅ Using ${cachedCustomers.length} cached customers`);
+              setCustomers(cachedCustomers);
+            }
+          } catch (dbErr) {
+            console.error('Failed to load customers from cache:', dbErr);
+          }
         } else {
-          console.error('Customers API fetch failed:', customersResult.reason);
+          console.error('Customers API fetch failed:', customersResult.reason instanceof Error ? customersResult.reason.message : String(customersResult.reason));
+          // Fallback to IndexedDB
+          try {
+            const { CustomersDB } = await import('@/lib/offline/indexeddb');
+            const cachedCustomers = await CustomersDB.getAll();
+            if (cachedCustomers.length > 0) {
+              console.log(`✅ Using ${cachedCustomers.length} cached customers`);
+              setCustomers(cachedCustomers);
+            }
+          } catch (dbErr) {
+            console.error('Failed to load customers from cache:', dbErr);
+          }
         }
 
+        // Handle suppliers
         if (suppliersResult.status === 'fulfilled' && suppliersResult.value.ok) {
           try {
             const { data } = await suppliersResult.value.json();
             setSuppliers(data);
+            // Cache suppliers for offline use
+            try {
+              const { SuppliersDB } = await import('@/lib/offline/indexeddb');
+              await SuppliersDB.upsertMany(data);
+            } catch (cacheErr) {
+              console.error('Failed to cache suppliers:', cacheErr);
+            }
           } catch (parseErr) {
             console.error('Failed to parse suppliers response:', parseErr);
           }
         } else if (suppliersResult.status === 'fulfilled') {
           console.error('Failed to fetch suppliers. Status:', suppliersResult.value.status);
+          // Fallback to IndexedDB
+          try {
+            const { SuppliersDB } = await import('@/lib/offline/indexeddb');
+            const cachedSuppliers = await SuppliersDB.getAll();
+            if (cachedSuppliers.length > 0) {
+              console.log(`✅ Using ${cachedSuppliers.length} cached suppliers`);
+              setSuppliers(cachedSuppliers);
+            }
+          } catch (dbErr) {
+            console.error('Failed to load suppliers from cache:', dbErr);
+          }
         } else {
-          console.error('Suppliers API fetch failed:', suppliersResult.reason);
+          console.error('Suppliers API fetch failed:', suppliersResult.reason instanceof Error ? suppliersResult.reason.message : String(suppliersResult.reason));
+          // Fallback to IndexedDB
+          try {
+            const { SuppliersDB } = await import('@/lib/offline/indexeddb');
+            const cachedSuppliers = await SuppliersDB.getAll();
+            if (cachedSuppliers.length > 0) {
+              console.log(`✅ Using ${cachedSuppliers.length} cached suppliers`);
+              setSuppliers(cachedSuppliers);
+            }
+          } catch (dbErr) {
+            console.error('Failed to load suppliers from cache:', dbErr);
+          }
         }
       } catch (error) {
         console.error('Error fetching data:', error);

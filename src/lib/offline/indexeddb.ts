@@ -3,7 +3,7 @@
 // Lakhan Bhandar - Local Data Persistence
 // ============================================================================
 
-import type { Product, Cart, Sale, SyncQueueItem, Customer } from '@/types/pos';
+import type { Product, Cart, Sale, SyncQueueItem, Customer, Supplier } from '@/types/pos';
 
 const DB_NAME = 'lakhan-bhandar-pos';
 const DB_VERSION = 1;
@@ -15,6 +15,7 @@ const STORES = {
   SALES: 'sales',
   SYNC_QUEUE: 'sync_queue',
   CUSTOMERS: 'customers',
+  SUPPLIERS: 'suppliers',
   PENDING_SALES: 'pending_sales',
 } as const;
 
@@ -56,6 +57,13 @@ export async function initDatabase(): Promise<IDBDatabase> {
         const customerStore = db.createObjectStore(STORES.CUSTOMERS, { keyPath: 'id' });
         customerStore.createIndex('phone', 'phone', { unique: false });
         customerStore.createIndex('name', 'name', { unique: false });
+      }
+
+      // Suppliers store - for offline supplier lookup
+      if (!db.objectStoreNames.contains(STORES.SUPPLIERS)) {
+        const supplierStore = db.createObjectStore(STORES.SUPPLIERS, { keyPath: 'id' });
+        supplierStore.createIndex('phone', 'phone', { unique: false });
+        supplierStore.createIndex('name', 'name', { unique: false });
       }
 
       // Carts store - for pending carts (multiple carts possible)
@@ -265,6 +273,66 @@ export const CustomersDB = {
 
   async clear(): Promise<void> {
     return clearStore(STORES.CUSTOMERS);
+  },
+};
+
+// ============================================================================
+// SUPPLIERS OPERATIONS (Offline Supplier Lookup)
+// ============================================================================
+
+export const SuppliersDB = {
+  async getAll(): Promise<Supplier[]> {
+    return getAllFromStore<Supplier>(STORES.SUPPLIERS);
+  },
+
+  async getById(id: string): Promise<Supplier | undefined> {
+    return getFromStore<Supplier>(STORES.SUPPLIERS, id);
+  },
+
+  async getByPhone(phone: string): Promise<Supplier | undefined> {
+    const db = await initDatabase();
+    const transaction = db.transaction(STORES.SUPPLIERS, 'readonly');
+    const store = transaction.objectStore(STORES.SUPPLIERS);
+    const index = store.index('phone');
+
+    return new Promise((resolve, reject) => {
+      const request = index.get(phone);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  },
+
+  async searchByName(query: string): Promise<Supplier[]> {
+    const suppliers = await this.getAll();
+    const lowerQuery = query.toLowerCase();
+    return suppliers.filter(
+      (s) =>
+        s.name.toLowerCase().includes(lowerQuery) ||
+        s.phone?.includes(query)
+    );
+  },
+
+  async upsert(supplier: Supplier): Promise<void> {
+    await putToStore(STORES.SUPPLIERS, supplier);
+  },
+
+  async upsertMany(suppliers: Supplier[]): Promise<void> {
+    const db = await initDatabase();
+    const transaction = db.transaction(STORES.SUPPLIERS, 'readwrite');
+    const store = transaction.objectStore(STORES.SUPPLIERS);
+
+    for (const supplier of suppliers) {
+      store.put(supplier);
+    }
+
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  },
+
+  async clear(): Promise<void> {
+    return clearStore(STORES.SUPPLIERS);
   },
 };
 
