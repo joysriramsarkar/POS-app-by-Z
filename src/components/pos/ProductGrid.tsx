@@ -171,8 +171,9 @@ export function ProductGrid({
           setSearchQuery(barcode);
         }
         toast({
-          title: 'Unknown barcode',
-          description: 'No product found for this barcode.',
+          title: 'আইটেম পাওয়া যায়নি',
+          description: 'এই বারকোডের জন্য কোনো প্রোডাক্ট পাওয়া যায়নি।',
+          variant: 'destructive',
         });
       }
     },
