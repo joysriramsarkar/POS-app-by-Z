@@ -1,3 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
+
 /**
  * Generates a temporary, local invoice number for client-side use
  * Used for offline mode and temporary records before sync
@@ -14,28 +16,17 @@ export function generateInvoiceNumber(): string {
 }
 
 /**
- * Generates a unique, database-backed invoice number for server-side use
- * Uses sequential counter to guarantee uniqueness per day
+ * Generates a unique invoice number for server-side use
+ * Uses a UUID fragment to guarantee uniqueness
  * Should be called only from server-side routes/actions
- * @throws Error if database is unavailable
  */
 export async function generateServerInvoiceNumber(): Promise<string> {
-  // Lazy import db only when this server function is called
-  const { db } = await import('./db');
-  
   const date = new Date();
   const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
   
-  // Get today's sale count from database for sequential numbering
-  const todayStart = new Date(date);
-  todayStart.setHours(0, 0, 0, 0);
+  // Generate a UUID and take an 8-character fragment to ensure uniqueness
+  const uuidFragment = uuidv4().split('-')[0].toUpperCase();
   
-  const count = await db.sale.count({
-    where: {
-      createdAt: { gte: todayStart }
-    }
-  });
-  
-  // Use sequential counter: guarantees uniqueness per day
-  return `INV-${dateStr}-${String(count + 1).padStart(6, '0')}`;
+  // Use date and UUID fragment: INV-YYYYMMDD-[UUID_FRAGMENT]
+  return `INV-${dateStr}-${uuidFragment}`;
 }
