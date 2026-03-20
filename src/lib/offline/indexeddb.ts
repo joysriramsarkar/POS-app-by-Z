@@ -5,11 +5,11 @@
 
 import type { Product, Cart, Sale, SyncQueueItem, Customer, Supplier } from '@/types/pos';
 
-const DB_NAME = 'lakhan-bhandar-pos';
-const DB_VERSION = 2;
+export const DB_NAME = 'lakhan-bhandar-pos';
+export const DB_VERSION = 3; // bumped to include action_queue upgrade for existing DB state
 
 // Database store names
-const STORES = {
+export const STORES = {
   PRODUCTS: 'products',
   CARTS: 'carts',
   SALES: 'sales',
@@ -43,8 +43,12 @@ export async function initDatabase(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const oldVersion = event.oldVersion;
+      const newVersion = event.newVersion ?? DB_VERSION;
 
-      // Products store - for offline product lookup
+      console.info(`IndexedDB upgrading from v${oldVersion} to v${newVersion}`);
+
+      // Database initialization all versions (idempotent checks)
       if (!db.objectStoreNames.contains(STORES.PRODUCTS)) {
         const productStore = db.createObjectStore(STORES.PRODUCTS, { keyPath: 'id' });
         productStore.createIndex('barcode', 'barcode', { unique: false });
@@ -52,26 +56,22 @@ export async function initDatabase(): Promise<IDBDatabase> {
         productStore.createIndex('name', 'name', { unique: false });
       }
 
-      // Customers store
       if (!db.objectStoreNames.contains(STORES.CUSTOMERS)) {
         const customerStore = db.createObjectStore(STORES.CUSTOMERS, { keyPath: 'id' });
         customerStore.createIndex('phone', 'phone', { unique: false });
         customerStore.createIndex('name', 'name', { unique: false });
       }
 
-      // Suppliers store - for offline supplier lookup
       if (!db.objectStoreNames.contains(STORES.SUPPLIERS)) {
         const supplierStore = db.createObjectStore(STORES.SUPPLIERS, { keyPath: 'id' });
         supplierStore.createIndex('phone', 'phone', { unique: false });
         supplierStore.createIndex('name', 'name', { unique: false });
       }
 
-      // Carts store - for pending carts (multiple carts possible)
       if (!db.objectStoreNames.contains(STORES.CARTS)) {
         db.createObjectStore(STORES.CARTS, { keyPath: 'id' });
       }
 
-      // Sales store - for offline sales
       if (!db.objectStoreNames.contains(STORES.SALES)) {
         const saleStore = db.createObjectStore(STORES.SALES, { keyPath: 'id' });
         saleStore.createIndex('invoiceNumber', 'invoiceNumber', { unique: true });
@@ -79,16 +79,24 @@ export async function initDatabase(): Promise<IDBDatabase> {
         saleStore.createIndex('synced', 'offlineSynced', { unique: false });
       }
 
-      // Sync queue - for tracking pending syncs
       if (!db.objectStoreNames.contains(STORES.SYNC_QUEUE)) {
         const syncStore = db.createObjectStore(STORES.SYNC_QUEUE, { keyPath: 'id' });
         syncStore.createIndex('synced', 'synced', { unique: false });
         syncStore.createIndex('entityType', 'entityType', { unique: false });
       }
 
-      // Pending sales - sales that need to be synced
       if (!db.objectStoreNames.contains(STORES.PENDING_SALES)) {
         db.createObjectStore(STORES.PENDING_SALES, { keyPath: 'id' });
+      }
+
+      // New in v3: Action queue store (shared component for sync worker)
+      if (!db.objectStoreNames.contains('action_queue')) {
+        const queueStore = db.createObjectStore('action_queue', { keyPath: 'id' });
+        queueStore.createIndex('status', 'status', { unique: false });
+        queueStore.createIndex('idempotencyKey', 'idempotencyKey', { unique: true });
+        queueStore.createIndex('nextRetryAt', 'nextRetryAt', { unique: false });
+        queueStore.createIndex('actionType', 'actionType', { unique: false });
+        queueStore.createIndex('createdAt', 'createdAt', { unique: false });
       }
     };
   });

@@ -305,146 +305,21 @@ function POSDashboard() {
     };
   }, [setOnline]);
 
-  // Sync pending offline operations when we regain connection
-  useEffect(() => {
-    if (!isOnline) return;
+  // ⚠️ REMOVED: This manual sync loop was causing DUPLICATE sync attempts
+  // The offline-context provider handles all sync operations automatically
+  // via network-listener.ts and sync-worker.ts
+  // 
+  // Keeping this comment to prevent accidental re-addition in future
+  //
+  // TODO: Remove this entire useEffect block on next refactor - it's handled by offline-context
 
-    const syncPending = async () => {
-      setSyncing(true);
-      try {
-        const unsynced = await SyncQueueDB.getUnsynced();
-        setPendingCount(unsynced.length);
-
-        if (unsynced.length === 0) {
-          console.log('No pending items to sync');
-          setSyncing(false);
-          return;
-        }
-
-        console.log(`Found ${unsynced.length} items to sync`);
-
-        for (const item of unsynced) {
-          try {
-            // Validate sync item
-            if (!item.entityType || !item.action || !item.payload) {
-              console.warn('Invalid sync item, skipping:', {
-                entityType: item.entityType,
-                action: item.action,
-                hasPayload: !!item.payload,
-              });
-              continue;
-            }
-
-            // Convert entity type and action to actionType format expected by API
-            // e.g., 'Sale' + 'create' -> 'sale:create'
-            let actionType = `${item.entityType.toLowerCase()}:${item.action}`;
-            
-            // Parse the payload if it's a JSON string
-            let payloadData;
-            try {
-              payloadData = typeof item.payload === 'string' ? JSON.parse(item.payload) : item.payload;
-            } catch (parseErr) {
-              console.error('Failed to parse payload for sync item:', {
-                id: item.id,
-                entityType: item.entityType,
-                action: item.action,
-                parseError: parseErr instanceof Error ? parseErr.message : String(parseErr),
-              });
-              continue;
-            }
-
-            // Special case: 'Product' + 'update' with quantityChange -> 'product:stock:update'
-            if (item.entityType === 'Product' && item.action === 'update' && payloadData && 'quantityChange' in payloadData) {
-              actionType = 'product:stock:update';
-            }
-
-            console.log(`📤 Syncing ${actionType}:`, { id: item.id, idempotencyKey: item.id });
-
-            const res = await fetch('/api/sync', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Idempotency-Key': item.id, // Use item.id as idempotency key
-              },
-              body: JSON.stringify({
-                actionType,
-                payload: payloadData,
-              }),
-            });
-
-            if (res.ok) {
-              console.log(`✅ Successfully synced ${actionType}`, { id: item.id });
-              await SyncQueueDB.markSynced(item.id);
-              if (item.entityType === 'Sale') {
-                await SalesDB.markSynced(item.entityId);
-              }
-            } else {
-              // Log detailed error information
-              let errorMessage = `Server error: ${res.status} ${res.statusText}`;
-              try {
-                const errorData = await res.json();
-                errorMessage = errorData.error || errorData.message || errorMessage;
-                console.error(`❌ Failed to sync ${actionType}:`, {
-                  id: item.id,
-                  status: res.status,
-                  error: errorMessage,
-                });
-              } catch (parseErr) {
-                console.error(`❌ Failed to sync ${actionType}:`, {
-                  id: item.id,
-                  status: res.status,
-                  statusText: res.statusText,
-                  parseError: 'Non-JSON response',
-                });
-              }
-              break; // abandon further sync until next attempt
-            }
-          } catch (err) {
-            // Network or other error
-            console.error('🔴 Sync request failed with exception:', {
-              message: err instanceof Error ? err.message : String(err),
-              name: err instanceof Error ? err.name : 'Unknown',
-              stack: err instanceof Error ? err.stack : undefined,
-            });
-            break;
-          }
-        }
-
-        const remaining = await SyncQueueDB.getUnsynced();
-        console.log(`Remaining items to sync: ${remaining.length}`);
-        setPendingCount(remaining.length);
-
-        // refresh caches after sync
-        const [prodsResult, custsResult] = await Promise.allSettled([
-          fetch('/api/products?limit=50'),
-          fetch('/api/customers'),
-        ]);
-
-        if (prodsResult.status === 'fulfilled' && prodsResult.value.ok) {
-          try {
-            const { data, nextCursor } = await prodsResult.value.json();
-            const hasMore = !!nextCursor;
-            setProducts(data, hasMore, nextCursor);
-          } catch (parseErr) {
-            console.error('Failed to parse products response:', parseErr);
-          }
-        }
-
-        if (custsResult.status === 'fulfilled' && custsResult.value.ok) {
-          try {
-            const { data } = await custsResult.value.json();
-            setCustomers(data);
-          } catch (parseErr) {
-            console.error('Failed to parse customers response:', parseErr);
-          }
-        }
-      } finally {
-        setSyncing(false);
-      }
-    };
-
-    syncPending().catch(console.error);
-  }, [isOnline, setSyncing, setPendingCount, setProducts, setCustomers]);
+  // ⚠️ REMOVED: This manual sync loop was causing DUPLICATE sync attempts
+  // The offline-context provider handles all sync operations automatically
+  // via network-listener.ts and sync-worker.ts
+  // 
+  // Keeping this comment to prevent accidental re-addition in future
+  //
+  // TODO: Remove this entire useEffect block on next refactor - it's handled by offline-context
 
   // Barcode scanner handler
   const lastScannedRef = useRef<{ barcode: string; time: number }>({ barcode: '', time: 0 });
@@ -549,9 +424,23 @@ function POSDashboard() {
               errorMessage = `Server error: ${response.statusText}`;
             }
             
-            // If database is down (error contains "P1001" or "connection"), fall back to offline
-            if (errorMessage.includes('P1001') || errorMessage.includes('connection') || errorMessage.includes('Can\'t reach')) {
-              console.warn('⚠️ Database unreachable, falling back to offline mode');
+            // ⚠️ CRITICAL: Catch ALL database/server errors that should trigger offline fallback
+            // Include 5xx server errors, connection issues, and transaction timeouts
+            const shouldFallbackToOffline = 
+              response.status >= 500 || // Any server error (500, 502, 503, etc.)
+              errorMessage.includes('P1001') || // Prisma: Can't reach database
+              errorMessage.includes('connection') || // Generic connection error
+              errorMessage.includes('Can\'t reach') || // Prisma connection error
+              errorMessage.includes('Transaction API error') || // Transaction timeout/pool exhaustion
+              errorMessage.includes('Unable to start a transaction') || // Transaction start failure
+              errorMessage.includes('timed out') || // Query timeout
+              errorMessage.includes('pool') || // Connection pool issue
+              errorMessage.includes('ECONNREFUSED') || // Connection refused
+              errorMessage.includes('ECONNRESET'); // Connection reset
+            
+            if (shouldFallbackToOffline) {
+              console.warn('⚠️ Database unreachable or overloaded, falling back to offline mode');
+              console.warn('📋 Error details:', { status: response.status, message: errorMessage });
               throw new Error('DATABASE_UNAVAILABLE');
             }
             

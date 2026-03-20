@@ -152,17 +152,27 @@ export async function POST(request: NextRequest) {
           throw new Error(`Unknown action type: ${actionType}`);
       }
 
+      // Extract entity ID from payload or result if available
+      let entityId: string | undefined;
+      if (typeof payload === 'object' && payload !== null) {
+        entityId = (payload as any).id || (payload as any).customerId || (payload as any).productId;
+      }
+
+      // ⚠️ CRITICAL: Use upsert to handle idempotency correctly
+      // If same idempotencyKey appears twice, we update (don't create duplicate)
       await tx.syncQueue.upsert({
         where: { idempotencyKey },
         update: {
           synced: true,
           syncedAt: new Date(),
           result: JSON.stringify(operationResult),
+          entityId, // Update entity_id on retry
         },
         create: {
           id: uuidv4(),
           idempotencyKey,
           entityType: actionType,
+          entityId, // Set entity_id to track which entity this syncs
           action: 'sync',
           payload: JSON.stringify(payload),
           synced: true,

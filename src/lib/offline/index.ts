@@ -3,7 +3,6 @@
 // Lakhan Bhandar POS
 // ============================================================================
 
-export { ActionQueue, getActionQueue, type QueueAction, type ActionStatus, type ActionType } from './action-queue';
 export { OfflineSyncWorker, getSyncWorker, type SyncResult } from './sync-worker';
 export { NetworkStatusMonitor, getNetworkMonitor, type NetworkStatus } from './network-listener';
 export { isOnline } from './indexeddb';

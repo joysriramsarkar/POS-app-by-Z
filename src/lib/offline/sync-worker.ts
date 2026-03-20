@@ -3,8 +3,8 @@
 // Lakhan Bhandar POS - Autonomous Sync with Idempotency & Retry
 // ============================================================================
 
-import { getActionQueue, type QueueAction } from './action-queue';
-import type { Sale, Customer, Product } from '@/types/pos';
+import { SyncQueueDB } from './indexeddb';
+import type { SyncQueueItem } from '@/types/pos';
 
 export interface SyncResult {
   success: boolean;
@@ -14,15 +14,13 @@ export interface SyncResult {
 }
 
 /**
- * SYNC WORKER: Processes action queue in background
+ * SYNC WORKER: Processes offline sync items in background
  * - Runs on network reconnection
  * - Processes FIFO (oldest first)
- * - Each item must complete before next starts (no race conditions)
  * - Auto-retries with exponential backoff
  */
 export class OfflineSyncWorker {
   private isRunning = false;
-  private queue = getActionQueue();
 
   /**
    * START SYNC: Begin processing all pending actions
@@ -30,98 +28,116 @@ export class OfflineSyncWorker {
    */
   async startSync(): Promise<void> {
     if (this.isRunning) {
-      console.log('Sync already running, skipping duplicate call');
+      console.log('⏳ Sync already running, skipping duplicate call');
       return;
     }
 
     this.isRunning = true;
-    console.log('🔄 Starting offline sync worker...');
+    console.log('🚀 Starting offline sync worker...');
+
+    // Fire sync start event so UI can show loading state
+    this.notifyStart();
 
     try {
-      const queue = await this.queue;
       let successCount = 0;
       let failureCount = 0;
 
-      // FIFO processing: Get all pending actions
-      const pendingActions = await queue.getPendingActions();
-      console.log(`📋 Found ${pendingActions.length} actions to sync`);
+      // Get pending sync items from SyncQueueDB
+      const pendingItems = await SyncQueueDB.getUnsynced();
+      console.log(`📋 Found ${pendingItems.length} offline queued items to sync`);
 
-      for (const action of pendingActions) {
+      if (pendingItems.length === 0) {
+        console.log('✅ No items to sync');
+        this.notifyUI({ synced: 0, failed: 0, total: 0 });
+        return;
+      }
+
+      for (const item of pendingItems) {
         try {
-          // Mark as processing to prevent concurrent attempts
-          await queue.markProcessing(action.id);
-          console.log(`⏳ Processing ${action.actionType}: ${action.idempotencyKey}`);
-
-          // Send to server with idempotency key
-          const result = await this.syncAction(action);
-
-          if (result.success) {
-            await queue.markCompleted(action.id);
-            console.log(`✅ Synced ${action.actionType}: ${action.idempotencyKey}`);
-            successCount++;
-          } else {
-            // Server rejected our data (validation error, etc.)
-            await queue.markFailed(action.id, result.error || 'Unknown error');
-            console.error(`❌ Failed to sync ${action.actionType}: ${result.error}`);
-            failureCount++;
+          // Prepare sync action type mapping
+          const actionType = this.mapQueueItemToActionType(item);
+          if (!actionType) {
+            throw new Error(`Unsupported sync item: ${item.entityType}.${item.action}`);
           }
+
+          // Parse payload from stored string
+          const parsedPayload = JSON.parse(item.payload);
+
+          const response = await fetch('/api/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Idempotency-Key': item.id,
+            },
+            body: JSON.stringify({
+              idempotencyKey: item.id,
+              actionType,
+              payload: parsedPayload,
+            }),
+          });
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`HTTP ${response.status}: ${response.statusText} ${text}`);
+          }
+
+          const result = await response.json();
+          if (!result.success) {
+            throw new Error(result.error || 'Sync API returned failure');
+          }
+
+          await SyncQueueDB.markSynced(item.id);
+          successCount++;
+          console.log(`✅ Synced ${actionType}: queue item ${item.id}`);
         } catch (error) {
-          // Network error, transient failure, will retry later
           const errorMsg = error instanceof Error ? error.message : String(error);
-          await queue.markFailed(action.id, errorMsg);
-          console.error(`⚠️  Sync error for ${action.actionType}: ${errorMsg}`);
+          await SyncQueueDB.incrementRetry(item.id, errorMsg);
           failureCount++;
+          console.error(`❌ Failed to sync queue item ${item.id}: ${errorMsg}`);
         }
       }
 
-      console.log(
-        `🏁 Sync complete: ${successCount} succeeded, ${failureCount} failed/retrying`
-      );
-
-      // Notify UI of sync completion
-      this.notifyUI({
-        synced: successCount,
-        failed: failureCount,
-        total: pendingActions.length,
-      });
+      console.log(`🏁 Sync complete: ${successCount} succeeded, ${failureCount} failed/retrying`);
+      this.notifyUI({ synced: successCount, failed: failureCount, total: pendingItems.length });
     } finally {
       this.isRunning = false;
     }
   }
 
-  /**
-   * SYNC ACTION: Send single action to server with idempotency key
-   */
-  private async syncAction(action: QueueAction): Promise<SyncResult> {
-    const response = await fetch('/api/sync', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // CRITICAL: Pass idempotency key so server can detect duplicates
-        'X-Idempotency-Key': action.idempotencyKey,
-      },
-      body: JSON.stringify({
-        idempotencyKey: action.idempotencyKey,
-        actionType: action.actionType,
-        payload: action.payload,
-      }),
-    });
-
-    if (!response.ok) {
-      return {
-        success: false,
-        idempotencyKey: action.idempotencyKey,
-        error: `HTTP ${response.status}: ${response.statusText}`,
-      };
+  private mapQueueItemToActionType(item: SyncQueueItem): string | null {
+    if (item.entityType === 'Sale' && item.action === 'create') return 'sale:create';
+    if (item.entityType === 'Customer' && item.action === 'create') return 'customer:create';
+    if (item.entityType === 'Customer' && item.action === 'update') return 'customer:update';
+    if (item.entityType === 'Product' && item.action === 'create') return 'product:create';
+    if (item.entityType === 'Product' && item.action === 'update') {
+      const payload = JSON.parse(item.payload);
+      if (payload.quantityChange !== undefined) return 'product:stock:update';
+      return 'product:update';
     }
 
-    const result = await response.json();
-    return {
-      success: result.success === true,
-      idempotencyKey: action.idempotencyKey,
-      data: result.data,
-      error: result.error,
+    return null;
+  }
+
+  /**
+   * GET QUEUE STATS: Dashboard health view
+   */
+  async getStats() {
+    const allItems = await SyncQueueDB.getAll();
+    const stats = {
+      pending: allItems.filter((item) => !item.synced).length,
+      processed: allItems.filter((item) => item.synced).length,
+      failed: allItems.filter((item) => item.retryCount >= 5).length,
+      total: allItems.length,
     };
+    return stats;
+  }
+
+  /**
+   * NOTIFY START: Emit sync start event  
+   */
+  private notifyStart(): void {
+    const event = new CustomEvent('offlineSyncStart', { detail: {} });
+    window.dispatchEvent(event);
   }
 
   /**
@@ -142,13 +158,6 @@ export class OfflineSyncWorker {
     );
   }
 
-  /**
-   * GET QUEUE STATS: Dashboard health view
-   */
-  async getStats() {
-    const queue = await this.queue;
-    return queue.getStats();
-  }
 }
 
 // Singleton instance

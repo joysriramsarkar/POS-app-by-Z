@@ -12,9 +12,6 @@
     "db:seed": "prisma db seed",
     "lint": "eslint ."
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.0.1",
     "@capacitor/android": "^8.2.0",
