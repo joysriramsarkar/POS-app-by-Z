@@ -132,7 +132,7 @@ const Reports: React.FC = () => {
 
       {errorMessage && (
         <div className="shrink-0 bg-destructive/10 border-b border-destructive/30 p-4 flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
+          <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
           <div className="flex-1">
             <p className="text-sm font-medium text-destructive">{errorMessage}</p>
           </div>
@@ -213,8 +213,8 @@ const Reports: React.FC = () => {
                 <CardTitle>Sales Trend</CardTitle>
                 <CardDescription>Daily sales and profit for the last 30 days</CardDescription>
               </CardHeader>
-              <CardContent className="h-[400px]">
-                <div className="w-full h-full min-h-[350px]">
+              <CardContent className="h-100">
+                <div className="w-full h-full min-h-87.5">
                   {isLoading ? (
                     <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
                       <p className="text-muted-foreground">Loading chart data...</p>

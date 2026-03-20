@@ -1094,7 +1094,7 @@ function POSDashboard() {
   };
 
   return (
-    <div className="h-[100dvh] w-full overflow-hidden flex flex-col lg:flex-row bg-slate-100/50 dark:bg-background">
+    <div className="h-dvh w-full overflow-hidden flex flex-col lg:flex-row bg-slate-100/50 dark:bg-background">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-64 border-r border-border/50 bg-card shrink-0 no-print shadow-xs z-10 transition-all duration-300">
         {renderSidebar()}
