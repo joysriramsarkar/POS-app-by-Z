@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { OfflineProvider } from "@/lib/offline/offline-context";
 
 import { Noto_Sans_Bengali } from "next/font/google";
 
@@ -55,10 +56,12 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <SessionProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            {children}
-            <Toaster />
-          </ThemeProvider>
+          <OfflineProvider>
+            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </OfflineProvider>
         </SessionProvider>
       </body>
     </html>

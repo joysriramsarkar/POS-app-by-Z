@@ -373,7 +373,8 @@ export async function POST(request: NextRequest) {
 
       return newSale;
     }, {
-      timeout: 30000, // 30 second timeout for complex transaction
+      timeout: 60000, // 60 second timeout for complex transaction
+      maxWait: 10000, // Max wait time for acquiring connection
     });
 
     return NextResponse.json({

@@ -72,7 +72,7 @@ export class ActionQueue {
     if (this.db) return;
 
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open(this.dbName, 1);
+      const request = indexedDB.open(this.dbName, 2);
 
       request.onerror = () => reject(request.error);
       request.onsuccess = () => {

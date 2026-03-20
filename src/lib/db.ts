@@ -11,6 +11,7 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient(): PrismaClient {
   const client = new PrismaClient({
     log: ['query'],
+    errorFormat: 'pretty',
   })
 
   // Log successful connection to PostgreSQL
@@ -18,6 +19,13 @@ function createPrismaClient(): PrismaClient {
     console.log('[PrismaClient] Successfully connected to PostgreSQL (Supabase)')
   }).catch((error) => {
     console.error('[PrismaClient] Connection failed:', error)
+  })
+
+  // Auto-disconnect on process termination (fixes PgBouncer prepared statement conflicts on Vercel)
+  process.on('SIGTERM', async () => {
+    console.log('[PrismaClient] SIGTERM received, disconnecting...')
+    await client.$disconnect()
+    process.exit(0)
   })
 
   return client

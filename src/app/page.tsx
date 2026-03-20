@@ -23,6 +23,7 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useOfflineContext } from '@/lib/offline/offline-context';
 import {
   Wifi,
   WifiOff,
@@ -90,6 +91,14 @@ function POSDashboard() {
   const { data: session } = useSession();
   const userRole = (session?.user as { id?: string; role?: string; username?: string })?.role;
 
+  // Offline context - USE THIS INSTEAD OF SYNC STORE for isOnline
+  const { isOnline: isOnlineContext, networkStatus } = useOfflineContext();
+  const [isOnline, setIsOnline] = useState(isOnlineContext);
+
+  useEffect(() => {
+    setIsOnline(isOnlineContext);
+  }, [isOnlineContext]);
+
   // Settings store
   const { settings } = useSettingsStore();
   const storeName = settings?.store_name || STORE_CONFIG.name;
@@ -125,7 +134,7 @@ function POSDashboard() {
   const getTotal = useCartStore((state) => state.getTotal);
   const cartItems = useCartStore((state) => state.items);
 
-  const isOnline = useSyncStore((state) => state.isOnline);
+  // Removed isOnline from useSyncStore - now using useOfflineContext above
   const setOnline = useSyncStore((state) => state.setOnline);
   const isSyncing = useSyncStore((state) => state.isSyncing);
   const pendingCount = useSyncStore((state) => state.pendingCount);
@@ -539,6 +548,13 @@ function POSDashboard() {
               // If response is not JSON, use status text
               errorMessage = `Server error: ${response.statusText}`;
             }
+            
+            // If database is down (error contains "P1001" or "connection"), fall back to offline
+            if (errorMessage.includes('P1001') || errorMessage.includes('connection') || errorMessage.includes('Can\'t reach')) {
+              console.warn('⚠️ Database unreachable, falling back to offline mode');
+              throw new Error('DATABASE_UNAVAILABLE');
+            }
+            
             throw new Error(errorMessage);
           }
 
@@ -571,6 +587,12 @@ function POSDashboard() {
           }
         } catch (fetchError) {
           if (fetchError instanceof Error) {
+            // If database is unavailable, also fallback to offline
+            if (fetchError.message === 'DATABASE_UNAVAILABLE') {
+              console.warn('⚠️ Falling back to offline mode due to database unavailability');
+              // Treat as offline, continue to offline block below
+              throw new Error('FALL_BACK_TO_OFFLINE');
+            }
             console.error('Fetch error:', fetchError.message);
             throw fetchError;
           } else {
@@ -646,6 +668,98 @@ function POSDashboard() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unable to complete sale';
+      
+      // If DATABASE_UNAVAILABLE or FALL_BACK_TO_OFFLINE, switch to offline mode
+      if (errorMessage === 'DATABASE_UNAVAILABLE' || errorMessage === 'FALL_BACK_TO_OFFLINE') {
+        // Re-run the offline flow
+        try {
+          setIsOnline(false);
+          // Retry the offline logic
+          const salePayload = {
+            items: cartItems.map(item => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+            })),
+            customerId: paymentData.customerId,
+            paymentMethod: paymentData.paymentMethod,
+            amountPaid: paymentData.amountPaid,
+            discount: paymentData.discount,
+            tax: paymentData.tax,
+            usePrepaid: paymentData.usePrepaid,
+            prepaidAmountUsed: paymentData.prepaidAmountUsed,
+          };
+          
+          let paymentStatus = 'Paid';
+          if (paymentData.amountPaid === 0) paymentStatus = 'Due';
+          else if (paymentData.amountPaid > 0 && paymentData.amountPaid < paymentData.total) paymentStatus = 'Partial';
+
+          const sale: Sale = {
+            id: uuidv4(),
+            invoiceNumber: generateInvoiceNumber(),
+            customerId: paymentData.customerId,
+            userId: (session?.user as { id?: string })?.id,
+            subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
+            discount: paymentData.discount,
+            tax: paymentData.tax,
+            totalAmount: paymentData.total,
+            amountPaid: paymentData.amountPaid,
+            paymentMethod: paymentData.paymentMethod,
+            paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
+            status: 'Completed',
+            notes: undefined,
+            offlineSynced: false,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            items: cartItems.map(item => ({
+              id: uuidv4(),
+              saleId: '',
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              createdAt: new Date(),
+            })),
+          } as Sale;
+
+          await SalesDB.save(sale);
+          await SyncQueueDB.add({
+            id: uuidv4(),
+            entityType: 'Sale',
+            entityId: sale.id,
+            action: 'create',
+            payload: JSON.stringify(sale),
+            synced: false,
+            retryCount: 0,
+            createdAt: new Date(),
+          });
+
+          cartItems.forEach((item) => {
+            updateProductStock(item.productId, -item.quantity);
+            ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
+          });
+
+          if (paymentData.customerId) {
+            const dueAmount = paymentData.total - paymentData.amountPaid;
+            if (dueAmount > 0) {
+              updateCustomerDue(paymentData.customerId, dueAmount);
+              CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
+            }
+          }
+
+          setCurrentSale(sale);
+          setCompletedCheckoutSale(sale);
+          clearCart();
+          toast({ title: 'Database offline', description: 'Sale saved locally. Will sync when connection restored.' });
+          return;
+        } catch (offlineError) {
+          console.error('Offline fallback failed:', offlineError);
+        }
+      }
+      
       console.error('Checkout failed:', {
         error: error,
         message: errorMessage,
