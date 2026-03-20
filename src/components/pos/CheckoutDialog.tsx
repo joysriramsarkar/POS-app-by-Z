@@ -178,7 +178,7 @@ export function CheckoutDialog({
       setOpen(open);
       if (!open) setCheckoutOpen(false);
     },
-    [getInitialAmount, setOpen, setCheckoutOpen]
+    [getInitialAmount, setOpen, setCheckoutOpen, paymentMethod]
   );
 
   const handleClose = useCallback(() => {
@@ -385,7 +385,7 @@ export function CheckoutDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px] w-[95vw] max-h-[90dvh] flex flex-col p-4 md:p-6">
+      <DialogContent className="sm:max-w-106.25 w-[95vw] max-h-[90dvh] flex flex-col p-4 md:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="w-5 h-5" />
@@ -393,7 +393,8 @@ export function CheckoutDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4">
+        <ScrollArea className="flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-4 pr-4">
           {customer && (
             <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded-lg">
               <Badge variant="secondary">{customer.name}</Badge>
@@ -530,6 +531,7 @@ export function CheckoutDialog({
             </div>
           )}
         </div>
+        </ScrollArea>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isProcessing}>Cancel</Button>

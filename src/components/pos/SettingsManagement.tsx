@@ -68,6 +68,40 @@ export default function SettingsManagement() {
     }
   };
 
+  // Change detection helpers for each section
+  const hasProfileChanges = (): boolean => {
+    return localSettings.store_name !== settings.store_name ||
+           localSettings.store_name_bn !== settings.store_name_bn ||
+           localSettings.store_address !== settings.store_address ||
+           localSettings.store_phone !== settings.store_phone ||
+           localSettings.store_gst !== settings.store_gst;
+  };
+
+  const hasPrinterChanges = (): boolean => {
+    return localSettings.print_paper_size !== settings.print_paper_size ||
+           localSettings.print_font_size !== settings.print_font_size ||
+           localSettings.print_header !== settings.print_header ||
+           localSettings.print_footer !== settings.print_footer ||
+           localSettings.auto_print !== settings.auto_print;
+  };
+
+  const hasThemeChanges = (): boolean => {
+    return localSettings.theme_mode !== settings.theme_mode ||
+           localSettings.primary_color !== settings.primary_color;
+  };
+
+  const hasLanguageChanges = (): boolean => {
+    return localSettings.app_language !== settings.app_language ||
+           localSettings.receipt_language !== settings.receipt_language;
+  };
+
+  const hasBillingChanges = (): boolean => {
+    return localSettings.default_discount !== settings.default_discount ||
+           localSettings.tax_rate !== settings.tax_rate ||
+           localSettings.currency_symbol !== settings.currency_symbol ||
+           localSettings.round_off !== settings.round_off;
+  };
+
   // ---------------------------------------------------------------------------
   // Backup & Restore Logic
   // ---------------------------------------------------------------------------
@@ -264,7 +298,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["store_name", "store_name_bn", "store_address", "store_phone", "store_gst"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                      <Button onClick={() => handleSave(["store_name", "store_name_bn", "store_address", "store_phone", "store_gst"])} disabled={isSaving || !hasProfileChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -353,7 +387,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["print_paper_size", "print_font_size", "print_header", "print_footer", "auto_print"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                      <Button onClick={() => handleSave(["print_paper_size", "print_font_size", "print_header", "print_footer", "auto_print"])} disabled={isSaving || !hasPrinterChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -461,7 +495,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["theme_mode", "primary_color"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                      <Button onClick={() => handleSave(["theme_mode", "primary_color"])} disabled={isSaving || !hasThemeChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -572,7 +606,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["app_language", "receipt_language"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                      <Button onClick={() => handleSave(["app_language", "receipt_language"])} disabled={isSaving || !hasLanguageChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>
@@ -631,7 +665,7 @@ export default function SettingsManagement() {
                     </div>
 
                     <div className="pt-4 flex justify-end">
-                      <Button onClick={() => handleSave(["default_discount", "tax_rate", "currency_symbol", "round_off"])} disabled={isSaving} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+                      <Button onClick={() => handleSave(["default_discount", "tax_rate", "currency_symbol", "round_off"])} disabled={isSaving || !hasBillingChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
                         {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         সংরক্ষণ করুন (Save)
                       </Button>

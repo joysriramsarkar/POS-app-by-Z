@@ -150,9 +150,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             }
           });
 
-          // Prefer global due from stats if available, otherwise use computed dueTotal
-          const preferDue = (stats && (stats.duePayments || stats.duePayments === 0)) ? stats.duePayments : dueTotal;
-          setBreakdown({ upi: upiTotal, cash: cashTotal, due: preferDue });
+          // Use only today's due amount from sales calculation
+          setBreakdown({ upi: upiTotal, cash: cashTotal, due: dueTotal });
         }
       } catch (err) {
         console.error('Failed to compute payment breakdown:', err);

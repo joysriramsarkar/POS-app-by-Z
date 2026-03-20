@@ -15,6 +15,7 @@ import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDi
 import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDialog';
 import { PartiesManagement } from '@/components/pos/PartiesManagement';
 import { UsersManagement } from '@/components/pos/UsersManagement';
+import { TransactionHistory } from '@/components/pos/TransactionHistory';
 import { Reports } from '@/components/pos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +39,7 @@ import {
   X,
   ScanLine,
   UserCog,
+  History,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
@@ -57,7 +59,7 @@ import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
-type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'settings' | 'users';
+type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'transactions' | 'settings' | 'users';
 
 const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -65,6 +67,7 @@ const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
   { id: 'stock', label: 'Stock / Items', icon: <Package className="w-5 h-5" /> },
   { id: 'parties', label: 'Parties', icon: <Users className="w-5 h-5" /> },
   { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
+  { id: 'transactions', label: 'Transactions', icon: <History className="w-5 h-5" /> },
   { id: 'users', label: 'Users', icon: <UserCog className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
@@ -585,6 +588,7 @@ function POSDashboard() {
           id: uuidv4(),
           invoiceNumber: generateInvoiceNumber(),
           customerId: paymentData.customerId,
+          userId: (session?.user as { id?: string })?.id, // Track which user created this sale
           subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
           discount: paymentData.discount,
           tax: paymentData.tax,
@@ -1075,6 +1079,8 @@ function POSDashboard() {
         return <PartiesManagement />;
       case 'reports':
         return <Reports />;
+      case 'transactions':
+        return <TransactionHistory />;
       case 'users':
         return <UsersManagement />;
       case 'settings':

@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         include: {
           items: true,
           customer: true,
+          user: true,
         },
       });
 
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
         include: {
           items: true,
           customer: true,
+          user: true,
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * limit,
@@ -169,67 +171,79 @@ export async function POST(request: NextRequest) {
 
     // Generate invoice number (now async, must be done before transaction)
     const invoiceNumber = await generateServerInvoiceNumber();
+    
+    // Get current user ID from session
+    const userId = (session?.user as { id?: string })?.id || null;
 
-    // Create sale with items in transaction
+    // Create sale with items in transaction (30 second timeout for complex operations)
     const sale = await db.$transaction(async (tx) => {
       // Create sale with proper Prisma syntax
-      const newSale = await tx.sale.create({
-        data: {
-          invoiceNumber,
-          subtotal,
-          discount: discountAmount,
-          tax: taxAmount,
-          totalAmount,
-          amountPaid: amountPaidValue,
-          paymentMethod: paymentMethod || 'Cash',
-          paymentStatus,
-          status: 'Completed',
-          notes: notes || null,
-          offlineSynced: true,
-          items: {
-            create: validatedItems.map((item) => ({
-              productId: item.productId,
-              productName: item.productName,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-            })),
-          },
-          ...(customerId && {
-            customer: {
-              connect: { id: customerId },
-            },
-          }),
+      const saleCreateData: any = {
+        invoiceNumber,
+        subtotal,
+        discount: discountAmount,
+        tax: taxAmount,
+        totalAmount,
+        amountPaid: amountPaidValue,
+        paymentMethod: paymentMethod || 'Cash',
+        paymentStatus,
+        status: 'Completed',
+        notes: notes || null,
+        offlineSynced: true,
+        items: {
+          create: validatedItems.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
         },
+      };
+
+      if (customerId) {
+        saleCreateData.customer = {
+          connect: { id: customerId },
+        };
+      }
+
+      if (userId) {
+        saleCreateData.user = {
+          connect: { id: userId },
+        };
+      }
+
+      const newSale = await tx.sale.create({
+        data: saleCreateData,
         include: {
           items: true,
           customer: true,
+          user: true,
         },
       });
 
       // Validate and update stock for each item BEFORE using customer data
-      // First pass: validate all stock is available using raw SQL to ensure atomicity
-      const stockCheckResults = await Promise.all(
-        validatedItems.map(item =>
-          tx.$queryRaw`
-            SELECT id, "current_stock" as currentStock, name 
-            FROM products 
-            WHERE id = ${item.productId} AND "current_stock" >= ${item.quantity}
-          ` as Promise<Array<{ id: string; currentStock: number; name: string }>>
-        )
-      );
+      // Check all items in a single batch query for better performance
+      const productIds = validatedItems.map(item => item.productId);
+      const productsInDb = await tx.product.findMany({
+        where: {
+          id: { in: productIds },
+        },
+        select: {
+          id: true,
+          name: true,
+          currentStock: true,
+        },
+      });
 
-      // Check if all items passed stock validation
-      for (let i = 0; i < validatedItems.length; i++) {
-        const item = validatedItems[i];
-        const result = stockCheckResults[i];
-        if (!result || result.length === 0) {
-          const product = await tx.product.findUnique({
-            where: { id: item.productId },
-          });
-          if (!product) {
-            throw new Error(`Product ${item.productId} not found`);
-          }
+      // Verify all products exist and have sufficient stock
+      const productMap = new Map(productsInDb.map(p => [p.id, p]));
+      for (const item of validatedItems) {
+        const product = productMap.get(item.productId);
+        if (!product) {
+          throw new Error(`Product ${item.productId} not found`);
+        }
+        if (product.currentStock < item.quantity) {
           throw new Error(`Insufficient stock for product ${product.name}. Available: ${product.currentStock}, Requested: ${item.quantity}`);
         }
       }
@@ -358,6 +372,8 @@ export async function POST(request: NextRequest) {
       }
 
       return newSale;
+    }, {
+      timeout: 30000, // 30 second timeout for complex transaction
     });
 
     return NextResponse.json({

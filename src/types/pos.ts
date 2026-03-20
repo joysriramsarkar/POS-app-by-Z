@@ -71,6 +71,7 @@ export interface Sale {
   id: string;
   invoiceNumber: string;
   customerId?: string;
+  userId?: string; // Track which user created this sale
   subtotal: number;
   discount: number;
   tax: number;
@@ -84,6 +85,7 @@ export interface Sale {
   createdAt: Date;
   updatedAt: Date;
   customer?: Customer;
+  user?: { id: string; name: string; username: string };
   items: SaleItem[];
 }
 

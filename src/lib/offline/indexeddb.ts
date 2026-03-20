@@ -6,7 +6,7 @@
 import type { Product, Cart, Sale, SyncQueueItem, Customer, Supplier } from '@/types/pos';
 
 const DB_NAME = 'lakhan-bhandar-pos';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // Database store names
 const STORES = {
@@ -100,6 +100,16 @@ export async function initDatabase(): Promise<IDBDatabase> {
 
 async function getStore(storeName: string, mode: IDBTransactionMode = 'readonly'): Promise<IDBObjectStore> {
   const db = await initDatabase();
+  
+  // Check if object store exists, if not throw helpful error
+  if (!db.objectStoreNames.contains(storeName)) {
+    throw new Error(
+      `Object store "${storeName}" not found in IndexedDB. ` +
+      `Available stores: ${Array.from(db.objectStoreNames).join(', ')}. ` +
+      `This typically means the database needs to be upgraded. Please refresh the page.`
+    );
+  }
+  
   const transaction = db.transaction(storeName, mode);
   return transaction.objectStore(storeName);
 }

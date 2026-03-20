@@ -19,6 +19,7 @@ export { UsersManagement } from './UsersManagement';
 export type { User as UserType } from './UsersManagement';
 export { AddUserDialog } from './AddUserDialog';
 export { default as SettingsManagement } from './SettingsManagement';
+export { TransactionHistory } from './TransactionHistory';
 
 // Print Components
 export { PrintInvoice, InvoicePreview } from './PrintInvoice';
