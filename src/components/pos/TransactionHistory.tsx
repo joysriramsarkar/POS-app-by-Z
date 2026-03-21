@@ -193,10 +193,10 @@ export function TransactionHistory() {
       </div>
 
       <Card className="bg-muted/30 shrink-0">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Search Invoice</label>
+        <CardContent className="pt-4">
+          <div className="flex flex-nowrap items-end gap-2 overflow-x-auto pb-2">
+            <div className="min-w-42.5 shrink-0 space-y-1">
+              <label className="text-xs md:text-sm font-medium">Search Invoice</label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -206,20 +206,17 @@ export function TransactionHistory() {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="pl-8"
+                  className="pl-8 h-8 md:h-9 text-xs md:text-sm"
                 />
               </div>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Transaction Status</label>
+            <div className="min-w-37.5 shrink-0 space-y-1">
+              <label className="text-xs md:text-sm font-medium">Transaction Status</label>
               <Select value={filterStatus} onValueChange={(value: string) => {
                 setFilterStatus(value);
                 setCurrentPage(1);
               }}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm" />
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="Completed">Completed</SelectItem>
@@ -229,15 +226,13 @@ export function TransactionHistory() {
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Payment Method</label>
+            <div className="min-w-37.5 shrink-0 space-y-1">
+              <label className="text-xs md:text-sm font-medium">Payment Method</label>
               <Select value={filterPaymentMethod} onValueChange={(value: string) => {
                 setFilterPaymentMethod(value);
                 setCurrentPage(1);
               }}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger className="h-8 md:h-9 text-xs md:text-sm" />
                 <SelectContent>
                   <SelectItem value="all">All Methods</SelectItem>
                   <SelectItem value="Cash">Cash</SelectItem>
@@ -249,7 +244,7 @@ export function TransactionHistory() {
               </Select>
             </div>
 
-            <div className="flex items-end">
+            <div className="min-w-30 shrink-0">
               <Button
                 variant="outline"
                 onClick={() => {
@@ -258,17 +253,17 @@ export function TransactionHistory() {
                   setFilterPaymentMethod('all');
                   setCurrentPage(1);
                 }}
-                className="w-full gap-2"
+                className="h-8 md:h-9 w-full gap-2 text-xs md:text-sm"
               >
                 <Filter className="w-4 h-4" />
-                Reset Filters
+                Reset
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
+      <Card className="flex-1 flex flex-col min-h-[65vh] md:min-h-0 overflow-hidden">
         <CardHeader className="border-b shrink-0">
           <CardTitle>Transactions</CardTitle>
           <CardDescription>
@@ -286,46 +281,47 @@ export function TransactionHistory() {
             </div>
           ) : (
             <ScrollArea className="flex-1 w-full h-full">
-              <div className="min-w-max">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background">
-                    <TableRow className="hover:bg-transparent border-b">
-                      <TableHead className="w-32">Invoice</TableHead>
-                      <TableHead className="w-32">Date & Time</TableHead>
-                      <TableHead className="w-40">Customer</TableHead>
-                      <TableHead className="w-32">User</TableHead>
-                      <TableHead className="w-24 text-right">Amount</TableHead>
-                      <TableHead className="w-24 text-right">Paid</TableHead>
-                      <TableHead className="w-28">Payment</TableHead>
-                      <TableHead className="w-24">Status</TableHead>
-                      <TableHead className="w-16 text-center">Actions</TableHead>
+              <div className="w-full overflow-x-auto">
+                <div className="min-w-max">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-background">
+                      <TableRow className="hover:bg-transparent border-b min-h-10 md:min-h-12">
+                      <TableHead className="w-32 text-xs md:text-sm py-1 md:py-2">Invoice</TableHead>
+                      <TableHead className="w-32 text-xs md:text-sm py-1 md:py-2">Date & Time</TableHead>
+                      <TableHead className="w-40 text-xs md:text-sm py-1 md:py-2">Customer</TableHead>
+                      <TableHead className="w-32 text-xs md:text-sm py-1 md:py-2">User</TableHead>
+                      <TableHead className="w-24 text-right text-xs md:text-sm py-1 md:py-2">Amount</TableHead>
+                      <TableHead className="w-24 text-right text-xs md:text-sm py-1 md:py-2">Paid</TableHead>
+                      <TableHead className="w-28 text-xs md:text-sm py-1 md:py-2">Payment</TableHead>
+                      <TableHead className="w-24 text-xs md:text-sm py-1 md:py-2">Status</TableHead>
+                      <TableHead className="w-16 text-center text-xs md:text-sm py-1 md:py-2">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {transactions.map((transaction: Transaction) => (
-                      <TableRow key={transaction.id} className="hover:bg-muted/50">
-                        <TableCell className="font-mono font-semibold">
+                      <TableRow key={transaction.id} className="hover:bg-muted/50 min-h-10 md:min-h-12">
+                        <TableCell className="font-mono font-semibold text-xs md:text-sm py-1 md:py-2">
                           {transaction.invoiceNumber}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-xs md:text-sm py-1 md:py-2">
                           <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-muted-foreground" />
                             {format(transaction.createdAt, 'dd MMM yyyy HH:mm')}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-xs md:text-sm py-1 md:py-2">
                           {transaction.customer ? (
                             <div className="space-y-0.5">
-                              <p className="font-medium text-sm">{transaction.customer.name}</p>
+                              <p className="font-medium text-xs md:text-sm">{transaction.customer.name}</p>
                               {transaction.customer.phone && (
                                 <p className="text-xs text-muted-foreground">{transaction.customer.phone}</p>
                               )}
                             </div>
                           ) : (
-                            <p className="text-sm text-muted-foreground">Walk-in Customer</p>
+                            <p className="text-xs md:text-sm text-muted-foreground">Walk-in Customer</p>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-xs md:text-sm py-1 md:py-2">
                           {transaction.user ? (
                             <div className="flex items-center gap-2">
                               <User className="w-4 h-4 text-muted-foreground" />
@@ -335,19 +331,19 @@ export function TransactionHistory() {
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-semibold">
+                        <TableCell className="text-right font-semibold text-xs md:text-sm py-1 md:py-2">
                           {formatPrice(transaction.totalAmount)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right text-xs md:text-sm py-1 md:py-2">
                           {formatPrice(transaction.amountPaid)}
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
+                        <TableCell className="text-xs md:text-sm py-1 md:py-2">
+                          <Badge variant="outline" className="text-xs md:text-sm">
                             {transaction.paymentMethod}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="space-y-2">
+                        <TableCell className="py-1 md:py-2">
+                          <div className="space-y-1 md:space-y-2">
                             <Badge className={getStatusColor(transaction.status)}>
                               {transaction.status}
                             </Badge>
@@ -383,6 +379,7 @@ export function TransactionHistory() {
                   </TableBody>
                 </Table>
               </div>
+            </div>
             </ScrollArea>
           )}
         </CardContent>

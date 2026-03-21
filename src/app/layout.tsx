@@ -41,7 +41,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#1a1a1a",
+  viewportFit: "cover",  // ← নতুন: নচ সহ ফুল স্ক্রিন
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },  // ← নতুন
+    { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },   // ← নতুন
+  ],
 };
 
 export default function RootLayout({

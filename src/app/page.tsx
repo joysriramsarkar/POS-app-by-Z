@@ -73,6 +73,15 @@ const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
 
+// নতুন মোবাইল বটম নেভিগেশন আইটেম যোগ
+const mobileBottomNavItems: { id: PageType | 'scan'; label: string; icon: React.ReactNode }[] = [
+  { id: 'dashboard', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
+  { id: 'billing', label: 'Bill', icon: <ShoppingCart className="w-5 h-5" /> },
+  { id: 'scan', label: 'Scan', icon: <ScanLine className="w-5 h-5" /> },  // ← প্রমিনেন্ট স্ক্যান বাটন
+  { id: 'stock', label: 'Stock', icon: <Package className="w-5 h-5" /> },
+  { id: 'parties', label: 'Parties', icon: <Users className="w-5 h-5" /> },
+];
+
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
