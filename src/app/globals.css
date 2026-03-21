@@ -157,6 +157,8 @@
     bottom: 0 !important;
     top: auto !important;
     border-radius: 1rem 1rem 0 0;
+    max-height: calc(100dvh - env(safe-area-inset-bottom) - 16px) !important;
+    z-index: 100 !important;
   }
 }
 @import "tw-animate-css";
@@ -278,6 +280,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    overflow: hidden; /* Lock body scroll */
+    overscroll-behavior-y: none; /* Prevent iOS rubber-banding */
+    overscroll-behavior-x: none;
   }
 }
 

@@ -459,10 +459,10 @@ function CompactProductCard({ product, onSelect }: CompactProductCardProps) {
       disabled={isOutOfStock}
       className={cn(
         'flex flex-col items-center justify-center p-2.5 rounded-xl border border-border/50 bg-card text-center shadow-xs',
-        'hover:bg-primary/5 hover:border-primary/20 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200',
+        'lg:hover:bg-primary/5 lg:hover:border-primary/20 lg:hover:shadow-md lg:hover:-translate-y-0.5 transition-all duration-200',
         'focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1',
         'touch-manipulation min-h-[90px]',
-        isOutOfStock && 'opacity-50 grayscale cursor-not-allowed hover:bg-card hover:border-border/50 hover:shadow-xs hover:translate-y-0'
+        isOutOfStock && 'opacity-50 grayscale cursor-not-allowed lg:hover:bg-card lg:hover:border-border/50 lg:hover:shadow-xs lg:hover:translate-y-0'
       )}
       aria-label={`${product.name}, ${formatPrice(product.sellingPrice)}`}
     >

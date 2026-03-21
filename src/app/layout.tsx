@@ -42,6 +42,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",  // ← নতুন: নচ সহ ফুল স্ক্রিন
+  interactiveWidget: "resizes-content", // Prevent virtual keyboard from overlaying fixed elements
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },  // ← নতুন
     { media: "(prefers-color-scheme: dark)", color: "#1a1a1a" },   // ← নতুন
