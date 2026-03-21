@@ -45,7 +45,7 @@ export function ProductCard({ product }: ProductCardProps) {
       <Card
         className={cn(
           'group relative overflow-hidden transition-all duration-300 cursor-pointer rounded-xl border-border/50',
-          'hover:shadow-xl hover:-translate-y-1 active:scale-[0.98]',
+          'lg:hover:shadow-xl lg:hover:-translate-y-1 active:scale-[0.98]',
           'focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           isOutOfStock && 'opacity-60 grayscale cursor-not-allowed'
         )}
@@ -76,7 +76,7 @@ export function ProductCard({ product }: ProductCardProps) {
         <CardContent className={cn('p-3', isLowStock && !isOutOfStock && 'pt-7')}>
           <div className="flex flex-col gap-2">
             {/* Product Image or Placeholder */}
-            <div className="aspect-square rounded-lg bg-muted/50 flex items-center justify-center overflow-hidden relative group-hover:bg-muted transition-colors">
+            <div className="aspect-square rounded-lg bg-muted/50 flex items-center justify-center overflow-hidden relative lg:group-hover:bg-muted transition-colors">
               {product.imageUrl ? (
                 <img
                   src={product.imageUrl}
@@ -93,7 +93,7 @@ export function ProductCard({ product }: ProductCardProps) {
               <div className="flex items-start justify-between gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <h3 className="font-medium text-sm line-clamp-2 leading-tight group-hover:text-primary transition-colors">
+                    <h3 className="font-medium text-sm line-clamp-2 leading-tight lg:group-hover:text-primary transition-colors">
                       {product.name}
                     </h3>
                   </TooltipTrigger>
@@ -105,7 +105,7 @@ export function ProductCard({ product }: ProductCardProps) {
               </div>
 
               {/* Category Badge */}
-              <Badge variant="secondary" className="text-[10px] px-2 py-0 h-4 bg-secondary/50 hover:bg-secondary">
+              <Badge variant="secondary" className="text-[10px] px-2 py-0 h-4 bg-secondary/50 lg:hover:bg-secondary">
                 {product.category}
               </Badge>
 
@@ -134,7 +134,7 @@ export function ProductCard({ product }: ProductCardProps) {
               className={cn(
                 "w-full mt-2 transition-all duration-300 touch-manipulation shadow-xs",
                 "sm:opacity-0 sm:-translate-y-2 sm:group-hover:opacity-100 sm:group-hover:translate-y-0",
-                "opacity-100 translate-y-0 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground"
+                "opacity-100 translate-y-0 bg-primary/10 text-primary lg:hover:bg-primary lg:hover:text-primary-foreground"
               )}
               disabled={isOutOfStock}
               onClick={(e) => {

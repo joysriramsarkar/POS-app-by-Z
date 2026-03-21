@@ -385,7 +385,7 @@ export function CheckoutDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-106.25 w-[95vw] max-h-[90dvh] flex flex-col p-4 md:p-6">
+      <DialogContent className="sm:max-w-106.25 w-[95vw] max-h-[90dvh] flex flex-col p-4 md:p-6 dialog-mobile">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="w-5 h-5" />

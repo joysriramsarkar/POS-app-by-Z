@@ -285,7 +285,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
       </div>
 
       {/* Cart Items - Mobile: flex-1 overflow-y-auto, Desktop: normal */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-2 sm:pb-0">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-32 sm:pb-0">
         <div className="p-1.5 md:p-3 space-y-1.5 md:space-y-2">
           {isCartEmpty ? (
             <div className="flex flex-col items-center justify-center py-8 md:py-12 text-center">

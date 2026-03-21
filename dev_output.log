@@ -1,0 +1,57 @@
+
+> nextjs_tailwind_shadcn_ts@0.2.0 dev
+> next dev -p 3000
+
+▲ Next.js 16.1.7 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+
+✓ Starting...
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+✓ Ready in 1534ms
+ GET /login?callbackUrl=%2F 200 in 3.3s (compile: 3.0s, render: 244ms)
+[PrismaClient] ❌ Connection failed: Error [PrismaClientInitializationError]: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   |
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   |
+
+Validation Error Count: 1
+    at <unknown> (-->  schema.prisma:10) {
+  clientVersion: '6.19.2',
+  errorCode: 'P1012',
+  retryable: undefined
+}
+[next-auth][warn][NEXTAUTH_URL]
+https://next-auth.js.org/warnings#nextauth_url
+ GET /api/auth/session 200 in 2.3s (compile: 2.3s, render: 51ms)
+ GET /api/auth/providers 200 in 151ms (compile: 95ms, render: 56ms)
+ GET /api/auth/csrf 200 in 46ms (compile: 28ms, render: 17ms)
+ POST /api/auth/callback/credentials 401 in 45ms (compile: 4ms, render: 41ms)
+[PrismaClient] ❌ Connection failed: Error [PrismaClientInitializationError]: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   |
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   |
+
+Validation Error Count: 1
+    at <unknown> (-->  schema.prisma:10) {
+  clientVersion: '6.19.2',
+  errorCode: 'P1012',
+  retryable: undefined
+}
+[PrismaClient] ❌ Connection failed: Error [PrismaClientInitializationError]: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
+  -->  schema.prisma:10
+   |
+ 9 |   provider  = "postgresql"
+10 |   url       = env("DATABASE_URL")
+   |
+
+Validation Error Count: 1
+    at <unknown> (-->  schema.prisma:10) {
+  clientVersion: '6.19.2',
+  errorCode: 'P1012',
+  retryable: undefined
+}
