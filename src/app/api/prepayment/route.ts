@@ -1,10 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { db } from '@/lib/db';
 import { getAuthenticatedUser } from '@/lib/api-middleware';
-
-const prisma = new PrismaClient();
 
 const prepaymentSchema = z.object({
   customerId: z.string().cuid(),
@@ -65,7 +63,7 @@ export async function POST(req: NextRequest) {
 
         const { customerId, amount } = validation.data;
 
-        const updatedCustomer = await prisma.$transaction(async (tx) => {
+        const updatedCustomer = await db.$transaction(async (tx) => {
             const customer = await tx.customer.findUnique({
                 where: { id: customerId },
             });

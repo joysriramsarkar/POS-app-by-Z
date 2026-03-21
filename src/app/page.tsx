@@ -1146,10 +1146,36 @@ function POSDashboard() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-background lg:rounded-tl-2xl lg:shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)] lg:border-t lg:border-l lg:border-border/50">
+        <main className="flex-1 flex flex-col min-h-0 overflow-hidden bg-background pb-16 lg:rounded-tl-2xl lg:shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)] lg:border-t lg:border-l lg:border-border/50">
           {renderPageContent()}
         </main>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-border/60 bg-card/95 backdrop-blur-sm py-1 px-2 bottom-nav">
+        <div className="flex items-center justify-between gap-1">
+          {mobileBottomNavItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                if (item.id === 'scan') {
+                  handleOpenMobileScanner();
+                } else {
+                  setCurrentPage(item.id as PageType);
+                }
+              }}
+              className={cn(
+                'flex flex-col items-center justify-center flex-1 py-1 rounded-lg text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary transition',
+                currentPage === item.id ? 'bg-primary/10 text-primary font-semibold' : ''
+              )}
+              aria-label={item.label}
+            >
+              {item.icon}
+              <span className="mt-0.5 text-[10px] leading-none">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {/* Mobile Scanner Dialog */}
       <CameraScannerDialog

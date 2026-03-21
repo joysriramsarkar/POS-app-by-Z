@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
+import { Pool } from 'pg'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
@@ -9,13 +11,24 @@ const globalForPrisma = globalThis as unknown as {
  * Prevents connection exhaustion during hot-reloading
  */
 function createPrismaClient(): PrismaClient {
+  // Create PostgreSQL connection pool
+  const connectionString = process.env.DATABASE_URL
+  if (!connectionString) {
+    throw new Error('DATABASE_URL environment variable is not set')
+  }
+
+  const pool = new Pool({ connectionString })
+  // Compatibility workaround between different pg @types versions used by Prisma adapter
+  const adapter = new PrismaPg(pool as unknown as any)
+
   const client = new PrismaClient({
-    // Logging
-    log: ['query'],
-    errorFormat: 'pretty',
-    
-    // ⚠️ CRITICAL: Connection pool configuration for PgBouncer
-    // Adjusted to handle serverless environment and connection pooling
+    adapter,
+    log: [
+      {
+        emit: 'stdout',
+        level: 'query',
+      },
+    ],
   })
 
   // Log successful connection to PostgreSQL

@@ -82,7 +82,7 @@
         "uuid": "^11.1.0",
         "vaul": "^1.1.2",
         "zod": "^4.0.2",
-        "zustand": "^5.0.6",
+        "zustand": "^5.0.6"
       },
       "devDependencies": {
         "@tailwindcss/postcss": "^4",
@@ -99,9 +99,9 @@
         "tailwindcss": "^4",
         "tsx": "^4.21.0",
         "tw-animate-css": "^1.3.5",
-        "typescript": "^5",
-      },
-    },
+        "typescript": "^5"
+      }
+    }
   },
   "trustedDependencies": [
     "sharp",
@@ -113,7 +113,7 @@
     "unrs-resolver",
     "es5-ext",
     "prisma",
-    "@parcel/watcher",
+    "@parcel/watcher"
   ],
   "packages": {
     "@alloc/quick-lru": ["@alloc/quick-lru@5.2.0", "", {}, "sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw=="],
@@ -2400,6 +2400,6 @@
 
     "execa/cross-spawn/shebang-command/shebang-regex": ["shebang-regex@1.0.0", "", {}, "sha512-wpoSFAxys6b2a2wHZ1XpDSgD7N9iVjg29Ph9uV/uaP9Ex/KXlkTZTeddxDPSYQpgvzKLGJke2UU0AzoGCjNIvQ=="],
 
-    "glob/minimatch/brace-expansion/balanced-match": ["balanced-match@4.0.4", "", {}, "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA=="],
+    "glob/minimatch/brace-expansion/balanced-match": ["balanced-match@4.0.4", "", {}, "sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA=="]
   }
 }

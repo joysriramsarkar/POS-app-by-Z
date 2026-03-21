@@ -373,7 +373,7 @@ export function ProductGrid({
             </div>
           ) : viewMode === 'grid' ? (
             // Standard Grid View
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
@@ -386,7 +386,7 @@ export function ProductGrid({
                   <h3 className="font-semibold text-sm text-muted-foreground mb-3 sticky top-0 bg-background py-1">
                     {category} ({categoryProducts.length})
                   </h3>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-4 xl:grid-cols-5 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {categoryProducts.map((product) => (
                       <CompactProductCard
                         key={product.id}
