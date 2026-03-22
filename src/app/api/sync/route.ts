@@ -222,11 +222,16 @@ async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, acti
       // VALIDATION PHASE: Check all prerequisites before creating anything
       
       // 1. Validate all products exist and check current stock levels
+      const productIds = Array.from(new Set(saleData.items.map(item => item.productId)));
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds } },
+      });
+
+      const productMap = new Map(products.map((p: any) => [p.id, p]));
       const productsToValidate: { product: any; item: any }[] = [];
+
       for (const item of saleData.items) {
-        const product = await tx.product.findUnique({
-          where: { id: item.productId },
-        });
+        const product = productMap.get(item.productId);
         
         if (!product) {
           throw new Error(`Product ${item.productId} not found during sync validation`);
