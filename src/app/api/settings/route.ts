@@ -19,10 +19,13 @@ export async function GET() {
     }, {});
 
     return NextResponse.json({ success: true, data: settingsObject });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching settings:", error);
     return NextResponse.json(
-      { error: "Failed to fetch settings", message: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Failed to fetch settings",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
@@ -59,10 +62,13 @@ export async function PUT(request: Request) {
     await db.$transaction(updatePromises);
 
     return NextResponse.json({ success: true, message: "Settings updated successfully" });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating settings:", error);
     return NextResponse.json(
-      { error: "Failed to update settings", message: error instanceof Error ? error.message : "Unknown error" },
+      {
+        error: "Failed to update settings",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
