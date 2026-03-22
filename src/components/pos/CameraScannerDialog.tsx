@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Camera, AlertCircle } from 'lucide-react';
+import { useCartStore } from '@/stores/pos-store';
 
 interface CameraScannerDialogProps {
   open: boolean;
@@ -32,6 +33,7 @@ export function CameraScannerDialog({
 }: CameraScannerDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const cartItems = useCartStore((state) => state.items);
 
   const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
 
@@ -101,6 +103,21 @@ export function CameraScannerDialog({
             <div className="flex items-center justify-center h-full">
               <p className="text-sm text-white/80">Tap Scan to open the camera scanner.</p>
             </div>
+
+            {/* Live Cart Preview */}
+            {cartItems.length > 0 && (
+              <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-3 text-white">
+                <p className="text-xs font-semibold mb-2 opacity-80">Cart Preview (Last {Math.min(3, cartItems.length)} items)</p>
+                <div className="space-y-1 max-h-24 overflow-y-auto">
+                  {cartItems.slice(-3).reverse().map((item, i) => (
+                    <div key={i} className="flex justify-between items-center text-sm">
+                      <span className="truncate flex-1 pr-2">{item.productName}</span>
+                      <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded">x{item.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

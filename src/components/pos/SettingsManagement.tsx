@@ -60,6 +60,11 @@ export default function SettingsManagement() {
         if (sectionKeys.includes("theme_mode")) {
           setTheme(localSettings.theme_mode);
         }
+
+        // Special logic for language saving
+        if (sectionKeys.includes("app_language")) {
+          setTimeout(() => window.location.reload(), 500);
+        }
       } else {
         toast({ variant: "destructive", title: "Error", description: "Failed to save settings." });
       }

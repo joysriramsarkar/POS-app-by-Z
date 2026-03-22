@@ -1,57 +1,38 @@
-
-> nextjs_tailwind_shadcn_ts@0.2.0 dev
-> next dev -p 3000
-
-▲ Next.js 16.1.7 (Turbopack)
+$ next dev -p 3000
+▲ Next.js 16.2.1 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.0.2:3000
+- Environments: .env
+✓ Ready in 515ms
 
-✓ Starting...
-⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
-✓ Ready in 1534ms
- GET /login?callbackUrl=%2F 200 in 3.3s (compile: 3.0s, render: 244ms)
-[PrismaClient] ❌ Connection failed: Error [PrismaClientInitializationError]: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
-  -->  schema.prisma:10
-   |
- 9 |   provider  = "postgresql"
-10 |   url       = env("DATABASE_URL")
-   |
-
-Validation Error Count: 1
-    at <unknown> (-->  schema.prisma:10) {
-  clientVersion: '6.19.2',
-  errorCode: 'P1012',
-  retryable: undefined
-}
-[next-auth][warn][NEXTAUTH_URL]
-https://next-auth.js.org/warnings#nextauth_url
- GET /api/auth/session 200 in 2.3s (compile: 2.3s, render: 51ms)
- GET /api/auth/providers 200 in 151ms (compile: 95ms, render: 56ms)
- GET /api/auth/csrf 200 in 46ms (compile: 28ms, render: 17ms)
- POST /api/auth/callback/credentials 401 in 45ms (compile: 4ms, render: 41ms)
-[PrismaClient] ❌ Connection failed: Error [PrismaClientInitializationError]: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
-  -->  schema.prisma:10
-   |
- 9 |   provider  = "postgresql"
-10 |   url       = env("DATABASE_URL")
-   |
-
-Validation Error Count: 1
-    at <unknown> (-->  schema.prisma:10) {
-  clientVersion: '6.19.2',
-  errorCode: 'P1012',
-  retryable: undefined
-}
-[PrismaClient] ❌ Connection failed: Error [PrismaClientInitializationError]: error: Error validating datasource `db`: the URL must start with the protocol `postgresql://` or `postgres://`.
-  -->  schema.prisma:10
-   |
- 9 |   provider  = "postgresql"
-10 |   url       = env("DATABASE_URL")
-   |
-
-Validation Error Count: 1
-    at <unknown> (-->  schema.prisma:10) {
-  clientVersion: '6.19.2',
-  errorCode: 'P1012',
-  retryable: undefined
-}
+○ Compiling /login ...
+ GET /login?callbackUrl=%2F 200 in 5.5s (next.js: 5.0s, application-code: 444ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+ GET /api/auth/session 200 in 3.2s (next.js: 3.2s, application-code: 53ms)
+ GET /login?callbackUrl=%2F 200 in 84ms (next.js: 5ms, application-code: 78ms)
+ GET /api/auth/session 200 in 43ms (next.js: 29ms, application-code: 14ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+ GET /api/auth/providers 200 in 57ms (next.js: 35ms, application-code: 22ms)
+ GET /api/auth/csrf 200 in 13ms (next.js: 3ms, application-code: 10ms)
+ POST /api/auth/callback/credentials 401 in 105ms (next.js: 8ms, application-code: 96ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+ GET /login?callbackUrl=%2Ftransactions 200 in 62ms (next.js: 4ms, application-code: 58ms)
+ GET /login?callbackUrl=%2F 200 in 64ms (next.js: 4ms, application-code: 60ms)
+ GET /login?callbackUrl=%2F 200 in 62ms (next.js: 3ms, application-code: 59ms)
+ GET /api/auth/session 200 in 38ms (next.js: 27ms, application-code: 11ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+ GET /api/auth/providers 200 in 36ms (next.js: 25ms, application-code: 11ms)
+ GET /api/auth/csrf 200 in 14ms (next.js: 3ms, application-code: 11ms)
+ POST /api/auth/callback/credentials 401 in 43ms (next.js: 3ms, application-code: 40ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+ GET /login?callbackUrl=%2F 200 in 67ms (next.js: 4ms, application-code: 64ms)
+ GET /api/auth/session 200 in 35ms (next.js: 23ms, application-code: 11ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+ GET /api/auth/providers 200 in 46ms (next.js: 30ms, application-code: 16ms)
+ GET /api/auth/csrf 200 in 14ms (next.js: 3ms, application-code: 12ms)
+ POST /api/auth/callback/credentials 401 in 34ms (next.js: 3ms, application-code: 31ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)
+ GET /login?callbackUrl=%2F 200 in 60ms (next.js: 3ms, application-code: 56ms)
+ GET /api/auth/session 200 in 38ms (next.js: 26ms, application-code: 12ms)
+[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)

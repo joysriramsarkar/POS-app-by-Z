@@ -194,8 +194,8 @@ export function TransactionHistory() {
 
       <Card className="bg-muted/30 shrink-0">
         <CardContent className="pt-4">
-          <div className="flex flex-nowrap items-end gap-2 overflow-x-auto pb-2">
-            <div className="min-w-42.5 shrink-0 space-y-1">
+          <div className="flex flex-col md:flex-row flex-nowrap items-end gap-2 md:overflow-x-auto pb-2 w-full">
+            <div className="w-full md:min-w-42.5 shrink-0 space-y-1">
               <label className="text-xs md:text-sm font-medium">Search Invoice</label>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -210,7 +210,7 @@ export function TransactionHistory() {
                 />
               </div>
             </div>
-            <div className="min-w-37.5 shrink-0 space-y-1">
+            <div className="w-full md:min-w-37.5 shrink-0 space-y-1">
               <label className="text-xs md:text-sm font-medium">Transaction Status</label>
               <Select value={filterStatus} onValueChange={(value: string) => {
                 setFilterStatus(value);
@@ -226,7 +226,7 @@ export function TransactionHistory() {
               </Select>
             </div>
 
-            <div className="min-w-37.5 shrink-0 space-y-1">
+            <div className="w-full md:min-w-37.5 shrink-0 space-y-1">
               <label className="text-xs md:text-sm font-medium">Payment Method</label>
               <Select value={filterPaymentMethod} onValueChange={(value: string) => {
                 setFilterPaymentMethod(value);
@@ -244,7 +244,7 @@ export function TransactionHistory() {
               </Select>
             </div>
 
-            <div className="min-w-30 shrink-0">
+            <div className="w-full md:min-w-30 shrink-0">
               <Button
                 variant="outline"
                 onClick={() => {
