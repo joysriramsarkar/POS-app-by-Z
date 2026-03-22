@@ -313,22 +313,6 @@ function POSDashboard() {
     };
   }, [setOnline]);
 
-  // ⚠️ REMOVED: This manual sync loop was causing DUPLICATE sync attempts
-  // The offline-context provider handles all sync operations automatically
-  // via network-listener.ts and sync-worker.ts
-  // 
-  // Keeping this comment to prevent accidental re-addition in future
-  //
-  // TODO: Remove this entire useEffect block on next refactor - it's handled by offline-context
-
-  // ⚠️ REMOVED: This manual sync loop was causing DUPLICATE sync attempts
-  // The offline-context provider handles all sync operations automatically
-  // via network-listener.ts and sync-worker.ts
-  // 
-  // Keeping this comment to prevent accidental re-addition in future
-  //
-  // TODO: Remove this entire useEffect block on next refactor - it's handled by offline-context
-
   // Barcode scanner handler
   const lastScannedRef = useRef<{ barcode: string; time: number }>({ barcode: '', time: 0 });
 
