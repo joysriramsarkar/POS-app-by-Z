@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db as prisma } from '@/lib/db';
+import { requirePermission } from '@/lib/api-middleware';
 
 export async function GET(request: NextRequest) {
+  const authResponse = await requirePermission(request, 'reports.view');
+  if (authResponse) return authResponse;
+
   try {
     const customersWithDues = await prisma.customer.findMany({
       where: {

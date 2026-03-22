@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db as prisma } from '@/lib/db';
 import { subDays, startOfDay, endOfDay } from 'date-fns';
+import { requirePermission } from '@/lib/api-middleware';
 
 export async function GET(request: NextRequest) {
+  const authResponse = await requirePermission(request, 'reports.view');
+  if (authResponse) return authResponse;
+
   try {
     const searchParams = request.nextUrl.searchParams;
     const days = parseInt(searchParams.get('days') || '30');
