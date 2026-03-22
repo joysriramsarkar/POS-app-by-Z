@@ -30,6 +30,8 @@ export const printToIframe = (options: PrintOptions): void => {
   }
 
   // Create a hidden iframe with minimal footprint
+  const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform();
+
   const iframe = document.createElement("iframe");
   iframe.style.display = "none";
   iframe.style.position = "absolute";
@@ -277,6 +279,56 @@ export const printToIframe = (options: PrintOptions): void => {
    * Trigger the print dialog after content is fully loaded
    */
   const handlePrint = (): void => {
+    if (isCapacitor) {
+      // Capacitor Android WebView iframe print fallback
+      try {
+        onBeforePrint?.();
+
+        // Temporarily append the print content to the main document body
+        const printContainer = document.createElement('div');
+        printContainer.innerHTML = printHtml;
+        printContainer.style.position = 'absolute';
+        printContainer.style.top = '0';
+        printContainer.style.left = '0';
+        printContainer.style.width = '100%';
+        printContainer.style.zIndex = '999999';
+        printContainer.style.background = 'white';
+
+        // Hide rest of the body
+        const originalChildren = Array.from(document.body.children) as HTMLElement[];
+        originalChildren.forEach(child => {
+          if (child.id !== iframe.id) {
+            child.setAttribute('data-original-display', child.style.display || '');
+            child.style.display = 'none';
+          }
+        });
+
+        document.body.appendChild(printContainer);
+
+        setTimeout(() => {
+          window.print();
+
+          // Cleanup
+          document.body.removeChild(printContainer);
+          originalChildren.forEach(child => {
+            if (child.id !== iframe.id) {
+              child.style.display = child.getAttribute('data-original-display') || '';
+              child.removeAttribute('data-original-display');
+            }
+          });
+          onAfterPrint?.();
+
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 300);
+
+      } catch (error) {
+        console.error("[PrintUtil] Capacitor print failed:", error);
+      }
+      return;
+    }
+
     if (iframe.contentWindow) {
       try {
         onBeforePrint?.();

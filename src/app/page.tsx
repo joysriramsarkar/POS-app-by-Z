@@ -74,12 +74,11 @@ const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
 ];
 
 // নতুন মোবাইল বটম নেভিগেশন আইটেম যোগ
-const mobileBottomNavItems: { id: PageType | 'scan'; label: string; icon: React.ReactNode }[] = [
-  { id: 'dashboard', label: 'Home', icon: <LayoutDashboard className="w-5 h-5" /> },
-  { id: 'billing', label: 'Bill', icon: <ShoppingCart className="w-5 h-5" /> },
-  { id: 'scan', label: 'Scan', icon: <ScanLine className="w-5 h-5" /> },  // ← প্রমিনেন্ট স্ক্যান বাটন
-  { id: 'stock', label: 'Stock', icon: <Package className="w-5 h-5" /> },
-  { id: 'parties', label: 'Parties', icon: <Users className="w-5 h-5" /> },
+const mobileBottomNavItems: { id: PageType | 'menu'; label: string; icon: React.ReactNode }[] = [
+  { id: 'dashboard', label: 'Home', icon: <LayoutDashboard className="w-6 h-6 md:w-5 md:h-5" /> },
+  { id: 'billing', label: 'Bill', icon: <ShoppingCart className="w-6 h-6 md:w-5 md:h-5" /> },
+  { id: 'stock', label: 'Stock', icon: <Package className="w-6 h-6 md:w-5 md:h-5" /> },
+  { id: 'menu', label: 'Menu', icon: <Menu className="w-6 h-6 md:w-5 md:h-5" /> },
 ];
 
 const formatPrice = (price: number) => {
@@ -352,6 +351,11 @@ function POSDashboard() {
           setCurrentPage('billing');
         }
       } else {
+        toast({
+          title: 'Product Not Found',
+          description: `Barcode ${barcode} not found in database.`,
+          variant: 'destructive',
+        });
         console.log('Product not found for barcode:', barcode);
       }
     },
@@ -1112,17 +1116,26 @@ function POSDashboard() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
         {/* Mobile Header */}
-        <header className="lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-4 py-3 no-print sticky top-0 z-20">
+        <header className="hidden lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-4 py-3 no-print sticky top-0 z-20">
           <div className="flex items-center justify-between gap-4">
             {/* Mobile Menu */}
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-9 w-9 p-0 hover:bg-primary/10 hover:text-primary transition-colors">
-                  <Menu className="w-5 h-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0 border-r-0 shadow-2xl">
-                {renderSidebar()}
+              <SheetContent side="bottom" className="w-full p-4 border-t-0 shadow-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto">
+                <div className="flex flex-col gap-4">
+                  <h2 className="text-lg font-bold border-b pb-2">Menu</h2>
+                  <div className="grid grid-cols-2 gap-3">
+                    {navItems.filter(item => ['reports', 'settings', 'parties', 'users'].includes(item.id)).map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavigate(item.id)}
+                        className="flex flex-col items-center justify-center p-4 rounded-xl border bg-card hover:bg-primary/10 transition-colors gap-2"
+                      >
+                        {item.icon}
+                        <span className="text-sm font-medium">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </SheetContent>
             </Sheet>
 
@@ -1158,8 +1171,8 @@ function POSDashboard() {
             <button
               key={item.id}
               onClick={() => {
-                if (item.id === 'scan') {
-                  handleOpenMobileScanner();
+                if (item.id === 'menu') {
+                  setIsMobileMenuOpen(true);
                 } else {
                   setCurrentPage(item.id as PageType);
                 }
