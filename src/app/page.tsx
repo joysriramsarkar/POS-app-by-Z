@@ -20,7 +20,6 @@ import { Reports } from '@/components/pos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useOfflineContext } from '@/lib/offline/offline-context';
@@ -60,9 +59,9 @@ import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
-type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'transactions' | 'settings' | 'users';
+type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'transactions' | 'settings' | 'users' | 'menu';
 
-const navItems: { id: PageType; label: string; icon: React.ReactNode }[] = [
+const navItems: { id: Exclude<PageType, 'menu'>; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
   { id: 'billing', label: 'Billing', icon: <ShoppingCart className="w-5 h-5" /> },
   { id: 'stock', label: 'Stock / Items', icon: <Package className="w-5 h-5" /> },
@@ -92,7 +91,6 @@ const formatPrice = (price: number) => {
 
 function POSDashboard() {
   const [currentPage, setCurrentPage] = useState<PageType>('billing');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Auth
@@ -171,7 +169,8 @@ function POSDashboard() {
         item.id === 'dashboard' || 
         item.id === 'billing' || 
         item.id === 'parties' || 
-        item.id === 'reports'
+        item.id === 'reports' || 
+        item.id === 'transactions'
       );
     }
   }, [userRole]);
@@ -870,7 +869,6 @@ function POSDashboard() {
       return;
     }
     setCurrentPage(page as PageType);
-    setIsMobileMenuOpen(false);
   }, [handleOpenMobileScanner]);
 
   // Open add stock for specific product
@@ -1081,6 +1079,31 @@ function POSDashboard() {
         return <Reports />;
       case 'transactions':
         return <TransactionHistory />;
+      case 'menu':
+        return (
+          <div className="p-4 overflow-y-auto h-full">
+            <div className="mb-4 flex items-center justify-between">
+              <h1 className="text-2xl font-bold">Menu</h1>
+              <Button size="sm" variant="outline" onClick={() => setCurrentPage('dashboard')}>
+                Back
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {filteredNavItems
+                .filter((item) => ['reports', 'settings', 'parties', 'users', 'transactions'].includes(item.id))
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setCurrentPage(item.id)}
+                    className="flex flex-col items-center justify-center p-4 rounded-xl border bg-card hover:bg-primary/10 transition-colors gap-2"
+                  >
+                    {item.icon}
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </button>
+                ))}
+            </div>
+          </div>
+        );
       case 'users':
         return <UsersManagement />;
       case 'settings':
@@ -1102,27 +1125,6 @@ function POSDashboard() {
         {/* Mobile Header */}
         <header className="hidden lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-4 py-3 no-print sticky top-0 z-20">
           <div className="flex items-center justify-between gap-4">
-            {/* Mobile Menu */}
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetContent side="bottom" className="w-full p-4 border-t-0 shadow-2xl rounded-t-2xl max-h-[80vh] overflow-y-auto">
-                <div className="flex flex-col gap-4">
-                  <h2 className="text-lg font-bold border-b pb-2">Menu</h2>
-                  <div className="grid grid-cols-2 gap-3">
-                    {navItems.filter(item => ['reports', 'settings', 'parties', 'users'].includes(item.id)).map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => handleNavigate(item.id)}
-                        className="flex flex-col items-center justify-center p-4 rounded-xl border bg-card hover:bg-primary/10 transition-colors gap-2"
-                      >
-                        {item.icon}
-                        <span className="text-sm font-medium">{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </SheetContent>
-            </Sheet>
-
             {/* Store Name */}
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shadow-sm">
@@ -1136,7 +1138,7 @@ function POSDashboard() {
             {/* Page indicator for non-billing pages */}
             {currentPage !== 'billing' && (
               <Badge variant="secondary" className="text-xs shadow-sm">
-                {navItems.find(n => n.id === currentPage)?.label}
+                {currentPage === 'menu' ? 'Menu' : navItems.find(n => n.id === currentPage)?.label}
               </Badge>
             )}
           </div>
@@ -1156,7 +1158,7 @@ function POSDashboard() {
               key={item.id}
               onClick={() => {
                 if (item.id === 'menu') {
-                  setIsMobileMenuOpen(true);
+                  setCurrentPage('menu');
                 } else {
                   setCurrentPage(item.id as PageType);
                 }

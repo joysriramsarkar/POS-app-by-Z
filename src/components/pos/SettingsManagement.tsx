@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { Store, Printer, Database, Palette, Users, Globe, Receipt, Download, Upload, Loader2, Save, LogOut } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
-import { useTheme } from "next-themes";
+import { useTheme } from "@/components/providers/ThemeProvider";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function SettingsManagement() {

@@ -1,7 +1,6 @@
 "use client";
 
-import { ThemeProvider as NextThemesProvider } from "next-themes";
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { useSettingsStore } from "@/stores/settings-store";
 
 // Use a CSS hex to HSL converter for Shadcn's variables
@@ -49,10 +48,88 @@ function DynamicColorProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function ThemeProvider({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>) {
-  return (
-    <NextThemesProvider {...props}>
-      <DynamicColorProvider>{children}</DynamicColorProvider>
-    </NextThemesProvider>
+type ThemeMode = "light" | "dark" | "system";
+
+type ThemeContextValue = {
+  theme: ThemeMode;
+  resolvedTheme: "light" | "dark";
+  setTheme: (theme: ThemeMode) => void;
+};
+
+const ThemeContext = createContext<ThemeContextValue>({
+  theme: "system",
+  resolvedTheme: "light",
+  setTheme: () => {},
+});
+
+const THEME_STORAGE_KEY = "theme_mode";
+
+function getSystemTheme() {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme: ThemeMode) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const applied = theme === "system" ? getSystemTheme() : theme;
+
+  root.classList.remove("light", "dark");
+  root.classList.add(applied);
+  root.style.colorScheme = applied;
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const { settings, updateSetting } = useSettingsStore();
+
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    if (typeof window === "undefined") return "system";
+    return (localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode) || settings.theme_mode || "system";
+  });
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+
+  useEffect(() => {
+    const update = () => {
+      const applied = theme === "system" ? getSystemTheme() : theme;
+      applyTheme(theme);
+      setResolvedTheme(applied);
+    };
+
+    update();
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => {
+      if (theme === "system") update();
+    };
+    media.addEventListener("change", handler);
+    return () => media.removeEventListener("change", handler);
+  }, [theme]);
+
+  const setTheme = useCallback(
+    (nextTheme: ThemeMode) => {
+      setThemeState(nextTheme);
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+      updateSetting("theme_mode", nextTheme);
+    },
+    [updateSetting]
   );
+
+  const value = useMemo(
+    () => ({
+      theme,
+      resolvedTheme,
+      setTheme,
+    }),
+    [theme, resolvedTheme, setTheme]
+  );
+
+  return (
+    <ThemeContext.Provider value={value}>
+      <DynamicColorProvider>{children}</DynamicColorProvider>
+    </ThemeContext.Provider>
+  );
+}
+
+export function useTheme() {
+  return useContext(ThemeContext);
 }

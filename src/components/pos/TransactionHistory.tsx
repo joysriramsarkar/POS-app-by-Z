@@ -185,6 +185,62 @@ export function TransactionHistory() {
     window.URL.revokeObjectURL(url);
   };
 
+  const handleUpdateSaleStatus = async (status: 'Cancelled' | 'Refunded') => {
+    if (!selectedTransaction) return;
+    const confirmMessage =
+      status === 'Cancelled'
+        ? 'Are you sure you want to cancel this order?'
+        : 'Are you sure you want to refund this order?';
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/sales', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedTransaction.id,
+          status,
+          reason: `${status} from transaction history`,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        throw new Error(data?.error || 'Unable to update sale status');
+      }
+
+      const updatedTransaction = {
+        ...selectedTransaction,
+        status,
+      };
+
+      setSelectedTransaction(updatedTransaction);
+      setTransactions((prev) =>
+        prev.map((transaction) =>
+          transaction.id === updatedTransaction.id ? updatedTransaction : transaction
+        )
+      );
+
+      toast({
+        title: 'Success',
+        description: `Sale ${status.toLowerCase()} successfully`,
+      });
+    } catch (error) {
+      console.error('Failed to update sale status:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to update sale status',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full gap-4 p-4 overflow-hidden">
       <div className="space-y-2 shrink-0">
@@ -520,6 +576,28 @@ export function TransactionHistory() {
                   </CardContent>
                 </Card>
               </div>
+
+              {selectedTransaction.status === 'Completed' && (
+                <div className="flex flex-col gap-3 mt-4">
+                  <div className="text-sm font-medium">Manage Order</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleUpdateSaleStatus('Cancelled')}
+                      className="h-10"
+                    >
+                      Cancel Order
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleUpdateSaleStatus('Refunded')}
+                      className="h-10"
+                    >
+                      Refund Order
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

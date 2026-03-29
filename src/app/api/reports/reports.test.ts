@@ -73,7 +73,7 @@ describe('Reports API Security', () => {
         mockGetSession.mockResolvedValueOnce({ user: { id: 'user-without-permission', role: 'CASHIER' } });
 
         // Mocking db.rolePermission.findFirst to return null for CASHIER
-        const { db } = require('@/lib/db');
+        const { db } = await import('@/lib/db');
         db.rolePermission.findFirst.mockResolvedValueOnce(null);
 
         const req = new Request(`http://localhost:3000/api/reports/${name}`);
@@ -87,7 +87,7 @@ describe('Reports API Security', () => {
       it('should return 200 when user has permission', async () => {
         mockGetSession.mockResolvedValueOnce({ user: { id: 'admin-id', role: 'ADMIN' } });
 
-        const { db } = require('@/lib/db');
+        const { db } = await import('@/lib/db');
         db.rolePermission.findFirst.mockResolvedValueOnce({ id: 'rp1' });
         db.user.findUnique.mockResolvedValueOnce({ id: 'admin-id', role: 'ADMIN', isActive: true });
 

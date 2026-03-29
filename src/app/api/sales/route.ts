@@ -471,26 +471,30 @@ export async function PUT(request: NextRequest) {
       });
 
       // Restore stock for cancelled/refunded items
-      await Promise.all(
-        existingSale.items.flatMap((item) => [
-          tx.product.update({
-            where: { id: item.productId },
-            data: {
-              currentStock: { increment: item.quantity },
-              updatedAt: new Date(),
-            },
-          }),
-          tx.stockHistory.create({
-            data: {
-              productId: item.productId,
-              changeType: 'return',
-              quantity: item.quantity,
-              reason: `${status}: ${existingSale.invoiceNumber}`,
-              referenceId: existingSale.id,
-            },
-          }),
-        ])
-      );
+      const productReturnQuantities = existingSale.items.reduce((acc, item) => {
+        acc.set(item.productId, (acc.get(item.productId) || 0) + item.quantity);
+        return acc;
+      }, new Map<string, number>());
+
+      for (const [productId, quantity] of productReturnQuantities.entries()) {
+        await tx.product.update({
+          where: { id: productId },
+          data: {
+            currentStock: { increment: quantity },
+            updatedAt: new Date(),
+          },
+        });
+
+        await tx.stockHistory.create({
+          data: {
+            productId,
+            changeType: 'return',
+            quantity,
+            reason: `${status}: ${existingSale.invoiceNumber}`,
+            referenceId: existingSale.id,
+          },
+        });
+      }
 
       // If sale was partially or fully due, reverse customer's totalDue update
       if (existingSale.customerId && existingSale.amountPaid < existingSale.totalAmount) {
