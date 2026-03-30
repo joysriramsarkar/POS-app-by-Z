@@ -79,7 +79,17 @@ function applyTheme(theme: ThemeMode) {
   root.style.colorScheme = applied;
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({
+  children,
+  attribute,
+  defaultTheme,
+  enableSystem,
+}: {
+  children: React.ReactNode;
+  attribute?: string;
+  defaultTheme?: string;
+  enableSystem?: boolean;
+}) {
   const { settings, updateSetting } = useSettingsStore();
 
   const [theme, setThemeState] = useState<ThemeMode>(() => {
