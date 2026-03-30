@@ -227,7 +227,7 @@ async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, acti
         where: { id: { in: productIds } },
       });
 
-      const productMap = new Map(products.map((p: any) => [p.id, p]));
+      const productMap = new Map<string, any>(products.map((p: any) => [p.id, p]));
       const productsToValidate: { product: any; item: any }[] = [];
 
       for (const item of saleData.items) {
