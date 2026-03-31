@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import {
   Calculator,
@@ -385,16 +384,15 @@ export function CheckoutDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-106.25 w-[95vw] max-h-[90dvh] flex flex-col p-4 md:p-6 dialog-mobile">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[90dvh] md:max-h-[85vh] p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-none border-b">
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="w-5 h-5" />
             Checkout
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-4 pr-4">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4 space-y-4">
           {customer && (
             <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded-lg">
               <Badge variant="secondary">{customer.name}</Badge>
@@ -402,16 +400,14 @@ export function CheckoutDialog({
             </div>
           )}
 
-          <ScrollArea className="flex-1 min-h-0 overflow-y-auto">
-            <div className="space-y-2 pr-2">
-              {items.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span className="truncate flex-1">{item.productName}<span className="text-muted-foreground ml-1">×{item.quantity}</span></span>
-                  <span className="font-medium ml-2">{formatPrice(item.totalPrice)}</span>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
+          <div className="space-y-2">
+            {items.map((item) => (
+              <div key={item.id} className="flex justify-between text-sm">
+                <span className="truncate flex-1">{item.productName}<span className="text-muted-foreground ml-1">×{item.quantity}</span></span>
+                <span className="font-medium ml-2">{formatPrice(item.totalPrice)}</span>
+              </div>
+            ))}
+          </div>
 
           <div className="space-y-1.5 border-t pt-4">
             <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>{formatPrice(subtotal)}</span></div>
@@ -420,24 +416,24 @@ export function CheckoutDialog({
             <Separator className="my-2" />
             <div className="flex justify-between font-semibold text-lg"><span>Total</span><span className="text-primary">{formatPrice(total)}</span></div>
           </div>
-          
+
           {customer && customer.prepaidBalance > 0 && (
             <div className="p-3 bg-green-50 border border-green-200 rounded-lg space-y-2">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Label htmlFor="use-prepaid" className="font-medium flex items-center gap-2">
-                            <Wallet className="w-5 h-5 text-green-600" />
-                            Use Prepaid Balance
-                        </Label>
-                        <p className="text-xs text-muted-foreground">Available: {formatPrice(customer.prepaidBalance)}</p>
-                    </div>
-                    <Switch id="use-prepaid" checked={usePrepaid} onCheckedChange={setUsePrepaid} />
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="use-prepaid" className="font-medium flex items-center gap-2">
+                    <Wallet className="w-5 h-5 text-green-600" />
+                    Use Prepaid Balance
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Available: {formatPrice(customer.prepaidBalance)}</p>
                 </div>
-                {usePrepaid && (
-                    <p className="text-sm text-green-700 font-medium text-center pt-1">
-                        Applying {formatPrice(prepaidAmountToUse)} from balance.
-                    </p>
-                )}
+                <Switch id="use-prepaid" checked={usePrepaid} onCheckedChange={setUsePrepaid} />
+              </div>
+              {usePrepaid && (
+                <p className="text-sm text-green-700 font-medium text-center pt-1">
+                  Applying {formatPrice(prepaidAmountToUse)} from balance.
+                </p>
+              )}
             </div>
           )}
 
@@ -531,9 +527,8 @@ export function CheckoutDialog({
             </div>
           )}
         </div>
-        </ScrollArea>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="px-6 pb-6 pt-4 flex-none border-t bg-background gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isProcessing}>Cancel</Button>
           <Button
             onClick={handleComplete}

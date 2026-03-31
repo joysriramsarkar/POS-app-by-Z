@@ -312,7 +312,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
         {/* Payment Method Selector - Visible Cards */}
         <div className="p-3 md:p-4 border-b md:border-b-0">
           <Label className="text-xs font-semibold text-muted-foreground mb-3 block uppercase tracking-wider">Payment Method</Label>
-          <div className="grid grid-cols-3 gap-2 md:gap-3">
+          <div className="grid grid-cols-4 gap-1 sm:grid-cols-3 sm:gap-2 md:gap-3">
             {paymentMethods
               .filter(({ method }) => method !== 'Due' || customerName) // Hide Due for walk-in customers
               .map(({ method, icon, label, color }) => (
@@ -321,7 +321,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
                 type="button"
                 onClick={() => setPaymentMethod(method)}
                 className={cn(
-                  'relative flex flex-col items-center justify-center px-1 py-2 md:px-3 md:py-3 rounded-xl border-2 transition-all duration-200 touch-manipulation',
+                  'relative flex flex-col items-center justify-center min-w-0 max-w-full whitespace-nowrap px-1 py-1 sm:px-2 sm:py-2 md:px-3 md:py-3 rounded-xl border-2 transition-all duration-200 touch-manipulation',
                   paymentMethod === method
                     ? 'border-primary bg-primary/10 shadow-md shadow-primary/10 scale-[1.02]'
                     : 'border-border/50 bg-background hover:bg-muted/80 hover:border-primary/30'
