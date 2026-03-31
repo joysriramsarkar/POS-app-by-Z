@@ -321,36 +321,32 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
                 type="button"
                 onClick={() => setPaymentMethod(method)}
                 className={cn(
-                  'relative flex flex-col items-center justify-center min-w-0 max-w-full whitespace-nowrap px-1 py-1 sm:px-2 sm:py-2 md:px-3 md:py-3 rounded-xl border-2 transition-all duration-200 touch-manipulation',
-                  paymentMethod === method
-                    ? 'border-primary bg-primary/10 shadow-md shadow-primary/10 scale-[1.02]'
-                    : 'border-border/50 bg-background hover:bg-muted/80 hover:border-primary/30'
-                )}
-              >
-                {paymentMethod === method && (
-                  <div className="absolute top-1.5 right-1.5 bg-primary rounded-full p-0.5 shadow-sm">
-                    <Check className="w-2.5 h-2.5 md:w-3 md:h-3 text-white" />
+                    'relative flex flex-col items-center justify-center min-w-0 max-w-full whitespace-nowrap rounded-xl border-2 transition-all duration-200 touch-manipulation h-10 sm:h-auto px-1 py-1 sm:px-2 sm:py-2 md:px-3 md:py-3',
+                    paymentMethod === method
+                      ? 'border-primary bg-primary/10 shadow-md shadow-primary/10 scale-[1.02]'
+                      : 'border-border/50 bg-background hover:bg-muted/80 hover:border-primary/30'
+                  )}
+                >
+                  {paymentMethod === method && (
+                    <div className="absolute top-1.5 right-1.5 bg-primary rounded-full p-0.5 shadow-sm">
+                      <Check className="w-2.5 h-2.5 text-white" />
+                    </div>
+                  )}
+                  <div className={cn(
+                    'mb-0.5 transition-transform duration-200 inline-flex items-center justify-center text-muted-foreground',
+                    paymentMethod === method ? 'text-primary scale-110' : 'group-hover:scale-110'
+                  )}>
+                    {icon}
                   </div>
-                )}
-                <div className={cn(
-                  'mb-1 transition-transform duration-200 inline-flex items-center justify-center',
-                  paymentMethod === method ? 'text-primary scale-110' : 'text-muted-foreground group-hover:scale-110'
-                )}>
-                  {icon}
-                </div>
-                <span className={cn(
-                  'text-xs font-bold tracking-tight',
-                  paymentMethod === method ? 'text-primary' : 'text-foreground'
-                )}>
-                  {label}
-                </span>
-              </button>
-            ))}
+                  <span className={cn(
+                    'text-[10px] font-bold tracking-tight sm:text-xs',
+                    paymentMethod === method ? 'text-primary' : 'text-foreground'
+                  )}>
+                    {label}
+                  </span>
+                </button>
+              ))}
           </div>
-        </div>
-
-        {/* Totals */}
-        <div className="p-3 md:p-4 space-y-2 bg-slate-50/50 dark:bg-slate-900/20 rounded-t-2xl md:rounded-none">
           {/* Subtotal */}
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground font-medium">Subtotal</span>

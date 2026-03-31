@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 import {
@@ -11,6 +11,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { convertBengaliToEnglishNumerals, isValidEanUpcBarcode } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Camera, AlertCircle } from 'lucide-react';
@@ -59,9 +60,14 @@ export function CameraScannerDialog({
     try {
       const { barcodes } = await BarcodeScanner.scan();
       if (barcodes.length > 0 && barcodes[0].rawValue) {
-        const scannedCode = barcodes[0].rawValue;
-        console.log("স্ক্যান করা কোড: ", scannedCode);
-        onBarcodeScanned(scannedCode);
+        const scannedCode = barcodes[0].rawValue.trim();
+        const normalizedBarcode = convertBengaliToEnglishNumerals(scannedCode);
+        if (isValidEanUpcBarcode(normalizedBarcode)) {
+          console.log('স্ক্যান করা কোড: ', normalizedBarcode);
+          onBarcodeScanned(normalizedBarcode);
+        } else {
+          setError('Invalid barcode detected. Please try again.');
+        }
       }
     } catch (err) {
       setError('Scan failed: ' + (err as Error).message);

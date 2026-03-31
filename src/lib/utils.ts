@@ -26,3 +26,8 @@ export function convertBengaliToEnglishNumerals(input: string): string {
 
   return input.replace(/[০-৯]/g, (match) => bengaliToEnglish[match] || match);
 }
+
+export function isValidEanUpcBarcode(input: string): boolean {
+  const normalized = convertBengaliToEnglishNumerals(input.trim());
+  return /^(?:\d{12}|\d{13})$/.test(normalized);
+}

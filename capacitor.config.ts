@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://lakhanb.vercel.app',
     cleartext: false
+  },
+  plugins: {
+    StatusBar: {
+      overlayWebView: false
+    }
   }
 };
 

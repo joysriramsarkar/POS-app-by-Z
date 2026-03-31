@@ -83,17 +83,18 @@ function ThermalInvoice({
   // ========================================================================
   // CRITICAL: Strict width constraints to prevent thermal printer breaks
   // ========================================================================
-  const therminalWidth = is58mm ? "w-[56mm]" : "w-[78mm]"; // Leave margin
+  const therminalWidth = is58mm ? "w-[58mm] max-w-[58mm]" : "w-[80mm] max-w-[80mm]";
   const containerStyle: React.CSSProperties = {
-    width: is58mm ? "56mm" : "78mm",
-    maxWidth: is58mm ? "56mm" : "78mm",
-    margin: "0 auto",
+    width: is58mm ? "58mm" : "80mm",
+    maxWidth: is58mm ? "58mm" : "80mm",
+    margin: "0",
     overflow: "hidden",
+    wordBreak: "break-word",
   };
 
   return (
     <div
-      className={`thermal-invoice ${therminalWidth} ${padding} bg-white text-black font-mono`}
+      className={`thermal-invoice thermal-${width} ${therminalWidth} ${padding} bg-white text-black font-mono overflow-hidden wrap-break-word`}
       style={containerStyle}
     >
       {/* Header */}

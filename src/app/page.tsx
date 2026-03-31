@@ -1123,7 +1123,7 @@ function POSDashboard() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
         {/* Mobile Header */}
-        <header className="hidden lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-4 py-3 no-print sticky top-0 z-20">
+        <header className="lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] no-print sticky top-0 z-20">
           <div className="flex items-center justify-between gap-4">
             {/* Store Name */}
             <div className="flex items-center gap-2">

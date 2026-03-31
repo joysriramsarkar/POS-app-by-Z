@@ -1,4 +1,6 @@
 
+import { Capacitor } from '@capacitor/core';
+
 /**
  * PrintOptions interface for configuring iframe-based printing
  */
@@ -9,6 +11,12 @@ interface PrintOptions {
   onAfterPrint?: () => void;
   format?: "thermal-58" | "thermal-80" | "a4" | "a5";
 }
+
+const isCapacitorNative = (): boolean => typeof window !== 'undefined' && Capacitor.isNativePlatform?.();
+
+const createShareBlob = async (html: string): Promise<Blob> => {
+  return new Blob([html], { type: 'text/html' });
+};
 
 /**
  * Industry-standard iframe-based print utility for POS applications
@@ -30,7 +38,7 @@ export const printToIframe = (options: PrintOptions): void => {
   }
 
   // Create a hidden iframe with minimal footprint
-  const isCapacitor = typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform();
+  const isCapacitor = isCapacitorNative();
 
   const iframe = document.createElement("iframe");
   iframe.style.display = "none";
@@ -46,8 +54,6 @@ export const printToIframe = (options: PrintOptions): void => {
     document.body.removeChild(iframe);
     return;
   }
-
-  // Build strict page sizing CSS based on format
   const getPageSizeStyle = (fmt?: string): string => {
     switch (fmt) {
       case "thermal-58":
@@ -278,55 +284,40 @@ export const printToIframe = (options: PrintOptions): void => {
   /**
    * Trigger the print dialog after content is fully loaded
    */
-  const handlePrint = (): void => {
+  const handlePrint = async (): Promise<void> => {
     if (isCapacitor) {
-      // Capacitor Android WebView iframe print fallback
       try {
         onBeforePrint?.();
 
-        // Temporarily append the print content to the main document body
-        const printContainer = document.createElement('div');
-        printContainer.innerHTML = printHtml;
-        printContainer.style.position = 'absolute';
-        printContainer.style.top = '0';
-        printContainer.style.left = '0';
-        printContainer.style.width = '100%';
-        printContainer.style.zIndex = '999999';
-        printContainer.style.background = 'white';
-
-        // Hide rest of the body
-        const originalChildren = Array.from(document.body.children) as HTMLElement[];
-        originalChildren.forEach(child => {
-          if (child.id !== iframe.id) {
-            child.setAttribute('data-original-display', child.style.display || '');
-            child.style.display = 'none';
-          }
-        });
-
-        document.body.appendChild(printContainer);
-
-        setTimeout(() => {
-          window.print();
-
-          // Cleanup
-          document.body.removeChild(printContainer);
-          originalChildren.forEach(child => {
-            if (child.id !== iframe.id) {
-              child.style.display = child.getAttribute('data-original-display') || '';
-              child.removeAttribute('data-original-display');
-            }
-          });
+        const printerPlugin = (Capacitor as any).Plugins?.Printer;
+        if (printerPlugin?.print) {
+          await printerPlugin.print({ html: printHtml });
           onAfterPrint?.();
-
           if (document.body.contains(iframe)) {
             document.body.removeChild(iframe);
           }
-        }, 300);
+          return;
+        }
 
+        if (navigator.share) {
+          const blob = await createShareBlob(printHtml);
+          const file = new File([blob], 'invoice.html', { type: 'text/html' });
+          await (navigator as any).share({
+            title: 'Invoice',
+            text: 'Please print or save this invoice from the share sheet.',
+            files: [file],
+          });
+          onAfterPrint?.();
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+          return;
+        }
+
+        console.warn('[PrintUtil] Capacitor native print/share not available; falling back to iframe print.');
       } catch (error) {
-        console.error("[PrintUtil] Capacitor print failed:", error);
+        console.error('[PrintUtil] Capacitor native print failed:', error);
       }
-      return;
     }
 
     if (iframe.contentWindow) {

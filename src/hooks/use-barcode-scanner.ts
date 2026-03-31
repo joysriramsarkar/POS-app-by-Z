@@ -8,7 +8,13 @@
 // ============================================================================
 
 import { useEffect, useRef, useCallback } from 'react';
-import { convertBengaliToEnglishNumerals } from '@/lib/utils';
+import { convertBengaliToEnglishNumerals, isValidEanUpcBarcode } from '@/lib/utils';
+
+const BARCODE_CHAR_REGEX = /^[0-9০-৯]$/;
+const MIN_INTER_KEY_TIME = 5; // ms
+const MAX_INTER_KEY_TIME = 80; // ms
+
+const normalizeBarcode = (raw: string) => convertBengaliToEnglishNumerals(raw.trim());
 
 // ============================================================================
 // CONFIGURATION
@@ -32,7 +38,7 @@ interface BarcodeScannerConfig {
 }
 
 interface BarcodeScannerState {
-  buffer: string;
+  buffer: string[];
   lastKeyTime: number;
   isScanning: boolean;
 }
@@ -43,10 +49,10 @@ interface BarcodeScannerState {
 
 export function useBarcodeScanner(config: BarcodeScannerConfig) {
   const {
-    minInterKeyTime = 0, // Minimum time between keys (scanners are fast)
-    maxInterKeyTime = 50, // Maximum time between keys for barcode detection
-    minBarcodeLength = 4,
-    maxBarcodeLength = 50,
+    minInterKeyTime = MIN_INTER_KEY_TIME,
+    maxInterKeyTime = MAX_INTER_KEY_TIME,
+    minBarcodeLength = 12,
+    maxBarcodeLength = 13,
     endChars = ['Enter', 'NumpadEnter'],
     onBarcodeDetected,
     onDebug,
@@ -54,7 +60,7 @@ export function useBarcodeScanner(config: BarcodeScannerConfig) {
 
   // Use ref to store state to avoid re-renders
   const stateRef = useRef<BarcodeScannerState>({
-    buffer: '',
+    buffer: [],
     lastKeyTime: 0,
     isScanning: false,
   });
@@ -98,61 +104,49 @@ export function useBarcodeScanner(config: BarcodeScannerConfig) {
 
       // Check if this is an end character
       if (endChars.includes(event.key)) {
-        // If we have a buffer and it's long enough, process it
-        if (state.buffer.length >= minBarcodeLength && state.buffer.length <= maxBarcodeLength) {
-          const rawBarcode = state.buffer;
-          const barcode = convertBengaliToEnglishNumerals(rawBarcode);
+        const rawBarcode = state.buffer.join('');
+        const barcode = normalizeBarcode(rawBarcode);
+        if (isValidEanUpcBarcode(barcode)) {
           debug(`Barcode detected: ${barcode} (raw: ${rawBarcode})`);
           onBarcodeDetected(barcode);
+        } else {
+          debug(`Invalid barcode on enter: ${barcode} (raw: ${rawBarcode})`);
         }
-        // Reset state
-        state.buffer = '';
+
+        state.buffer = [];
         state.isScanning = false;
         state.lastKeyTime = 0;
         event.preventDefault(); // Prevent form submission
         return;
       }
 
-      // Check for valid barcode characters (alphanumeric, Bengali numerals, and some special chars)
-      const isValidBarcodeChar = /^[a-zA-Z0-9\-_.০-৯]$/.test(event.key);
-
-      if (!isValidBarcodeChar) {
-        // Reset if invalid character
-        state.buffer = '';
+      // Only allow digits and Bengali digits for strict UPC/EAN handling
+      if (!BARCODE_CHAR_REGEX.test(event.key)) {
+        state.buffer = [];
         state.isScanning = false;
         state.lastKeyTime = 0;
         return;
       }
 
-      // Determine if this could be a barcode scan based on timing
-      if (state.buffer.length === 0) {
-        // First character of potential barcode
-        state.buffer = event.key;
-        state.isScanning = true;
+      const isScannerSpeed = state.lastKeyTime > 0 && timeSinceLastKey <= maxInterKeyTime;
+      const shouldAppend = state.buffer.length === 0 || isScannerSpeed;
+
+      if (!shouldAppend && timeSinceLastKey > maxInterKeyTime) {
+        state.buffer = [event.key];
+        state.isScanning = false;
         state.lastKeyTime = currentTime;
-      } else {
-        // Check timing to determine if this is a scanner or human typing
-        const isScannerSpeed = timeSinceLastKey <= maxInterKeyTime;
+        return;
+      }
 
-        if (isScannerSpeed || state.isScanning) {
-          // This looks like a scanner or we're already scanning
-          state.buffer += event.key;
-          state.isScanning = isScannerSpeed;
-          state.lastKeyTime = currentTime;
+      state.buffer.push(event.key);
+      state.lastKeyTime = currentTime;
+      state.isScanning = isScannerSpeed || state.buffer.length === 1;
 
-          // Safety check: if buffer is too long, reset
-          if (state.buffer.length > maxBarcodeLength) {
-            debug(`Buffer too long, resetting`);
-            state.buffer = '';
-            state.isScanning = false;
-            state.lastKeyTime = 0;
-          }
-        } else {
-          // Human typing speed, start new potential barcode
-          state.buffer = event.key;
-          state.isScanning = false;
-          state.lastKeyTime = currentTime;
-        }
+      if (state.buffer.length > maxBarcodeLength) {
+        debug(`Buffer too long, resetting: ${state.buffer.join('')}`);
+        state.buffer = [];
+        state.isScanning = false;
+        state.lastKeyTime = 0;
       }
     },
     [endChars, minBarcodeLength, maxBarcodeLength, maxInterKeyTime, onBarcodeDetected, debug]
@@ -162,9 +156,10 @@ export function useBarcodeScanner(config: BarcodeScannerConfig) {
   const clearBuffer = useCallback(() => {
     const state = stateRef.current;
     if (state.buffer.length > 0 && state.buffer.length < minBarcodeLength) {
-      debug(`Clearing partial buffer: ${state.buffer}`);
-      state.buffer = '';
+      debug(`Clearing partial buffer: ${state.buffer.join('')}`);
+      state.buffer = [];
       state.isScanning = false;
+      state.lastKeyTime = 0;
     }
   }, [minBarcodeLength, debug]);
 
@@ -184,7 +179,7 @@ export function useBarcodeScanner(config: BarcodeScannerConfig) {
 
   // Return current state for debugging
   return {
-    getCurrentBuffer: () => stateRef.current.buffer,
+    getCurrentBuffer: () => stateRef.current.buffer.join(''),
     isScanning: () => stateRef.current.isScanning,
   };
 }
@@ -202,53 +197,71 @@ export function useSimpleBarcodeScanner({
   onBarcodeDetected,
   enabled = true,
 }: SimpleBarcodeScannerConfig) {
-  const bufferRef = useRef<string>('');
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bufferRef = useRef<string[]>([]);
+  const lastKeyTimeRef = useRef<number | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!enabled) return;
 
+    const flushBuffer = () => {
+      bufferRef.current = [];
+      lastKeyTimeRef.current = null;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Skip if typing in an input field
       const activeElement = document.activeElement;
       const isEditable =
         activeElement instanceof HTMLInputElement ||
         activeElement instanceof HTMLTextAreaElement ||
         activeElement?.getAttribute('contenteditable') === 'true';
 
-      if (isEditable) return;
+      if (isEditable && event.key !== 'Enter' && event.key !== 'NumpadEnter') {
+        return;
+      }
 
-      // Check for Enter key (barcode end marker)
       if (event.key === 'Enter' || event.key === 'NumpadEnter') {
-        if (bufferRef.current.length >= 3) { // Reduced to 3 to support shorter barcodes
-          const rawBarcode = bufferRef.current;
-          const barcode = convertBengaliToEnglishNumerals(rawBarcode);
-          bufferRef.current = '';
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
+        const rawBarcode = bufferRef.current.join('');
+        const barcode = normalizeBarcode(rawBarcode);
+        flushBuffer();
+
+        if (isValidEanUpcBarcode(barcode)) {
           onBarcodeDetected(barcode);
           event.preventDefault();
         }
         return;
       }
 
-      // Only accept alphanumeric, Bengali numerals and common barcode characters
-      if (/^[a-zA-Z0-9\-_.০-৯]$/.test(event.key)) {
-        bufferRef.current += event.key;
-
-        // Clear existing timeout
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-        }
-
-        // Set timeout to clear buffer if typing stops (human typing)
-        // Some wireless barcode scanners have a 100-200ms delay between keys
-        timeoutRef.current = setTimeout(() => {
-          bufferRef.current = '';
-        }, 250);
+      if (!BARCODE_CHAR_REGEX.test(event.key)) {
+        flushBuffer();
+        return;
       }
+
+      const currentTime = Date.now();
+      const lastTime = lastKeyTimeRef.current;
+      const interKeyTime = lastTime ? currentTime - lastTime : 0;
+
+      if (lastTime && (interKeyTime < MIN_INTER_KEY_TIME || interKeyTime > MAX_INTER_KEY_TIME)) {
+        bufferRef.current = [event.key];
+      } else {
+        bufferRef.current.push(event.key);
+      }
+
+      lastKeyTimeRef.current = currentTime;
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      timeoutRef.current = setTimeout(() => {
+        bufferRef.current = [];
+        lastKeyTimeRef.current = null;
+        timeoutRef.current = null;
+      }, 400);
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -259,7 +272,12 @@ export function useSimpleBarcodeScanner({
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [onBarcodeDetected, enabled]);
+  }, [enabled, onBarcodeDetected]);
+
+  return {
+    getCurrentBuffer: () => bufferRef.current.join(''),
+    isScanning: () => bufferRef.current.length > 0,
+  };
 }
 
 export default useBarcodeScanner;
