@@ -299,7 +299,7 @@ export const printToIframe = (options: PrintOptions): void => {
           return;
         }
 
-        if (navigator.share) {
+        if ('share' in navigator) {
           const blob = await createShareBlob(printHtml);
           const file = new File([blob], 'invoice.html', { type: 'text/html' });
           await (navigator as any).share({
