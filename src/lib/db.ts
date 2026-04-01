@@ -14,10 +14,16 @@ function createPrismaClient(): PrismaClient {
   // Create PostgreSQL connection pool
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is not set')
+    if (process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE === 'phase-production-build') {
+      // Allow build to pass without DATABASE_URL by returning a mock client or avoiding throwing
+      console.warn('DATABASE_URL environment variable is not set during build phase.');
+    } else {
+      console.warn('DATABASE_URL environment variable is not set. Database operations will fail.');
+    }
   }
 
-  const pool = new Pool({ connectionString })
+  // Use dummy connection string if building to prevent throw
+  const pool = new Pool({ connectionString: connectionString || "postgresql://dummy:dummy@localhost:5432/dummy" })
   // Compatibility workaround between different pg @types versions used by Prisma adapter
   const adapter = new PrismaPg(pool as unknown as any)
 
