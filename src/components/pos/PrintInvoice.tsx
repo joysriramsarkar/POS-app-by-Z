@@ -78,7 +78,7 @@ function ThermalInvoice({
   const config = storeConfig || STORE_CONFIG;
   const is58mm = width === "58mm";
   const fontSize = is58mm ? "text-[10px]" : "text-xs";
-  const padding = is58mm ? "p-2" : "p-3";
+  const sectionPadding = is58mm ? "p-2" : "p-3";
   
   // ========================================================================
   // CRITICAL: Strict width constraints to prevent thermal printer breaks
@@ -87,18 +87,19 @@ function ThermalInvoice({
   const containerStyle: React.CSSProperties = {
     width: is58mm ? "58mm" : "80mm",
     maxWidth: is58mm ? "58mm" : "80mm",
-    margin: "0",
+    margin: "0 auto",
     overflow: "hidden",
     wordBreak: "break-word",
+    boxSizing: "border-box",
   };
 
   return (
     <div
-      className={`thermal-invoice thermal-${width} ${therminalWidth} ${padding} bg-white text-black font-mono overflow-hidden wrap-break-word`}
+      className={`thermal-invoice thermal-${width} ${therminalWidth} p-0 bg-white text-black font-mono overflow-hidden wrap-break-word`}
       style={containerStyle}
     >
       {/* Header */}
-      <div className="text-center space-y-1 truncate">
+      <div className={`text-center space-y-1 truncate ${sectionPadding}`}>
         {showLogo && (
           <div className="flex justify-center mb-2">
             <img src="/favicon.ico" alt="Logo" className="w-10 h-10" />
@@ -113,7 +114,7 @@ function ThermalInvoice({
       <Separator className="my-2 bg-black" />
 
       {/* Invoice Info */}
-      <div className={`${fontSize} space-y-0.5`}>
+      <div className={`${fontSize} space-y-0.5 ${sectionPadding}`}>
         <div className="flex justify-between min-w-0">
           <span className="shrink-0">Invoice:</span>
           <span className="font-semibold shrink-0 ml-2">{sale.invoiceNumber}</span>
@@ -145,32 +146,27 @@ function ThermalInvoice({
       <Separator className="my-2 bg-black" />
 
       {/* Items Table - STRICTLY SIZED TO PREVENT OVERFLOW */}
-      <div className={`${fontSize} overflow-hidden`}>
-        <div className="flex font-bold border-b border-black pb-0.5 min-w-0">
-          <span className="flex-1 min-w-0 truncate">Item</span>
-          <span className="w-10 text-right shrink-0">Qty</span>
-          <span className="w-14 text-right shrink-0">Price</span>
-          <span className="w-14 text-right shrink-0">Total</span>
-        </div>
-
-        {/* Items */}
-        <div className="border-b border-dashed border-gray-400 overflow-hidden">
-          {sale.items.map((item) => (
-            <div
-              key={item.id}
-              className="py-0.5 flex border-b border-dotted border-gray-300 last:border-0 min-w-0 overflow-hidden"
-            >
-              <span className="flex-1 min-w-0 truncate pr-1">{item.productName}</span>
-              <span className="w-10 text-right shrink-0">{item.quantity}</span>
-              <span className="w-14 text-right shrink-0">
-                {item.unitPrice.toFixed(0)}
-              </span>
-              <span className="w-14 text-right shrink-0 font-medium">
-                {item.totalPrice.toFixed(0)}
-              </span>
-            </div>
-          ))}
-        </div>
+      <div className={`${fontSize} overflow-hidden ${sectionPadding}`}>
+        <table className="w-full product-table border-separate border-spacing-0">
+          <thead>
+            <tr>
+              <th className="text-left w-[55%] font-bold border-b border-black pb-0.5">Item</th>
+              <th className="text-right w-[15%] font-bold border-b border-black pb-0.5">Qty</th>
+              <th className="text-right w-[15%] font-bold border-b border-black pb-0.5">Price</th>
+              <th className="text-right w-[15%] font-bold border-b border-black pb-0.5">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sale.items.map((item) => (
+              <tr key={item.id} className="border-b border-dotted border-gray-300 last:border-0">
+                <td className="product-name-cell w-[55%] pr-1 align-top whitespace-normal wrap-break-word">{item.productName}</td>
+                <td className="w-[15%] text-right align-top">{item.quantity}</td>
+                <td className="w-[15%] text-right align-top">{item.unitPrice.toFixed(0)}</td>
+                <td className="w-[15%] text-right align-top font-medium">{item.totalPrice.toFixed(0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
         {/* Totals */}
         <div className="mt-1 space-y-0.5 overflow-hidden">

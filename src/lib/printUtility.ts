@@ -14,10 +14,6 @@ interface PrintOptions {
 
 const isCapacitorNative = (): boolean => typeof window !== 'undefined' && Capacitor.isNativePlatform?.();
 
-const createShareBlob = async (html: string): Promise<Blob> => {
-  return new Blob([html], { type: 'text/html' });
-};
-
 /**
  * Industry-standard iframe-based print utility for POS applications
  * 
@@ -208,6 +204,19 @@ export const printToIframe = (options: PrintOptions): void => {
             font-family: 'Monaco', 'Courier', monospace !important;
             page-break-inside: auto !important;
             page-break-after: auto !important;
+            box-sizing: border-box !important;
+          }
+
+          .product-table {
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+          }
+
+          .product-name-cell {
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            white-space: normal !important;
           }
 
           /* Prevent breaks inside critical sections */
@@ -289,9 +298,10 @@ export const printToIframe = (options: PrintOptions): void => {
       try {
         onBeforePrint?.();
 
-        const printerPlugin = (Capacitor as any).Plugins?.Printer;
-        if (printerPlugin?.print) {
-          await printerPlugin.print({ html: printHtml });
+        // @ts-expect-error - cordova is injected at runtime
+        if (window.cordova && window.cordova.plugins && window.cordova.plugins.printer) {
+          // @ts-expect-error
+          window.cordova.plugins.printer.print(printHtml, { name: 'Lakhan_Bhandar_Invoice' });
           onAfterPrint?.();
           if (document.body.contains(iframe)) {
             document.body.removeChild(iframe);
@@ -299,25 +309,11 @@ export const printToIframe = (options: PrintOptions): void => {
           return;
         }
 
-        if (navigator.share) {
-          const blob = await createShareBlob(printHtml);
-          const file = new File([blob], 'invoice.html', { type: 'text/html' });
-          await (navigator as any).share({
-            title: 'Invoice',
-            text: 'Please print or save this invoice from the share sheet.',
-            files: [file],
-          });
-          onAfterPrint?.();
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-          return;
-        }
-
-        console.warn('[PrintUtil] Capacitor native print/share not available; falling back to iframe print.');
+        console.error('[PrintUtil] Capacitor native print failed: cordova printer plugin not available.');
       } catch (error) {
         console.error('[PrintUtil] Capacitor native print failed:', error);
       }
+      return;
     }
 
     if (iframe.contentWindow) {
