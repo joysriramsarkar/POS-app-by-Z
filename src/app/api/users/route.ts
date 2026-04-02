@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getServerSession } from "next-auth";
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
