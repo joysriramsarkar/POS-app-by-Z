@@ -309,11 +309,8 @@ export const printToIframe = (options: PrintOptions): void => {
           return;
         }
 
-<<<<<<< HEAD
-        console.error('[PrintUtil] Capacitor native print failed: cordova printer plugin not available.');
-=======
         if ('share' in navigator) {
-          const blob = await createShareBlob(printHtml);
+          const blob = new Blob([printHtml], { type: 'text/html' });
           const file = new File([blob], 'invoice.html', { type: 'text/html' });
           await (navigator as any).share({
             title: 'Invoice',
@@ -328,7 +325,6 @@ export const printToIframe = (options: PrintOptions): void => {
         }
 
         console.warn('[PrintUtil] Capacitor native print/share not available; falling back to iframe print.');
->>>>>>> 8195c1619c2a6aab7ae923f11ed8a1defec2ea51
       } catch (error) {
         console.error('[PrintUtil] Capacitor native print failed:', error);
       }
