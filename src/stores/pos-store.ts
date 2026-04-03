@@ -7,6 +7,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import type { CartItem, PaymentMethod, Product, Customer, Sale } from '@/types/pos';
 import { v4 as uuidv4 } from 'uuid';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
+import Decimal from 'decimal.js';
 
 // ============================================================================
 // CART STORE
@@ -75,12 +76,12 @@ export const useCartStore = create<CartState & CartActions>()(
         if (existingItemIndex >= 0) {
           const updatedItems = [...currentItems];
           const existingItem = updatedItems[existingItemIndex];
-          const newQuantity = existingItem.quantity + quantity;
+          const newQuantity = new Decimal(existingItem.quantity).plus(new Decimal(quantity)).toNumber();
 
           updatedItems[existingItemIndex] = {
             ...existingItem,
             quantity: newQuantity,
-            totalPrice: newQuantity * existingItem.unitPrice,
+            totalPrice: new Decimal(newQuantity).times(new Decimal(existingItem.unitPrice)).toNumber(),
           };
           set({ items: updatedItems });
         } else {
@@ -91,7 +92,7 @@ export const useCartStore = create<CartState & CartActions>()(
             barcode: product.barcode || undefined,
             quantity: quantity,
             unitPrice: product.sellingPrice,
-            totalPrice: quantity * product.sellingPrice,
+            totalPrice: new Decimal(quantity).times(new Decimal(product.sellingPrice)).toNumber(),
             unit: product.unit,
             availableStock: product.currentStock,
           };
@@ -114,7 +115,7 @@ export const useCartStore = create<CartState & CartActions>()(
         set((state) => ({
           items: state.items.map((item) =>
             item.id === itemId
-              ? { ...item, quantity, totalPrice: quantity * item.unitPrice }
+              ? { ...item, quantity, totalPrice: new Decimal(quantity).times(new Decimal(item.unitPrice)).toNumber() }
               : item
           ),
         }));
@@ -161,13 +162,13 @@ export const useCartStore = create<CartState & CartActions>()(
       setPendingSyncCount: (count: number) => set({ pendingSyncCount: count }),
 
       getSubtotal: () => {
-        return get().items.reduce((sum, item) => sum + item.totalPrice, 0);
+        return get().items.reduce((sum, item) => new Decimal(sum).plus(new Decimal(item.totalPrice)).toNumber(), 0);
       },
 
       getTotal: () => {
         const subtotal = get().getSubtotal();
         const { discount, tax } = get();
-        return subtotal - discount + tax;
+        return new Decimal(subtotal).minus(new Decimal(discount)).plus(new Decimal(tax)).toNumber();
       },
 
       getItemCount: () => {

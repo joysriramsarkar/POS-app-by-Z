@@ -181,6 +181,8 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
               onKeyDown={handleInputKeyDown}
               className="w-12 md:w-16 h-8 md:h-8 text-center px-1 touch-manipulation text-sm"
               aria-label="Quantity"
+              max={item.availableStock}
+              min={0}
             />
 
             {/* Increment Button */}

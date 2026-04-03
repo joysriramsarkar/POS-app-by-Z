@@ -103,6 +103,7 @@ model LedgerEntry {
 
   @@index([customerId])
   @@index([createdAt])
+  @@index([customerId, createdAt])
   @@map("ledger_entries")
 }
 

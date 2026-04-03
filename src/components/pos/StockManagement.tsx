@@ -160,7 +160,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
               <Package className="w-6 h-6" />
-              Stock / Items
+              Inventory Management
             </h1>
             <p className="text-sm text-muted-foreground">
               {products.length} items • {lowStockCount} low stock • {outOfStockCount} out of stock
