@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 // Helper function to check admin access
-async function requireAdmin(session: any) {
+export async function requireAdmin(session: any) {
   if (!session?.user?.role || session.user.role !== "ADMIN") {
     return null;
   }
