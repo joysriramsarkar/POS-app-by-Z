@@ -19,11 +19,10 @@ export { UsersManagement } from './UsersManagement';
 export type { User as UserType } from './UsersManagement';
 export { AddUserDialog } from './AddUserDialog';
 export { default as SettingsManagement } from './SettingsManagement';
-export { TransactionHistory } from './TransactionHistory';
+export { TransactionHistory } from './transaction-history';
 
 // Print Components
 export { PrintInvoice, InvoicePreview } from './PrintInvoice';
 export { PrintDialog } from './PrintDialog';
 
 export { default as Reports } from './Reports';
-
