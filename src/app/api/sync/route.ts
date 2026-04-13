@@ -307,18 +307,18 @@ async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, acti
         if (updateResult === 0) {
           console.warn(`Warning during sync: Could not update stock for product ${item.productId}`);
         }
-
-        // Create stock history for audit trail
-        await tx.stockHistory.create({
-          data: {
-            productId: item.productId,
-            changeType: 'sale',
-            quantity: -item.quantity,
-            reason: `Offline sync sale: ${saleData.invoiceNumber}`,
-            referenceId: sale.id,
-          },
-        });
       }
+
+      // Create stock history for audit trail in a single batch
+      await tx.stockHistory.createMany({
+        data: saleData.items.map((item) => ({
+          productId: item.productId,
+          changeType: 'sale',
+          quantity: -item.quantity,
+          reason: `Offline sync sale: ${saleData.invoiceNumber}`,
+          referenceId: sale.id,
+        })),
+      });
 
       // Update customer due if applicable
       const amountPaid = saleData.amountPaid || 0;
