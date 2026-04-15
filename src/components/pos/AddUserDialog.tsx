@@ -37,11 +37,11 @@ interface AddUserDialogProps {
   onSuccess: () => void;
 }
 
-export function AddUserDialog({
-  user,
-  onClose,
-  onSuccess,
-}: AddUserDialogProps) {
+function useUserForm(
+  user: User | null | undefined,
+  onClose: () => void,
+  onSuccess: () => void,
+) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -99,7 +99,7 @@ export function AddUserDialog({
         payload.password = password;
       }
 
-      const url = isEditing ? `/api/users/${user.id}` : "/api/users";
+      const url = isEditing ? `/api/users/${user?.id}` : "/api/users";
       const method = isEditing ? "PATCH" : "POST";
 
       const response = await fetch(url, {
@@ -111,7 +111,7 @@ export function AddUserDialog({
       if (!response.ok) {
         const error = await response.json();
         throw new Error(
-          error.error || `Failed to ${isEditing ? "update" : "create"} user`
+          error.error || `Failed to ${isEditing ? "update" : "create"} user`,
         );
       }
 
@@ -134,13 +134,43 @@ export function AddUserDialog({
     }
   };
 
+  return {
+    loading,
+    showPassword,
+    setShowPassword,
+    formData,
+    setFormData,
+    password,
+    setPassword,
+    errors,
+    isEditing,
+    handleSubmit,
+  };
+}
+
+export function AddUserDialog({
+  user,
+  onClose,
+  onSuccess,
+}: AddUserDialogProps) {
+  const {
+    loading,
+    showPassword,
+    setShowPassword,
+    formData,
+    setFormData,
+    password,
+    setPassword,
+    errors,
+    isEditing,
+    handleSubmit,
+  } = useUserForm(user, onClose, onSuccess);
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px] w-[95vw] max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {isEditing ? "Edit User" : "Add New User"}
-          </DialogTitle>
+          <DialogTitle>{isEditing ? "Edit User" : "Add New User"}</DialogTitle>
           <DialogDescription>
             {isEditing
               ? "Update user information and role"
@@ -232,9 +262,7 @@ export function AddUserDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ADMIN">
-                  Admin - Full access
-                </SelectItem>
+                <SelectItem value="ADMIN">Admin - Full access</SelectItem>
                 <SelectItem value="MANAGER">
                   Manager - Manage products & sales
                 </SelectItem>
@@ -268,7 +296,9 @@ export function AddUserDialog({
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={isEditing ? "Enter new password (optional)" : "Enter password"}
+                placeholder={
+                  isEditing ? "Enter new password (optional)" : "Enter password"
+                }
                 disabled={loading}
                 className={errors.password ? "border-destructive" : ""}
               />
@@ -304,7 +334,11 @@ export function AddUserDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 gap-2">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 gap-2"
+            >
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
               {isEditing ? "Update User" : "Create User"}
             </Button>
