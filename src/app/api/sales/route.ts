@@ -249,29 +249,20 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Second pass: atomically update stock for all items in a single batch
-      // Use raw SQL with UNNEST for efficient atomic conditional updates to prevent race conditions
-      if (validatedItems.length > 0) {
-        const itemProductIds = validatedItems.map((item: any) => item.productId);
-        const itemQuantities = validatedItems.map((item: any) => item.quantity);
-
+      // Second pass: atomically update stock for all items
+      // We must do updates one-by-one to ensure atomic conditional check for each product
+      for (const item of validatedItems) {
+        // Use raw SQL for atomic conditional update to prevent race conditions
         const updateResult = await tx.$executeRaw`
-          UPDATE products AS p
-          SET
-            "current_stock" = p."current_stock" - u.quantity::float,
-            "updated_at" = NOW()
-          FROM (
-            SELECT unnest(${itemProductIds}::text[]) as id, unnest(${itemQuantities}::float[]) as quantity
-          ) AS u
-          WHERE p.id = u.id AND p."current_stock" >= u.quantity::float
+          UPDATE products
+          SET "current_stock" = "current_stock" - ${item.quantity},
+              "updated_at" = NOW()
+          WHERE id = ${item.productId} AND "current_stock" >= ${item.quantity}
         `;
 
-        // The number of updated rows should match the number of unique items
-        // Note: If duplicate productIds exist in validatedItems, they should ideally be merged before this step,
-        // but assuming they are distinct based on the application logic.
-        const distinctProductCount = new Set(itemProductIds).size;
-        if (updateResult !== distinctProductCount) {
-          throw new Error(`Atomic stock update failed. Another transaction may have depleted stock.`);
+        if (updateResult === 0) {
+          // This should not happen as we validated above, but just in case
+          throw new Error(`Atomic stock update failed for product ${item.productId}. Another transaction may have depleted stock.`);
         }
       }
 

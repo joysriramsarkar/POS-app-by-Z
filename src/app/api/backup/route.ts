@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
-import bcrypt from "bcryptjs";
-import crypto from "crypto";
 
 export const dynamic = 'force-dynamic';
 
@@ -40,19 +38,7 @@ export async function GET() {
       db.purchase.findMany(),
       db.purchaseItem.findMany(),
       db.setting.findMany(),
-      db.user.findMany({
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          name: true,
-          phone: true,
-          role: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true
-        }
-      })
+      db.user.findMany()
     ]);
 
     const backupData = {
@@ -117,23 +103,6 @@ export async function POST(request: Request) {
       users = []
     } = backupData.data;
 
-    // Ensure all restored users have a secure password hash.
-    // Since passwords are not exported in the backup, users will be assigned
-    // cryptographically strong random passwords upon restore and will require a password reset
-    // by an administrator (or through an email reset flow if implemented).
-    const usersWithPassword = await Promise.all(users.map(async (user: any) => {
-      if (!user.password) {
-        // Generate a strong 32-character random hex string as the new temporary password
-        const randomPassword = crypto.randomBytes(16).toString('hex');
-        const secureRandomHash = await bcrypt.hash(randomPassword, 10);
-        return {
-          ...user,
-          password: secureRandomHash
-        };
-      }
-      return user;
-    }));
-
     // Use interactive transaction to sequentially clear and restore data to avoid foreign key issues
     await db.$transaction(async (tx) => {
       // CLEAR EVERYTHING first (order matters for foreign keys)
@@ -156,7 +125,7 @@ export async function POST(request: Request) {
       await tx.user.deleteMany();
 
       // RESTORE EVERYTHING (order matters for foreign keys)
-      if (usersWithPassword.length > 0) await tx.user.createMany({ data: usersWithPassword });
+      if (users.length > 0) await tx.user.createMany({ data: users });
       if (settings.length > 0) await tx.setting.createMany({ data: settings });
       if (categories.length > 0) await tx.category.createMany({ data: categories });
       if (products.length > 0) await tx.product.createMany({ data: products });

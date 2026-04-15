@@ -50,47 +50,17 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Invalid payload format" }, { status: 400 });
     }
 
-    const entries = Object.entries(body);
-    if (entries.length > 0) {
-      const keys: string[] = [];
-      const values: string[] = [];
-
-      for (const [key, value] of entries) {
-        keys.push(key);
-        values.push(typeof value === "string" ? value : String(value));
-      }
-
-      await db.$transaction(async (tx) => {
-        // Find existing keys to determine updates vs inserts
-        const existingSettings = await tx.setting.findMany({
-          where: { key: { in: keys } },
-          select: { key: true }
-        });
-        const existingKeys = new Set(existingSettings.map((s: any) => s.key));
-
-        const toCreate: { key: string, value: string }[] = [];
-
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          const value = values[i];
-          if (existingKeys.has(key)) {
-            // Update individual existing settings. Prisma does not have an updateMany for different values.
-            // Using individual updates inside an interactive transaction is safe.
-            await tx.setting.update({
-              where: { key },
-              data: { value }
-            });
-          } else {
-            toCreate.push({ key, value });
-          }
-        }
-
-        // Batch insert new settings
-        if (toCreate.length > 0) {
-          await tx.setting.createMany({ data: toCreate });
-        }
+    // We'll update or insert all keys provided in the request body
+    const updatePromises = Object.entries(body).map(([key, value]) => {
+      const stringValue = typeof value === "string" ? value : String(value);
+      return db.setting.upsert({
+        where: { key },
+        update: { value: stringValue },
+        create: { key, value: stringValue },
       });
-    }
+    });
+
+    await db.$transaction(updatePromises);
 
     return NextResponse.json({ success: true, message: "Settings updated successfully" });
   } catch (error: unknown) {
