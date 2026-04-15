@@ -296,27 +296,31 @@ async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, acti
       });
 
       // Update stock for all products
-      for (const item of saleData.items) {
-        const updateResult = await tx.$executeRaw`
-          UPDATE products 
-          SET "current_stock" = "current_stock" - ${item.quantity},
+      if (saleData.items.length > 0) {
+        const productIds = saleData.items.map((i: any) => i.productId);
+        const quantities = saleData.items.map((i: any) => i.quantity);
+
+        await tx.$executeRaw`
+          UPDATE products AS p
+          SET "current_stock" = p."current_stock" - update_data.quantity,
               "updated_at" = NOW()
-          WHERE id = ${item.productId}
+          FROM (
+            SELECT unnest(${productIds}::text[]) AS id, unnest(${quantities}::float[]) AS quantity
+          ) AS update_data
+          WHERE p.id = update_data.id
         `;
 
-        if (updateResult === 0) {
-          console.warn(`Warning during sync: Could not update stock for product ${item.productId}`);
-        }
-
         // Create stock history for audit trail
-        await tx.stockHistory.create({
-          data: {
-            productId: item.productId,
-            changeType: 'sale',
-            quantity: -item.quantity,
-            reason: `Offline sync sale: ${saleData.invoiceNumber}`,
-            referenceId: sale.id,
-          },
+        const historyData = saleData.items.map((item: any) => ({
+          productId: item.productId,
+          changeType: 'sale',
+          quantity: -item.quantity,
+          reason: `Offline sync sale: ${saleData.invoiceNumber}`,
+          referenceId: sale.id,
+        }));
+
+        await tx.stockHistory.createMany({
+          data: historyData,
         });
       }
 
