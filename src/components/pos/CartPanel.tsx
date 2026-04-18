@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
@@ -123,12 +124,18 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
     [setCustomer, paymentMethod, setPaymentMethod]
   );
 
+  const { toast } = useToast();
+
   const handleAddPartyFromCart = async () => {
     if (!newParty.name) return;
 
     // Validate phone if provided
     if (newParty.phone && !/^[0-9]{10}$/.test(newParty.phone)) {
-      alert('Phone number must be exactly 10 digits.');
+      toast({
+        title: 'Invalid Phone Number',
+        description: 'Phone number must be exactly 10 digits.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -140,7 +147,8 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create customer');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create customer');
       }
 
       const { data: newCustomer } = await response.json();
@@ -148,9 +156,17 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
       handleCustomerSelect(newCustomer);
       setShowAddPartyDialog(false);
       setNewParty({ name: '', phone: '', address: '', notes: '' });
+      toast({
+        title: 'Customer Added',
+        description: `${newCustomer.name} has been added and selected.`,
+      });
     } catch (error) {
       console.error('Failed to add customer:', error);
-      alert('Failed to create customer');
+      toast({
+        title: 'Failed to Create Customer',
+        description: error instanceof Error ? error.message : 'An unexpected error occurred.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -252,19 +268,17 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
               </div>
               {onAddCustomer && (
                 <div className="p-2 border-t space-y-2">
-                  {onAddCustomer && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => {
-                        setCustomerDialogOpen(true);
-                        onAddCustomer();
-                      }}
-                    >
-                      Add from Party List
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      setCustomerDialogOpen(true);
+                      onAddCustomer();
+                    }}
+                  >
+                    Add from Party List
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

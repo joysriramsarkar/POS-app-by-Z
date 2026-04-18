@@ -30,7 +30,6 @@ import {
 import type { PaymentMethod, Sale, SaleItem, Customer } from '@/types/pos';
 import { useCartStore, useUIStore, useProductsStore, useCustomersStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
-import { generateInvoiceNumber } from '@/lib/invoice';
 
 interface CheckoutDialogProps {
   open?: boolean;

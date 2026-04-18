@@ -1,11 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -15,32 +13,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { BulkStockUpdateDialog } from './BulkStockUpdateDialog';
 import {
   Package,
   Plus,
   Search,
   Edit,
-  AlertTriangle,
   Filter,
   ArrowUpDown,
-  History,
   X,
   Upload,
 } from 'lucide-react';
@@ -63,8 +49,6 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
 
   const products = useProductsStore((state) => state.products);

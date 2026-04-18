@@ -384,24 +384,89 @@ function POSDashboard() {
 
   const handleCheckoutComplete = useCallback(async (paymentData: PaymentData) => {
     setIsProcessingPayment(true);
-    try {
-      const salePayload = {
+
+    const salePayload = {
+      items: cartItems.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+      })),
+      customerId: paymentData.customerId,
+      paymentMethod: paymentData.paymentMethod,
+      amountPaid: paymentData.amountPaid,
+      discount: paymentData.discount,
+      tax: paymentData.tax,
+      usePrepaid: paymentData.usePrepaid,
+      prepaidAmountUsed: paymentData.prepaidAmountUsed,
+    };
+
+    const processOfflineSale = async () => {
+      let paymentStatus = 'Paid';
+      if (paymentData.amountPaid === 0) paymentStatus = 'Due';
+      else if (paymentData.amountPaid > 0 && paymentData.amountPaid < paymentData.total) paymentStatus = 'Partial';
+
+      const sale: Sale = {
+        id: uuidv4(),
+        invoiceNumber: generateInvoiceNumber(),
+        customerId: paymentData.customerId,
+        userId: (session?.user as { id?: string })?.id,
+        subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
+        discount: paymentData.discount,
+        tax: paymentData.tax,
+        totalAmount: paymentData.total,
+        amountPaid: paymentData.amountPaid,
+        paymentMethod: paymentData.paymentMethod,
+        paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
+        status: 'Completed',
+        notes: undefined,
+        offlineSynced: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
         items: cartItems.map(item => ({
+          id: uuidv4(),
+          saleId: '',
           productId: item.productId,
           productName: item.productName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           totalPrice: item.totalPrice,
+          createdAt: new Date(),
         })),
-        customerId: paymentData.customerId,
-        paymentMethod: paymentData.paymentMethod,
-        amountPaid: paymentData.amountPaid,
-        discount: paymentData.discount,
-        tax: paymentData.tax,
-        usePrepaid: paymentData.usePrepaid,
-        prepaidAmountUsed: paymentData.prepaidAmountUsed,
-      };
+      } as Sale;
 
+      await SalesDB.save(sale);
+      await SyncQueueDB.add({
+        id: uuidv4(),
+        entityType: 'Sale',
+        entityId: sale.id,
+        action: 'create',
+        payload: JSON.stringify(sale),
+        synced: false,
+        retryCount: 0,
+        createdAt: new Date(),
+      });
+
+      cartItems.forEach((item) => {
+        updateProductStock(item.productId, -item.quantity);
+        ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
+      });
+
+      if (paymentData.customerId) {
+        const dueAmount = paymentData.total - paymentData.amountPaid;
+        if (dueAmount > 0) {
+          updateCustomerDue(paymentData.customerId, dueAmount);
+          CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
+        }
+      }
+
+      setCurrentSale(sale);
+      setCompletedCheckoutSale(sale);
+      clearCart();
+    };
+
+    try {
       if (isOnline) {
         try {
           const response = await fetch('/api/sales', {
@@ -486,69 +551,7 @@ function POSDashboard() {
         }
       } else {
         // --- OFFLINE FALLBACK ------------------------------------------------
-        // create a local sale object and queue for sync
-        let paymentStatus = 'Paid';
-        if (paymentData.amountPaid === 0) paymentStatus = 'Due';
-        else if (paymentData.amountPaid > 0 && paymentData.amountPaid < paymentData.total) paymentStatus = 'Partial';
-
-        const sale: Sale = {
-          id: uuidv4(),
-          invoiceNumber: generateInvoiceNumber(),
-          customerId: paymentData.customerId,
-          userId: (session?.user as { id?: string })?.id, // Track which user created this sale
-          subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
-          discount: paymentData.discount,
-          tax: paymentData.tax,
-          totalAmount: paymentData.total,
-          amountPaid: paymentData.amountPaid,
-          paymentMethod: paymentData.paymentMethod,
-          paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
-          status: 'Completed',
-          notes: undefined,
-          offlineSynced: false,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          items: cartItems.map(item => ({
-            id: uuidv4(),
-            saleId: '',
-            productId: item.productId,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.totalPrice,
-            createdAt: new Date(),
-          })),
-        } as Sale;
-
-        await SalesDB.save(sale);
-        await SyncQueueDB.add({
-          id: uuidv4(),
-          entityType: 'Sale',
-          entityId: sale.id,
-          action: 'create',
-          payload: JSON.stringify(sale),
-          synced: false,
-          retryCount: 0,
-          createdAt: new Date(),
-        });
-
-        // adjust local stock and customer due
-        cartItems.forEach((item) => {
-          updateProductStock(item.productId, -item.quantity);
-          ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
-        });
-
-        if (paymentData.customerId) {
-          const dueAmount = paymentData.total - paymentData.amountPaid;
-          if (dueAmount > 0) {
-            updateCustomerDue(paymentData.customerId, dueAmount);
-            CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
-          }
-        }
-
-        setCurrentSale(sale);
-        setCompletedCheckoutSale(sale);
-        clearCart();
+        await processOfflineSale();
         toast({ title: 'Offline sale saved', description: 'Will sync when connection is restored.' });
       }
     } catch (error) {
@@ -559,85 +562,7 @@ function POSDashboard() {
         // Re-run the offline flow
         try {
           setIsOnline(false);
-          // Retry the offline logic
-          const salePayload = {
-            items: cartItems.map(item => ({
-              productId: item.productId,
-              productName: item.productName,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-            })),
-            customerId: paymentData.customerId,
-            paymentMethod: paymentData.paymentMethod,
-            amountPaid: paymentData.amountPaid,
-            discount: paymentData.discount,
-            tax: paymentData.tax,
-            usePrepaid: paymentData.usePrepaid,
-            prepaidAmountUsed: paymentData.prepaidAmountUsed,
-          };
-          
-          let paymentStatus = 'Paid';
-          if (paymentData.amountPaid === 0) paymentStatus = 'Due';
-          else if (paymentData.amountPaid > 0 && paymentData.amountPaid < paymentData.total) paymentStatus = 'Partial';
-
-          const sale: Sale = {
-            id: uuidv4(),
-            invoiceNumber: generateInvoiceNumber(),
-            customerId: paymentData.customerId,
-            userId: (session?.user as { id?: string })?.id,
-            subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
-            discount: paymentData.discount,
-            tax: paymentData.tax,
-            totalAmount: paymentData.total,
-            amountPaid: paymentData.amountPaid,
-            paymentMethod: paymentData.paymentMethod,
-            paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
-            status: 'Completed',
-            notes: undefined,
-            offlineSynced: false,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            items: cartItems.map(item => ({
-              id: uuidv4(),
-              saleId: '',
-              productId: item.productId,
-              productName: item.productName,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-              createdAt: new Date(),
-            })),
-          } as Sale;
-
-          await SalesDB.save(sale);
-          await SyncQueueDB.add({
-            id: uuidv4(),
-            entityType: 'Sale',
-            entityId: sale.id,
-            action: 'create',
-            payload: JSON.stringify(sale),
-            synced: false,
-            retryCount: 0,
-            createdAt: new Date(),
-          });
-
-          cartItems.forEach((item) => {
-            updateProductStock(item.productId, -item.quantity);
-            ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
-          });
-
-          if (paymentData.customerId) {
-            const dueAmount = paymentData.total - paymentData.amountPaid;
-            if (dueAmount > 0) {
-              updateCustomerDue(paymentData.customerId, dueAmount);
-              CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
-            }
-          }
-
-          setCurrentSale(sale);
-          setCompletedCheckoutSale(sale);
-          clearCart();
+          await processOfflineSale();
           toast({ title: 'Database offline', description: 'Sale saved locally. Will sync when connection restored.' });
           return;
         } catch (offlineError) {
@@ -666,12 +591,18 @@ function POSDashboard() {
   }, [
     cartItems,
     isOnline,
+    session,
     setCurrentSale,
+    setCompletedCheckoutSale,
     setPrintDialogOpen,
     clearCart,
     setProducts,
     updateCustomerDue,
+    updateProductStock,
     setCheckoutOpen,
+    setIsOnline,
+    setPendingCount,
+    pendingCount,
     toast,
   ]);
 

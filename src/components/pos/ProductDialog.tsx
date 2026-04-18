@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import {
   Dialog,
   DialogContent,
@@ -110,7 +111,9 @@ export function ProductDialog({
   const [minStockLevel, setMinStockLevel] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
+  const { toast } = useToast();
   const categories = useProductsStore((state) => state.categories);
   const allCategories = [...new Set([...DEFAULT_CATEGORIES, ...categories])].sort();
 
@@ -152,18 +155,36 @@ export function ProductDialog({
   };
 
   const handleSubmit = async () => {
-    if (!name || !category || !buyingPrice || !sellingPrice) return;
+    setFormError(null);
+    if (!name.trim()) {
+      setFormError('Product name is required.');
+      return;
+    }
+    if (!isCategoryValid) {
+      setFormError('Please select or enter a category.');
+      return;
+    }
+    const bp = parseFloat(buyingPrice);
+    const sp = parseFloat(sellingPrice);
+    if (isNaN(bp) || bp < 0) {
+      setFormError('Buying price must be a valid non-negative number.');
+      return;
+    }
+    if (isNaN(sp) || sp < 0) {
+      setFormError('Selling price must be a valid non-negative number.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const data: ProductFormData = {
         id: product?.id,
-        name,
+        name: name.trim(),
         nameBn: nameBn || undefined,
         barcode: barcode || undefined,
         category: category === 'new_category_custom_value' ? newCategory.trim() : category,
-        buyingPrice: parseFloat(buyingPrice),
-        sellingPrice: parseFloat(sellingPrice),
+        buyingPrice: bp,
+        sellingPrice: sp,
         unit,
         currentStock: parseFloat(currentStock) || 0,
         minStockLevel: parseFloat(minStockLevel) || 5,
@@ -172,6 +193,10 @@ export function ProductDialog({
 
       onSubmit?.(data);
       onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to save product';
+      setFormError(msg);
+      toast({ title: 'Save Failed', description: msg, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -184,6 +209,11 @@ export function ProductDialog({
   const profitMargin = buyingPrice && sellingPrice && parseFloat(buyingPrice) > 0
     ? (((parseFloat(sellingPrice) - parseFloat(buyingPrice)) / parseFloat(buyingPrice)) * 100).toFixed(1)
     : null;
+
+  const showNameError = formError && !name.trim();
+  const showCategoryError = formError && !isCategoryValid;
+  const showBuyingPriceError = formError && (isNaN(parseFloat(buyingPrice)) || parseFloat(buyingPrice) < 0);
+  const showSellingPriceError = formError && (isNaN(parseFloat(sellingPrice)) || parseFloat(sellingPrice) < 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -207,6 +237,7 @@ export function ProductDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Tata Salt"
+              className={showNameError ? 'border-destructive focus-visible:ring-destructive' : ''}
             />
           </div>
 
@@ -262,7 +293,7 @@ export function ProductDialog({
                 }
               }}
             >
-              <SelectTrigger id="product-form-category">
+              <SelectTrigger id="product-form-category" className={showCategoryError ? 'border-destructive focus-visible:ring-destructive' : ''}>
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -283,7 +314,7 @@ export function ProductDialog({
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   placeholder="Enter new category name"
-                  className="h-9 text-sm"
+                  className={cn("h-9 text-sm", showCategoryError ? 'border-destructive focus-visible:ring-destructive' : '')}
                   autoFocus
                 />
               </div>
@@ -319,6 +350,7 @@ export function ProductDialog({
                 placeholder="0"
                 min="0"
                 step="0.01"
+                className={showBuyingPriceError ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
             </div>
             <div className="space-y-2">
@@ -331,6 +363,7 @@ export function ProductDialog({
                 placeholder="0"
                 min="0"
                 step="0.01"
+                className={showSellingPriceError ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
             </div>
           </div>
@@ -389,6 +422,13 @@ export function ProductDialog({
               onCheckedChange={setIsActive}
             />
           </div>
+
+          {/* Form error message */}
+          {formError && (
+            <p className="text-sm text-destructive flex items-center gap-1 pt-1">
+              <span aria-hidden="true">⚠️</span>{formError}
+            </p>
+          )}
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">

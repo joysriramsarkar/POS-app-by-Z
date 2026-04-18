@@ -147,10 +147,10 @@ export function TransactionHistory() {
   };
 
   return (
-    <div className="flex flex-col h-full gap-4 p-4 overflow-hidden">
-      <div className="space-y-2 shrink-0">
-        <h1 className="text-2xl font-bold">Transaction History</h1>
-        <p className="text-muted-foreground">View and manage all sales transactions</p>
+    <div className="flex flex-col h-full gap-2 md:gap-4 p-2 md:p-4 overflow-hidden">
+      <div className="space-y-1 md:space-y-2 shrink-0">
+        <h1 className="text-xl md:text-2xl font-bold">Transaction History</h1>
+        <p className="hidden md:block text-muted-foreground">View and manage all sales transactions</p>
       </div>
 
       <TransactionFilters

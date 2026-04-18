@@ -1,4 +1,4 @@
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Table,
   TableBody,
@@ -27,8 +27,7 @@ export function TransactionTable({
 }: TransactionTableProps) {
   return (
     <ScrollArea className="flex-1 w-full h-full">
-      <div className="w-full overflow-x-auto">
-        <div className="min-w-max">
+      <div className="min-w-max">
           <Table>
             <TableHeader className="sticky top-0 bg-background">
               <TableRow className="hover:bg-transparent border-b min-h-10 md:min-h-12">
@@ -124,8 +123,8 @@ export function TransactionTable({
               ))}
             </TableBody>
           </Table>
-        </div>
       </div>
+      <ScrollBar orientation="horizontal" />
     </ScrollArea>
   );
 }
