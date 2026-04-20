@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { db } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { ProductInputSchema, SaleInputSchema, CustomerInputSchema } from '@/schemas';
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
   }
 }
 // Sync sale from offline
-async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, action: string) {
+async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof SaleInputSchema>, action: string) {
   if (action === 'create') {
     if (!saleData.invoiceNumber) {
       throw new Error('Invoice number is required for sync');
@@ -383,7 +384,7 @@ async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, acti
 }
 
 // Sync customer from offline
-async function syncCustomer(tx: any, customerData: z.infer<typeof CustomerInputSchema>, action: string) {
+async function syncCustomer(tx: Prisma.TransactionClient, customerData: z.infer<typeof CustomerInputSchema>, action: string) {
   if (action === 'create') {
     // Check if customer already exists (Server-wins)
     if (customerData.phone) {
@@ -431,7 +432,7 @@ async function syncCustomer(tx: any, customerData: z.infer<typeof CustomerInputS
 }
 
 // Sync product updates (primarily stock changes) from offline
-async function syncProduct(tx: any, productData: z.infer<typeof ProductSyncPayloadSchema> | z.infer<typeof ProductInputSchema>, action: string) {
+async function syncProduct(tx: Prisma.TransactionClient, productData: z.infer<typeof ProductSyncPayloadSchema> | z.infer<typeof ProductInputSchema>, action: string) {
   if (action === 'create') {
     // Create a new product from full product data
     if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
