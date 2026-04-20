@@ -297,8 +297,8 @@ async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, acti
 
       // Update stock for all products
       if (saleData.items.length > 0) {
-        const productIds = saleData.items.map((i: any) => i.productId);
-        const quantities = saleData.items.map((i: any) => i.quantity);
+        const productIds = saleData.items.map((i) => i.productId);
+        const quantities = saleData.items.map((i) => i.quantity);
 
         await tx.$executeRaw`
           UPDATE products AS p
@@ -311,7 +311,7 @@ async function syncSale(tx: any, saleData: z.infer<typeof SaleInputSchema>, acti
         `;
 
         // Create stock history for audit trail
-        const historyData = saleData.items.map((item: any) => ({
+        const historyData = saleData.items.map((item) => ({
           productId: item.productId,
           changeType: 'sale',
           quantity: -item.quantity,
