@@ -21,7 +21,7 @@ import {
   ScanLine,
 } from 'lucide-react';
 import { useProductsStore, useCartStore } from '@/stores/pos-store';
-import { STORE_CONFIG } from '@/types/pos';
+import { STORE_CONFIG, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 
 interface DashboardStats {
@@ -75,7 +75,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           try {
             const { data: sales } = await salesResult.value.json();
             if (sales) {
-              const recentTransactions = sales.map((sale: any) => ({
+              const recentTransactions = sales.map((sale: Sale) => ({
                 id: sale.id,
                 invoiceNumber: sale.invoiceNumber,
                 customerName: sale.customer?.name,
