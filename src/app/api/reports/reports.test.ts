@@ -3,10 +3,16 @@ import { GET as getSales } from './sales/route';
 import { GET as getDues } from './dues/route';
 import { GET as getProducts } from './products/route';
 import { GET as getStock } from './stock/route';
+import { NextRequest } from 'next/server';
 
 // Mock next-auth
 const mockGetSession = mock(() => Promise.resolve(null));
 mock.module('next-auth/next', () => ({
+  getServerSession: mockGetSession,
+}));
+
+// Mock next-auth
+mock.module('next-auth', () => ({
   getServerSession: mockGetSession,
 }));
 
@@ -59,7 +65,7 @@ describe('Reports API Security', () => {
       it('should return 401 when unauthenticated', async () => {
         mockGetSession.mockResolvedValueOnce(null);
 
-        const req = new Request(`http://localhost:3000/api/reports/${name}`);
+        const req = new NextRequest(`http://localhost:3000/api/reports/${name}`);
         const res = await handler(req as any);
 
         expect(res.status).toBe(401);
@@ -76,7 +82,7 @@ describe('Reports API Security', () => {
         const { db } = await import('@/lib/db');
         db.rolePermission.findFirst.mockResolvedValueOnce(null);
 
-        const req = new Request(`http://localhost:3000/api/reports/${name}`);
+        const req = new NextRequest(`http://localhost:3000/api/reports/${name}`);
         const res = await handler(req as any);
 
         expect(res.status).toBe(403);
@@ -91,7 +97,7 @@ describe('Reports API Security', () => {
         db.rolePermission.findFirst.mockResolvedValueOnce({ id: 'rp1' });
         db.user.findUnique.mockResolvedValueOnce({ id: 'admin-id', role: 'ADMIN', isActive: true });
 
-        const req = new Request(`http://localhost:3000/api/reports/${name}`);
+        const req = new NextRequest(`http://localhost:3000/api/reports/${name}`);
         const res = await handler(req as any);
 
         expect(res.status).toBe(200);
