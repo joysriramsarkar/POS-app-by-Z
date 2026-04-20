@@ -121,18 +121,27 @@ export async function POST(request: Request) {
     // Since passwords are not exported in the backup, users will be assigned
     // cryptographically strong random passwords upon restore and will require a password reset
     // by an administrator (or through an email reset flow if implemented).
-    const usersWithPassword = await Promise.all(users.map(async (user: any) => {
-      if (!user.password) {
-        // Generate a strong 32-character random hex string as the new temporary password
-        const randomPassword = crypto.randomBytes(16).toString('hex');
-        const secureRandomHash = await bcrypt.hash(randomPassword, 10);
-        return {
-          ...user,
-          password: secureRandomHash
-        };
-      }
-      return user;
-    }));
+    // Use chunking to avoid blocking the event loop with too many concurrent bcrypt operations.
+    const usersWithPassword: any[] = [];
+    const CHUNK_SIZE = 5;
+    for (let i = 0; i < users.length; i += CHUNK_SIZE) {
+      const chunk = users.slice(i, i + CHUNK_SIZE);
+      const processedChunk = await Promise.all(chunk.map(async (user: any) => {
+        if (!user.password) {
+          // Generate a strong 32-character random hex string as the new temporary password
+          const randomPassword = crypto.randomBytes(16).toString('hex');
+          const secureRandomHash = await bcrypt.hash(randomPassword, 10);
+          return {
+            ...user,
+            password: secureRandomHash
+          };
+        }
+        return user;
+      }));
+      usersWithPassword.push(...processedChunk);
+      // Yield to the event loop to ensure the server remains responsive
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
 
     // Use interactive transaction to sequentially clear and restore data to avoid foreign key issues
     await db.$transaction(async (tx) => {
