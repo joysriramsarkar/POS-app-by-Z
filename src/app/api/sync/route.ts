@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { ProductInputSchema, SaleInputSchema, CustomerInputSchema } from '@/schemas';
 
+
 const ProductSyncPayloadSchema = z.union([
   ProductInputSchema,
   z.object({
@@ -26,20 +27,23 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   try {
     const { searchParams } = new URL(request.url);
-    const action = searchParams.get('action');
+    const action = searchParams.get("action");
 
-    if (action === 'status') {
+    if (action === "status") {
       // Return sync status
       const [pendingCount, lastSync] = await Promise.all([
         db.syncQueue.count({ where: { synced: false } }),
         db.syncQueue.findFirst({
           where: { synced: true },
-          orderBy: { syncedAt: 'desc' },
+          orderBy: { syncedAt: "desc" },
         }),
       ]);
 
@@ -55,7 +59,7 @@ export async function GET(request: NextRequest) {
     // Return all pending sync items
     const pendingItems = await db.syncQueue.findMany({
       where: { synced: false },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
 
     return NextResponse.json({
@@ -63,10 +67,10 @@ export async function GET(request: NextRequest) {
       data: pendingItems,
     });
   } catch (error) {
-    console.error('Error fetching sync status:', error);
+    console.error("Error fetching sync status:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch sync status' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch sync status" },
+      { status: 500 },
     );
   }
 }
@@ -75,15 +79,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   try {
-    const idempotencyKey = request.headers.get('X-Idempotency-Key');
+    const idempotencyKey = request.headers.get("X-Idempotency-Key");
     if (!idempotencyKey) {
       return NextResponse.json(
-        { success: false, error: 'Missing X-Idempotency-Key header' },
-        { status: 400 }
+        { success: false, error: "Missing X-Idempotency-Key header" },
+        { status: 400 },
       );
     }
 
@@ -92,8 +99,8 @@ export async function POST(request: NextRequest) {
 
     if (!actionType || !payload) {
       return NextResponse.json(
-        { success: false, error: 'Missing actionType or payload' },
-        { status: 400 }
+        { success: false, error: "Missing actionType or payload" },
+        { status: 400 },
       );
     }
 
@@ -103,50 +110,78 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingSync && existingSync.synced) {
-        console.log(`✅ Idempotency hit: returning cached result for ${idempotencyKey}`);
+        console.log(
+          `✅ Idempotency hit: returning cached result for ${idempotencyKey}`,
+        );
         return {
           cached: true,
-          data: JSON.parse(existingSync.result as string)
+          data: JSON.parse(existingSync.result as string),
         };
       }
 
       let operationResult;
 
       switch (actionType) {
-        case 'sale:create': {
+        case "sale:create": {
           const saleResult = SaleInputSchema.safeParse(payload);
-          if (!saleResult.success) throw new Error('Invalid Sale payload: ' + saleResult.error.message);
-          operationResult = await syncSale(tx, saleResult.data, 'create');
+          if (!saleResult.success)
+            throw new Error(
+              "Invalid Sale payload: " + saleResult.error.message,
+            );
+          operationResult = await syncSale(tx, saleResult.data, "create");
           break;
         }
-        case 'customer:create': {
+        case "customer:create": {
           const customerResult = CustomerInputSchema.safeParse(payload);
-          if (!customerResult.success) throw new Error('Invalid Customer payload: ' + customerResult.error.message);
-          operationResult = await syncCustomer(tx, customerResult.data, 'create');
+          if (!customerResult.success)
+            throw new Error(
+              "Invalid Customer payload: " + customerResult.error.message,
+            );
+          operationResult = await syncCustomer(
+            tx,
+            customerResult.data,
+            "create",
+          );
           break;
         }
-        case 'customer:update': {
+        case "customer:update": {
           const customerResult = CustomerInputSchema.safeParse(payload);
-          if (!customerResult.success) throw new Error('Invalid Customer payload: ' + customerResult.error.message);
-          operationResult = await syncCustomer(tx, customerResult.data, 'update');
+          if (!customerResult.success)
+            throw new Error(
+              "Invalid Customer payload: " + customerResult.error.message,
+            );
+          operationResult = await syncCustomer(
+            tx,
+            customerResult.data,
+            "update",
+          );
           break;
         }
-        case 'product:stock:update': {
+        case "product:stock:update": {
           const productResult = ProductSyncPayloadSchema.safeParse(payload);
-          if (!productResult.success) throw new Error('Invalid Product payload: ' + productResult.error.message);
-          operationResult = await syncProduct(tx, productResult.data, 'update');
+          if (!productResult.success)
+            throw new Error(
+              "Invalid Product payload: " + productResult.error.message,
+            );
+          operationResult = await syncProduct(tx, productResult.data, "update");
           break;
         }
-        case 'product:create': {
+        case "product:create": {
           const productResult = ProductInputSchema.safeParse(payload);
-          if (!productResult.success) throw new Error('Invalid Product payload: ' + productResult.error.message);
-          operationResult = await syncProduct(tx, productResult.data, 'create');
+          if (!productResult.success)
+            throw new Error(
+              "Invalid Product payload: " + productResult.error.message,
+            );
+          operationResult = await syncProduct(tx, productResult.data, "create");
           break;
         }
-        case 'product:update': {
+        case "product:update": {
           const productResult = ProductInputSchema.safeParse(payload);
-          if (!productResult.success) throw new Error('Invalid Product payload: ' + productResult.error.message);
-          operationResult = await syncProduct(tx, productResult.data, 'update');
+          if (!productResult.success)
+            throw new Error(
+              "Invalid Product payload: " + productResult.error.message,
+            );
+          operationResult = await syncProduct(tx, productResult.data, "update");
           break;
         }
         default:
@@ -155,8 +190,14 @@ export async function POST(request: NextRequest) {
 
       // Extract entity ID from payload or result if available
       let entityId: string | undefined;
-      if (typeof payload === 'object' && payload !== null) {
-        entityId = (payload as any).id || (payload as any).customerId || (payload as any).productId;
+      if (typeof payload === "object" && payload !== null) {
+        const p = payload as Record<string, unknown>;
+        const id = typeof p.id === "string" ? p.id : undefined;
+        const customerId =
+          typeof p.customerId === "string" ? p.customerId : undefined;
+        const productId =
+          typeof p.productId === "string" ? p.productId : undefined;
+        entityId = id || customerId || productId;
       }
 
       // ⚠️ CRITICAL: Use upsert to handle idempotency correctly
@@ -174,7 +215,7 @@ export async function POST(request: NextRequest) {
           idempotencyKey,
           entityType: actionType,
           entityId, // Set entity_id to track which entity this syncs
-          action: 'sync',
+          action: "sync",
           payload: JSON.stringify(payload),
           synced: true,
           syncedAt: new Date(),
@@ -193,21 +234,22 @@ export async function POST(request: NextRequest) {
       message: `${actionType} synced successfully`,
     });
   } catch (error) {
-    console.error('Error syncing data:', error);
+    console.error("Error syncing data:", error);
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to sync data',
+        error: error instanceof Error ? error.message : "Failed to sync data",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 // Sync sale from offline
 async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof SaleInputSchema>, action: string) {
   if (action === 'create') {
+
     if (!saleData.invoiceNumber) {
-      throw new Error('Invoice number is required for sync');
+      throw new Error("Invoice number is required for sync");
     }
     // Check if sale already exists (prevent duplicates)
     const existing = await tx.sale.findUnique({
@@ -220,88 +262,99 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
 
     // Create sale with items
     // already in tx
-      // VALIDATION PHASE: Check all prerequisites before creating anything
-      
-      // 1. Validate all products exist and check current stock levels
-      const productIds = Array.from(new Set(saleData.items.map(item => item.productId)));
-      const products = await tx.product.findMany({
-        where: { id: { in: productIds } },
+    // VALIDATION PHASE: Check all prerequisites before creating anything
+
+    // 1. Validate all products exist and check current stock levels
+    const productIds = Array.from(
+      new Set(saleData.items.map((item) => item.productId)),
+    );
+    const products = await tx.product.findMany({
+      where: { id: { in: productIds } },
+    });
+
+    const productMap = new Map<string, any>(
+      products.map((p: any) => [p.id, p]),
+    );
+    const productsToValidate: { product: any; item: any }[] = [];
+
+    for (const item of saleData.items) {
+      const product = productMap.get(item.productId);
+
+      if (!product) {
+        throw new Error(
+          `Product ${item.productId} not found during sync validation`,
+        );
+      }
+
+      // Note: During offline sync, we may not have exact stock levels, so we log warnings but allow the sync
+      // This prevents losing sales data. Stock discrepancies should be reconciled via inventory management
+      if (product.currentStock < item.quantity) {
+        console.warn(
+          `Warning: Product ${product.name} has insufficient stock (have: ${product.currentStock}, need: ${item.quantity}) during sync. Sale will be recorded but may cause stock issues.`,
+        );
+      }
+
+      productsToValidate.push({ product, item });
+    }
+
+    // 2. Validate customer exists if specified
+    if (saleData.customerId) {
+      const customer = await tx.customer.findUnique({
+        where: { id: saleData.customerId },
       });
 
-      const productMap = new Map<string, any>(products.map((p: any) => [p.id, p]));
-      const productsToValidate: { product: any; item: any }[] = [];
-
-      for (const item of saleData.items) {
-        const product = productMap.get(item.productId);
-        
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found during sync validation`);
-        }
-        
-        // Note: During offline sync, we may not have exact stock levels, so we log warnings but allow the sync
-        // This prevents losing sales data. Stock discrepancies should be reconciled via inventory management
-        if (product.currentStock < item.quantity) {
-          console.warn(`Warning: Product ${product.name} has insufficient stock (have: ${product.currentStock}, need: ${item.quantity}) during sync. Sale will be recorded but may cause stock issues.`);
-        }
-        
-        productsToValidate.push({ product, item });
+      if (!customer) {
+        throw new Error(
+          `Customer ${saleData.customerId} not found during sync validation`,
+        );
       }
+    }
 
-      // 2. Validate customer exists if specified
-      if (saleData.customerId) {
-        const customer = await tx.customer.findUnique({
-          where: { id: saleData.customerId },
-        });
-        
-        if (!customer) {
-          throw new Error(`Customer ${saleData.customerId} not found during sync validation`);
-        }
-      }
+    // 3. Validate basic sale data
+    if (!saleData.items || saleData.items.length === 0) {
+      throw new Error("Sale must have at least one item");
+    }
 
-      // 3. Validate basic sale data
-      if (!saleData.items || saleData.items.length === 0) {
-        throw new Error('Sale must have at least one item');
-      }
+    if ((saleData.totalAmount || 0) < 0) {
+      throw new Error("Total amount cannot be negative");
+    }
 
-      if ((saleData.totalAmount || 0) < 0) {
-        throw new Error('Total amount cannot be negative');
-      }
-
-      // CREATE PHASE: Now that validation passed, create records
-      const sale = await tx.sale.create({
-        data: {
-          id: saleData.id,
-          invoiceNumber: saleData.invoiceNumber as string,
-          customerId: saleData.customerId || null,
-          subtotal: saleData.subtotal || 0,
-          discount: saleData.discount || 0,
-          tax: saleData.tax || 0,
-          totalAmount: saleData.totalAmount || 0,
-          amountPaid: saleData.amountPaid || 0,
-          paymentMethod: saleData.paymentMethod || 'Cash',
-          paymentStatus: saleData.paymentStatus || 'Paid',
-          status: saleData.status || 'Completed',
-          notes: saleData.notes || null,
-          offlineSynced: true,
-          items: {
-            create: saleData.items.map((item) => ({
-              productId: item.productId,
-              productName: item.productName,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice,
-            })),
-          },
+    // CREATE PHASE: Now that validation passed, create records
+    const sale = await tx.sale.create({
+      data: {
+        id: saleData.id,
+        invoiceNumber: saleData.invoiceNumber as string,
+        customerId: saleData.customerId || null,
+        subtotal: saleData.subtotal || 0,
+        discount: saleData.discount || 0,
+        tax: saleData.tax || 0,
+        totalAmount: saleData.totalAmount || 0,
+        amountPaid: saleData.amountPaid || 0,
+        paymentMethod: saleData.paymentMethod || "Cash",
+        paymentStatus: saleData.paymentStatus || "Paid",
+        status: saleData.status || "Completed",
+        notes: saleData.notes || null,
+        offlineSynced: true,
+        items: {
+          create: saleData.items.map((item) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
         },
-        include: { items: true },
-      });
+      },
+      include: { items: true },
+    });
 
       // Update stock for all products
       if (saleData.items.length > 0) {
         const productIds = saleData.items.map((i) => i.productId);
         const quantities = saleData.items.map((i) => i.quantity);
 
-        await tx.$executeRaw`
+
+      await tx.$executeRaw`
           UPDATE products AS p
           SET "current_stock" = p."current_stock" - update_data.quantity,
               "updated_at" = NOW()
@@ -320,64 +373,65 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
           referenceId: sale.id,
         }));
 
-        await tx.stockHistory.createMany({
-          data: historyData,
-        });
-      }
 
-      // Update customer due if applicable
-      const amountPaid = saleData.amountPaid || 0;
-      const totalAmount = saleData.totalAmount || 0;
+      await tx.stockHistory.createMany({
+        data: historyData,
+      });
+    }
 
-      if (saleData.customerId && amountPaid < totalAmount) {
-        const dueAmount = totalAmount - amountPaid;
-        
-        // Fetch customer BEFORE updating for correct balance calculation
-        const customer = await tx.customer.findUnique({
+    // Update customer due if applicable
+    const amountPaid = saleData.amountPaid || 0;
+    const totalAmount = saleData.totalAmount || 0;
+
+    if (saleData.customerId && amountPaid < totalAmount) {
+      const dueAmount = totalAmount - amountPaid;
+
+      // Fetch customer BEFORE updating for correct balance calculation
+      const customer = await tx.customer.findUnique({
+        where: { id: saleData.customerId },
+      });
+
+      if (customer) {
+        const newTotalDue = customer.totalDue + dueAmount;
+
+        await tx.customer.update({
           where: { id: saleData.customerId },
+          data: {
+            totalDue: { increment: dueAmount },
+            updatedAt: new Date(),
+          },
         });
 
-        if (customer) {
-          const newTotalDue = customer.totalDue + dueAmount;
+        // Add ledger entries for double-entry bookkeeping tracking
+        // Add credit for the total amount
+        await tx.ledgerEntry.create({
+          data: {
+            customerId: saleData.customerId,
+            entryType: "credit",
+            amount: totalAmount,
+            balanceAfter: newTotalDue,
+            description: `Offline sync credit purchase: ${saleData.invoiceNumber}`,
+            referenceId: sale.id,
+          },
+        });
 
-          await tx.customer.update({
-            where: { id: saleData.customerId },
-            data: {
-              totalDue: { increment: dueAmount },
-              updatedAt: new Date(),
-            },
-          });
-
-          // Add ledger entries for double-entry bookkeeping tracking
-          // Add credit for the total amount
+        // Add debit for the amount paid if partial payment
+        if (amountPaid > 0) {
           await tx.ledgerEntry.create({
             data: {
               customerId: saleData.customerId,
-              entryType: 'credit',
-              amount: totalAmount,
-              balanceAfter: newTotalDue,
-              description: `Offline sync credit purchase: ${saleData.invoiceNumber}`,
+              entryType: "debit",
+              amount: amountPaid,
+              balanceAfter: newTotalDue - amountPaid,
+              description: `Offline sync payment for: ${saleData.invoiceNumber}`,
               referenceId: sale.id,
             },
           });
-
-          // Add debit for the amount paid if partial payment
-          if (amountPaid > 0) {
-            await tx.ledgerEntry.create({
-              data: {
-                customerId: saleData.customerId,
-                entryType: 'debit',
-                amount: amountPaid,
-                balanceAfter: newTotalDue - amountPaid,
-                description: `Offline sync payment for: ${saleData.invoiceNumber}`,
-                referenceId: sale.id,
-              },
-            });
-          }
         }
       }
+    }
 
-      return sale;
+    return sale;
   }
 
   throw new Error(`Unknown action: ${action}`);
@@ -386,6 +440,7 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
 // Sync customer from offline
 async function syncCustomer(tx: Prisma.TransactionClient, customerData: z.infer<typeof CustomerInputSchema>, action: string) {
   if (action === 'create') {
+
     // Check if customer already exists (Server-wins)
     if (customerData.phone) {
       const existing = await tx.customer.findUnique({
@@ -411,9 +466,9 @@ async function syncCustomer(tx: Prisma.TransactionClient, customerData: z.infer<
     });
   }
 
-  if (action === 'update') {
+  if (action === "update") {
     if (!customerData.id) {
-      throw new Error('Customer ID is required for update');
+      throw new Error("Customer ID is required for update");
     }
 
     return tx.customer.update({
@@ -434,9 +489,27 @@ async function syncCustomer(tx: Prisma.TransactionClient, customerData: z.infer<
 // Sync product updates (primarily stock changes) from offline
 async function syncProduct(tx: Prisma.TransactionClient, productData: z.infer<typeof ProductSyncPayloadSchema> | z.infer<typeof ProductInputSchema>, action: string) {
   if (action === 'create') {
+
     // Create a new product from full product data
-    if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
-      const { id, barcode, name, nameBn, category, buyingPrice, sellingPrice, unit, currentStock, minStockLevel, isActive } = productData as any;
+    if (
+      "name" in productData &&
+      "category" in productData &&
+      "buyingPrice" in productData &&
+      "sellingPrice" in productData
+    ) {
+      const {
+        id,
+        barcode,
+        name,
+        nameBn,
+        category,
+        buyingPrice,
+        sellingPrice,
+        unit,
+        currentStock,
+        minStockLevel,
+        isActive,
+      } = productData as any;
 
       // Check if product already exists (prevent duplicates)
       if (id) {
@@ -463,38 +536,55 @@ async function syncProduct(tx: Prisma.TransactionClient, productData: z.infer<ty
       });
     }
 
-    throw new Error('Invalid product data for create action');
-  } else if (action === 'update') {
-    if ('productId' in productData && 'quantityChange' in productData) {
+    throw new Error("Invalid product data for create action");
+  } else if (action === "update") {
+    if ("productId" in productData && "quantityChange" in productData) {
       const { productId, quantityChange } = productData;
 
       // already in tx
-        const updated = await tx.product.update({
-          where: { id: productId },
-          data: {
-            currentStock: { increment: quantityChange },
-            updatedAt: new Date(),
-          },
-        });
+      const updated = await tx.product.update({
+        where: { id: productId },
+        data: {
+          currentStock: { increment: quantityChange },
+          updatedAt: new Date(),
+        },
+      });
 
-        await tx.stockHistory.create({
-          data: {
-            productId,
-            changeType: quantityChange > 0 ? 'purchase' : 'sale',
-            quantity: quantityChange,
-            reason: 'Offline sync',
-          },
-        });
+      await tx.stockHistory.create({
+        data: {
+          productId,
+          changeType: quantityChange > 0 ? "purchase" : "sale",
+          quantity: quantityChange,
+          reason: "Offline sync",
+        },
+      });
 
-        return updated;
+      return updated;
     }
 
     // fallback to update entire object if no quantityChange provided
-    if ('name' in productData && 'category' in productData && 'buyingPrice' in productData && 'sellingPrice' in productData) {
-      const { id, barcode, name, nameBn, category, buyingPrice, sellingPrice, unit, currentStock, minStockLevel, isActive } = productData as any;
+    if (
+      "name" in productData &&
+      "category" in productData &&
+      "buyingPrice" in productData &&
+      "sellingPrice" in productData
+    ) {
+      const {
+        id,
+        barcode,
+        name,
+        nameBn,
+        category,
+        buyingPrice,
+        sellingPrice,
+        unit,
+        currentStock,
+        minStockLevel,
+        isActive,
+      } = productData as any;
 
       if (!id) {
-        throw new Error('Product ID is required for update sync');
+        throw new Error("Product ID is required for update sync");
       }
 
       return tx.product.upsert({
@@ -527,7 +617,7 @@ async function syncProduct(tx: Prisma.TransactionClient, productData: z.infer<ty
       });
     }
 
-    throw new Error('Invalid product data payload');
+    throw new Error("Invalid product data payload");
   }
 
   throw new Error(`Unknown action: ${action}`);
@@ -537,7 +627,10 @@ async function syncProduct(tx: Prisma.TransactionClient, productData: z.infer<ty
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   try {
@@ -566,10 +659,10 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Error updating sync status:', err);
+    console.error("Error updating sync status:", err);
     return NextResponse.json(
-      { success: false, error: 'Failed to update sync status' },
-      { status: 500 }
+      { success: false, error: "Failed to update sync status" },
+      { status: 500 },
     );
   }
 }
