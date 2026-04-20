@@ -28,12 +28,10 @@ export class OfflineSyncWorker {
    */
   async startSync(): Promise<void> {
     if (this.isRunning) {
-      console.log('⏳ Sync already running, skipping duplicate call');
       return;
     }
 
     this.isRunning = true;
-    console.log('🚀 Starting offline sync worker...');
 
     // Fire sync start event so UI can show loading state
     this.notifyStart();
@@ -44,10 +42,8 @@ export class OfflineSyncWorker {
 
       // Get pending sync items from SyncQueueDB
       const pendingItems = await SyncQueueDB.getUnsynced();
-      console.log(`📋 Found ${pendingItems.length} offline queued items to sync`);
 
       if (pendingItems.length === 0) {
-        console.log('✅ No items to sync');
         this.notifyUI({ synced: 0, failed: 0, total: 0 });
         return;
       }
@@ -88,16 +84,13 @@ export class OfflineSyncWorker {
 
           await SyncQueueDB.markSynced(item.id);
           successCount++;
-          console.log(`✅ Synced ${actionType}: queue item ${item.id}`);
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
           await SyncQueueDB.incrementRetry(item.id, errorMsg);
           failureCount++;
-          console.error(`❌ Failed to sync queue item ${item.id}: ${errorMsg}`);
         }
       }
 
-      console.log(`🏁 Sync complete: ${successCount} succeeded, ${failureCount} failed/retrying`);
       this.notifyUI({ synced: successCount, failed: failureCount, total: pendingItems.length });
     } finally {
       this.isRunning = false;

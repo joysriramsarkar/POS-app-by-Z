@@ -93,7 +93,7 @@ function useUserForm(
 
     try {
       setLoading(true);
-      const payload: any = { ...formData };
+      const payload: User & { password?: string } = { ...formData };
 
       if (password) {
         payload.password = password;
@@ -253,7 +253,7 @@ export function AddUserDialog({
             <Label htmlFor="role">Role</Label>
             <Select
               value={formData.role}
-              onValueChange={(value: any) =>
+              onValueChange={(value: User["role"]) =>
                 setFormData({ ...formData, role: value })
               }
               disabled={loading}

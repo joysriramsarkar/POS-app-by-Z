@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateServerInvoiceNumber } from '@/lib/invoice';
 import { v4 as uuidv4 } from 'uuid';
-import { SaleInputSchema } from '@/schemas';
+import { SaleInputSchema, SaleItemInput } from '@/schemas';
 
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Verify all products exist and have sufficient stock
-      const productMap = new Map(productsInDb.map(p => [p.id, p]));
+      const productMap = new Map(productsInDb.map((p) => [p.id, p]));
       for (const item of validatedItems) {
         const product = productMap.get(item.productId);
         if (!product) {
@@ -252,8 +252,8 @@ export async function POST(request: NextRequest) {
       // Second pass: atomically update stock for all items in a single batch
       // Use raw SQL with UNNEST for efficient atomic conditional updates to prevent race conditions
       if (validatedItems.length > 0) {
-        const itemProductIds = validatedItems.map((item: any) => item.productId);
-        const itemQuantities = validatedItems.map((item: any) => item.quantity);
+        const itemProductIds = validatedItems.map((item: SaleItemInput) => item.productId);
+        const itemQuantities = validatedItems.map((item: SaleItemInput) => item.quantity);
 
         const updateResult = await tx.$executeRaw`
           UPDATE products AS p
