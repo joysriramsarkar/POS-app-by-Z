@@ -42,6 +42,7 @@ export const SaleInputSchema = z.object({
   prepaidAmountUsed: z.coerce.number().nonnegative().optional().default(0),
 });
 
+export type SaleItemInput = z.infer<typeof SaleItemInputSchema>;
 export type SaleInput = z.infer<typeof SaleInputSchema>;
 
 export const CustomerInputSchema = z.object({
