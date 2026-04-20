@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     console.log('🔍 [HEALTH CHECK] Starting database connection check...')
-    console.log('📝 [HEALTH CHECK] DATABASE_URL:', process.env.DATABASE_URL?.substring(0, 50) + '...')
     console.log('📝 [HEALTH CHECK] NODE_ENV:', process.env.NODE_ENV)
 
     // Try to query the database
