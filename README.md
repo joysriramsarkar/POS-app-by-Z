@@ -30,13 +30,13 @@ A modern, offline-first Point of Sale (POS) Progressive Web App (PWA) built with
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) installed on your system.
+- [Node.js](https://nodejs.org/) installed on your system.
 
 ### Installation
 
 1. Clone the repository and install dependencies:
    ```bash
-   bun install
+   npm install
    ```
 
 2. Set up your environment variables by creating a `.env` file (copy from `.env.example` if available) and configuring the required variables:
@@ -49,14 +49,14 @@ A modern, offline-first Point of Sale (POS) Progressive Web App (PWA) built with
 
 3. Initialize the database:
    ```bash
-   bun run db:push
-   bun run db:generate
-   bun run db:seed
+   npm run db:push
+   npm run db:generate
+   npm run db:seed
    ```
 
 4. Start the development server:
    ```bash
-   bun run dev
+   npm run dev
    ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the application in your browser.
@@ -72,8 +72,8 @@ Open [http://localhost:3000](http://localhost:3000) to view the application in y
 To build the application for production:
 
 ```bash
-bun run build
-bun start
+npm run build
+npm start
 ```
 
 ## 📜 License

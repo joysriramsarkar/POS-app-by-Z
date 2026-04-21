@@ -89,7 +89,6 @@
     "recharts": "^2.15.4",
     "sharp": "^0.34.3",
     "sonner": "^2.0.6",
-    "sqlite3": "^6.0.1",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7",
     "uuid": "^11.1.0",
@@ -104,7 +103,6 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "bun-types": "^1.3.4",
     "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "^16.1.6",
@@ -124,7 +122,6 @@
     "esbuild",
     "prisma",
     "sharp",
-    "sqlite3",
     "unrs-resolver"
   ]
 }

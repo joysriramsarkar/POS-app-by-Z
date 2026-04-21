@@ -380,6 +380,7 @@ export const useProductsStore = create<ProductsState & ProductsActions>((set, ge
 interface CustomersState {
   customers: Customer[];
   isLoading: boolean;
+  setLoading: (loading: boolean) => void;
 }
 
 interface CustomersActions {
@@ -387,14 +388,14 @@ interface CustomersActions {
   addCustomer: (customer: Customer) => void;
   updateCustomer: (id: string, data: Partial<Customer>) => void;
   updateCustomerDue: (id: string, amount: number) => void;
-  getCustomerByPhone: (phone: string) => Customer | undefined;
-  searchCustomers: (query: string) => Customer[];
   reset: () => void;
 }
 
 export const useCustomersStore = create<CustomersState & CustomersActions>((set, get) => ({
   customers: [],
   isLoading: false,
+
+  setLoading: (loading) => set({ isLoading: loading }),
 
   setCustomers: (customers) => {
     set({ customers, isLoading: false });
@@ -424,18 +425,6 @@ export const useCustomersStore = create<CustomersState & CustomersActions>((set,
     }));
   },
 
-  getCustomerByPhone: (phone) => {
-    return get().customers.find((c) => c.phone === phone);
-  },
-
-  searchCustomers: (query) => {
-    const lowerQuery = query.toLowerCase();
-    return get().customers.filter(
-      (c) =>
-        c.isActive &&
-        (c.name.toLowerCase().includes(lowerQuery) || c.phone?.includes(query))
-    );
-  },
   reset: () => set({
     customers: [],
     isLoading: false,

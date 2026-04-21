@@ -1,11 +1,10 @@
-const config = {
-  seed: "tsx prisma/seed.ts",
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-      directUrl: process.env.DIRECT_URL,
-    },
-  },
-};
+import { defineConfig } from 'prisma/config';
 
-export default config;
+export default defineConfig({
+  datasource: {
+    url: process.env.DIRECT_URL,
+  },
+  migrations: {
+    seed: 'tsx prisma/seed.ts',
+  },
+});

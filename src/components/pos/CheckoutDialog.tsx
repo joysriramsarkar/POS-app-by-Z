@@ -330,60 +330,45 @@ export function CheckoutDialog({
     }
   }, [paymentMethod, remainingTotal]);
 
-  if (showSuccess) {
-    return (
-      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-md w-[95vw] max-h-[90dvh] overflow-y-auto no-print">
-          <DialogHeader>
-            <DialogTitle className="sr-only">Payment Success</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col items-center py-6">
+  const displayedTotal = lastSale ? (lastSale.totalAmount ?? total) : total;
+  const displayedPaymentMethod = lastSale ? (lastSale.paymentMethod as string) : paymentMethod;
+  const displayedChange = lastSale
+    ? Math.max(0, (Number(lastSale.amountPaid || 0) - Number(lastSale.totalAmount || 0)))
+    : change;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={isProcessing ? () => {} : handleOpenChange}>
+      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[90dvh] md:max-h-[85vh] p-0 overflow-hidden" onInteractOutside={isProcessing ? (e) => e.preventDefault() : undefined}>
+        {isProcessing && (
+          <div className="flex flex-col items-center py-16 gap-4">
+            <span className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-muted-foreground font-medium">Processing sale...</p>
+          </div>
+        )}
+        {showSuccess && (
+          <div className="flex flex-col items-center py-6 px-6">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
             <h2 className="text-xl font-semibold mb-2">Payment Successful!</h2>
-            {
-              (() => {
-                const displayedTotal = lastSale ? (lastSale.totalAmount ?? total) : total;
-                const displayedPaymentMethod = lastSale ? (lastSale.paymentMethod as string) : paymentMethod;
-                const displayedChange = lastSale
-                  ? Math.max(0, (Number(lastSale.amountPaid || 0) - Number(lastSale.totalAmount || 0)))
-                  : change;
-
-                return (
-                  <>
-                    <p className="text-muted-foreground text-center">Sale completed for {formatPrice(displayedTotal)}</p>
-
-                    {(displayedPaymentMethod === 'Cash' || displayedPaymentMethod === 'Mixed') && displayedChange > 0 && (
-                      <div className="mt-4 p-4 bg-muted rounded-lg w-full text-center">
-                        <p className="text-sm text-muted-foreground">Change to return</p>
-                        <p className="text-2xl font-bold text-primary">{formatPrice(displayedChange)}</p>
-                      </div>
-                    )}
-                  </>
-                );
-              })()
-            }
-
+            <p className="text-muted-foreground text-center">Sale completed for {formatPrice(displayedTotal)}</p>
+            {(displayedPaymentMethod === 'Cash' || displayedPaymentMethod === 'Mixed') && displayedChange > 0 && (
+              <div className="mt-4 p-4 bg-muted rounded-lg w-full text-center">
+                <p className="text-sm text-muted-foreground">Change to return</p>
+                <p className="text-2xl font-bold text-primary">{formatPrice(displayedChange)}</p>
+              </div>
+            )}
             <div className="flex gap-3 mt-6 w-full">
               <Button variant="outline" className="flex-1" onClick={handlePrint}>
-                <Printer className="w-4 h-4 mr-2" />
-                Print
+                <Printer className="w-4 h-4 mr-2" />Print
               </Button>
               <Button className="flex-1 bg-blue-600 text-white hover:bg-blue-700" onClick={handleClose}>
-                <Receipt className="w-4 h-4 mr-2" />
-                New Sale
+                <Receipt className="w-4 h-4 mr-2" />New Sale
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[425px] flex flex-col max-h-[90dvh] md:max-h-[85vh] p-0 overflow-hidden">
+        )}
+        {!isProcessing && !showSuccess && (<>
         <DialogHeader className="px-6 pt-6 pb-4 flex-none border-b">
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="w-5 h-5" />
@@ -528,20 +513,20 @@ export function CheckoutDialog({
         </div>
 
         <DialogFooter className="px-6 pb-6 pt-4 flex-none border-t bg-background gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isProcessing}>Cancel</Button>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
           <Button
             onClick={handleComplete}
-            disabled={!isValidPayment || isProcessing}
+            disabled={!isValidPayment}
             className="min-w-30 bg-blue-600 text-white hover:bg-blue-700"
           >
-            {isProcessing ? 'Processing...' : (
-              <><CheckCircle2 className="w-4 h-4 mr-2" />Complete Sale</>
-            )}
+            <CheckCircle2 className="w-4 h-4 mr-2" />Complete Sale
           </Button>
         </DialogFooter>
+        </>)}
       </DialogContent>
     </Dialog>
   );
 }
 
 export default CheckoutDialog;
+

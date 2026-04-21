@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -38,7 +38,6 @@ import { cn } from '@/lib/utils';
 interface CartPanelProps {
   onCheckout: () => void;
   customers?: Customer[];
-  onAddCustomer?: () => void;
   onScan?: () => void;
 }
 
@@ -49,10 +48,12 @@ const paymentMethods: { method: PaymentMethod; icon: React.ReactNode; label: str
   { method: 'Due', icon: <Clock className="w-5 h-5" />, label: 'Due', color: 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' },
 ];
 
-export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }: CartPanelProps) {
+export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps) {
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [searchedCustomers, setSearchedCustomers] = useState<Customer[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [showAddPartyDialog, setShowAddPartyDialog] = useState(false);
   const [newParty, setNewParty] = useState({
     name: '',
@@ -75,7 +76,6 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
   const setPaymentMethod = useCartStore((state) => state.setPaymentMethod);
 
   const setCheckoutOpen = useUIStore((state) => state.setCheckoutOpen);
-  const setCustomerDialogOpen = useUIStore((state) => state.setCustomerDialogOpen);
 
   const subtotal = getSubtotal();
   const total = getTotal();
@@ -116,13 +116,36 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
       setCustomer(customer);
       setCustomerSearchOpen(false);
       setCustomerSearchQuery('');
-      // If selecting walk-in customer and current payment is Due, switch to Cash
+      setSearchedCustomers([]);
       if (!customer && paymentMethod === 'Due') {
         setPaymentMethod('Cash');
       }
     },
     [setCustomer, paymentMethod, setPaymentMethod]
   );
+
+  useEffect(() => {
+    const searchCustomers = async () => {
+      if (!customerSearchQuery.trim()) {
+        setSearchedCustomers([]);
+        return;
+      }
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/customers?search=${encodeURIComponent(customerSearchQuery)}`);
+        if (res.ok) {
+          const { data } = await res.json();
+          setSearchedCustomers(data);
+        }
+      } catch {
+        setSearchedCustomers([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+    const timer = setTimeout(searchCustomers, 300);
+    return () => clearTimeout(timer);
+  }, [customerSearchQuery]);
 
   const { toast } = useToast();
 
@@ -170,11 +193,16 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
     }
   };
 
-  const filteredCustomers = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
-      c.phone?.includes(customerSearchQuery)
-  );
+  const displayCustomers = customerSearchQuery
+    ? (searchedCustomers.length > 0 || isSearching
+        ? searchedCustomers
+        : customers.filter(
+            (c) =>
+              c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+              c.phone?.includes(customerSearchQuery)
+          )
+      )
+    : customers.slice(0, 20);
 
   const isCartEmpty = items.length === 0;
   const itemCountDisplay = itemCount === 0 ? 'Empty' : `${itemCount} item${itemCount !== 1 ? 's' : ''}`;
@@ -233,7 +261,9 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
                   value={customerSearchQuery}
                   onChange={(e) => setCustomerSearchQuery(e.target.value)}
                   className="h-8"
+                  autoFocus
                 />
+                {isSearching && <p className="text-xs text-muted-foreground px-1 pt-1">Searching...</p>}
               </div>
               <div className="max-h-48 overflow-y-auto">
                 <div className="p-2">
@@ -244,7 +274,7 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
                   >
                     Walk-in Customer
                   </Button>
-                  {filteredCustomers.map((customer) => (
+                  {displayCustomers.map((customer) => (
                     <Button
                       key={customer.id}
                       variant="ghost"
@@ -266,19 +296,8 @@ export function CartPanel({ onCheckout, customers = [], onAddCustomer, onScan }:
                   ))}
                 </div>
               </div>
-              {onAddCustomer && (
-                <div className="p-2 border-t space-y-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      setCustomerDialogOpen(true);
-                      onAddCustomer();
-                    }}
-                  >
-                    Add from Party List
-                  </Button>
+              {onScan && (
+                <div className="p-2 border-t">
                   <Button
                     variant="outline"
                     size="sm"

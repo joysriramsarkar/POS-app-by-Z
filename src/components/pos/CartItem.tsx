@@ -76,14 +76,22 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
     removeItem(item.id);
   }, [item.id, removeItem]);
 
-  // Update global store on input change
+  const [inputValue, setInputValue] = useState<string>(String(item.quantity));
+
+  useEffect(() => {
+    setInputValue(String(item.quantity));
+  }, [item.quantity]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    if (!isNaN(value)) {
+    setInputValue(e.target.value);
+  };
+
+  const commitInputValue = () => {
+    const value = parseFloat(inputValue);
+    if (!isNaN(value) && value > 0) {
       handleQuantityChange(value);
-    } else if (e.target.value === '') {
-      // Allow clearing the input, which will be handled by handleQuantityChange (removes item if 0)
-      handleQuantityChange(0);
+    } else {
+      setInputValue(String(item.quantity));
     }
   };
 
@@ -103,7 +111,8 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
   
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      (e.target as HTMLInputElement).blur(); // Lose focus
+      commitInputValue();
+      (e.target as HTMLInputElement).blur();
     }
   };
 
@@ -176,9 +185,10 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
               name={`quantity-${item.id}`}
               type="number"
               inputMode="decimal" // Hint for mobile keyboards
-              value={item.quantity}
+              value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleInputKeyDown}
+              onBlur={commitInputValue}
               className="w-12 md:w-16 h-8 md:h-8 text-center px-1 touch-manipulation text-sm"
               aria-label="Quantity"
               max={item.availableStock}

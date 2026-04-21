@@ -318,8 +318,10 @@ export function PartiesManagement() {
       setEditingParty(null);
       setEditingPartyType('customer');
       setNewParty({ name: '', phone: '', address: '', notes: '' });
+      toast({ title: `${editingPartyType === 'customer' ? 'Customer' : 'Supplier'} Updated`, description: `${newParty.name} has been updated successfully.` });
     } catch (error) {
       console.error('Failed to update party:', error);
+      toast({ title: 'Update Failed', description: error instanceof Error ? error.message : 'An unexpected error occurred.', variant: 'destructive' });
     }
   };
 
@@ -351,9 +353,11 @@ export function PartiesManagement() {
       const { data: updatedFromServer } = await response.json();
       updateCustomer(selectedCustomer.id, updatedFromServer);
       setShowPaymentDialog(false);
+      toast({ title: 'Payment Recorded', description: `₹${paidAmount} payment recorded for ${selectedCustomer.name}.` });
 
     } catch (error) {
       console.error("Failed to record payment:", error);
+      toast({ title: 'Payment Failed', description: error instanceof Error ? error.message : 'An unexpected error occurred.', variant: 'destructive' });
     }
   };
 
@@ -417,15 +421,15 @@ export function PartiesManagement() {
 
         const { data: newCustomer } = await response.json();
         addCustomer(newCustomer);
+        toast({ title: 'Customer Added', description: `${newCustomer.name} has been added successfully.` });
 
       } catch (error) {
         console.error("Failed to add customer:", error);
-        // Optionally: show a toast to the user
-        return; // prevent clearing form on error
+        toast({ title: 'Failed to Add Customer', description: error instanceof Error ? error.message : 'An unexpected error occurred.', variant: 'destructive' });
+        return;
       }
 
     } else {
-      // Add new supplier
       try {
         const response = await fetch('/api/suppliers', {
           method: 'POST',
@@ -440,10 +444,12 @@ export function PartiesManagement() {
 
         const { data: newSupplier } = await response.json();
         setSuppliers(prev => [...prev, newSupplier]);
+        toast({ title: 'Supplier Added', description: `${newSupplier.name} has been added successfully.` });
 
       } catch (error) {
         console.error("Failed to add supplier:", error);
-        return; // prevent clearing form on error
+        toast({ title: 'Failed to Add Supplier', description: error instanceof Error ? error.message : 'An unexpected error occurred.', variant: 'destructive' });
+        return;
       }
     }
 

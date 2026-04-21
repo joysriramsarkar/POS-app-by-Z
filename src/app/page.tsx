@@ -130,6 +130,7 @@ function POSDashboard() {
   const customers = useCustomersStore((state) => state.customers);
   const updateCustomerDue = useCustomersStore((state) => state.updateCustomerDue);
   const setCustomers = useCustomersStore((state) => state.setCustomers);
+  const setCustomersLoading = useCustomersStore((state) => state.setLoading);
 
   const { toast } = useToast();
 
@@ -194,6 +195,25 @@ function POSDashboard() {
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  // Load customers on mount
+  useEffect(() => {
+    const loadCustomers = async () => {
+      setCustomersLoading(true);
+      try {
+        const res = await fetch('/api/customers');
+        if (res.ok) {
+          const { data } = await res.json();
+          setCustomers(data);
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setCustomersLoading(false);
+      }
+    };
+    loadCustomers();
+  }, [setCustomers, setCustomersLoading]);
 
   // Load products on mount
   useEffect(() => {
@@ -610,11 +630,6 @@ function POSDashboard() {
     setCheckoutOpen(true);
   }, [setCheckoutOpen]);
 
-  // Handle opening parties page to add/select customer
-  const handleOpenPartiesPage = useCallback(() => {
-    setCurrentPage('parties');
-  }, [setCurrentPage]);
-
   // Handle stock entry
   const handleStockEntry = useCallback(async (data: StockEntryData) => {
     try {
@@ -986,13 +1001,13 @@ function POSDashboard() {
               )}
 
               <div className="flex-1 min-h-0">
-                <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} onScan={handleOpenMobileScanner} />
+                <CartPanel onCheckout={handleOpenCheckout} customers={customers} onScan={handleOpenMobileScanner} />
               </div>
             </div>
 
             {/* Desktop Cart Panel */}
             <aside className="hidden sm:block w-96 border-l bg-card shrink-0">
-              <CartPanel onCheckout={handleOpenCheckout} customers={customers} onAddCustomer={handleOpenPartiesPage} onScan={handleOpenMobileScanner} />
+              <CartPanel onCheckout={handleOpenCheckout} customers={customers} onScan={handleOpenMobileScanner} />
             </aside>
           </div>
         );
