@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +22,7 @@ import {
 import { useProductsStore, useCartStore } from '@/stores/pos-store';
 import { STORE_CONFIG, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
+import { useLogout } from '@/hooks/use-logout';
 
 interface DashboardStats {
   todaySales: number;
@@ -48,6 +48,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
+  const handleLogout = useLogout();
   const [stats, setStats] = useState<DashboardStats>({
     todaySales: 0,
     todayOrders: 0,
@@ -204,7 +205,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <p className="font-semibold">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => signOut()} className="gap-2 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/50">
+            <Button onClick={handleLogout} className="gap-2 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/50">
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">লগ আউট (Logout)</span>
             </Button>

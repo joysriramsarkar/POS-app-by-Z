@@ -49,14 +49,19 @@ export class OfflineSyncWorker {
       }
 
       for (const item of pendingItems) {
+        // Skip permanently failed items
+        if (item.retryCount >= 5) {
+          await SyncQueueDB.markFailed(item.id, 'Max retries exceeded');
+          failureCount++;
+          continue;
+        }
+
         try {
-          // Prepare sync action type mapping
           const actionType = this.mapQueueItemToActionType(item);
           if (!actionType) {
             throw new Error(`Unsupported sync item: ${item.entityType}.${item.action}`);
           }
 
-          // Parse payload from stored string
           const parsedPayload = JSON.parse(item.payload);
 
           const response = await fetch('/api/sync', {
@@ -72,6 +77,13 @@ export class OfflineSyncWorker {
             }),
           });
 
+          // Session expired — stop sync and force re-login
+          if (response.status === 401) {
+            window.dispatchEvent(new CustomEvent('syncSessionExpired'));
+            this.notifyUI({ synced: successCount, failed: failureCount, total: pendingItems.length });
+            return;
+          }
+
           if (!response.ok) {
             const text = await response.text();
             throw new Error(`HTTP ${response.status}: ${response.statusText} ${text}`);
@@ -86,7 +98,12 @@ export class OfflineSyncWorker {
           successCount++;
         } catch (error) {
           const errorMsg = error instanceof Error ? error.message : String(error);
-          await SyncQueueDB.incrementRetry(item.id, errorMsg);
+          const newRetryCount = item.retryCount + 1;
+          if (newRetryCount >= 5) {
+            await SyncQueueDB.markFailed(item.id, errorMsg);
+          } else {
+            await SyncQueueDB.incrementRetry(item.id, errorMsg);
+          }
           failureCount++;
         }
       }
@@ -117,9 +134,9 @@ export class OfflineSyncWorker {
   async getStats() {
     const allItems = await SyncQueueDB.getAll();
     const stats = {
-      pending: allItems.filter((item) => !item.synced).length,
+      pending: allItems.filter((item) => !item.synced && !item.failed).length,
       processed: allItems.filter((item) => item.synced).length,
-      failed: allItems.filter((item) => item.retryCount >= 5).length,
+      failed: allItems.filter((item) => item.failed).length,
       total: allItems.length,
     };
     return stats;

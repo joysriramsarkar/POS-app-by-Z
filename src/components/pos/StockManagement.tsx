@@ -182,11 +182,13 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
   };
 
   const getStockStatus = (product: Product) => {
+    if (product.currentStock < 0) return { label: 'Negative Stock', variant: 'destructive' as const };
     if (product.currentStock === 0) return { label: 'Out of Stock', variant: 'destructive' as const };
     if (product.currentStock <= product.minStockLevel) return { label: 'Low Stock', variant: 'secondary' as const };
     return { label: 'In Stock', variant: 'default' as const };
   };
 
+  const negativeStockCount = storeProducts.filter(p => p.currentStock < 0).length;
   const lowStockCount = storeProducts.filter(p => p.currentStock <= p.minStockLevel && p.currentStock > 0).length;
   const outOfStockCount = storeProducts.filter(p => p.currentStock === 0).length;
 
@@ -202,7 +204,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
               Inventory Management
             </h1>
             <p className="text-sm text-muted-foreground">
-              {storeProducts.length} items • {lowStockCount} low stock • {outOfStockCount} out of stock
+              {storeProducts.length} items • {negativeStockCount > 0 && <span className="text-red-600 font-semibold">{negativeStockCount} negative stock • </span>}{lowStockCount} low stock • {outOfStockCount} out of stock
             </p>
           </div>
           <div className='flex gap-2'>
@@ -344,10 +346,12 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
                     <TableCell className="text-center">
                       <span className={cn(
                         "font-medium",
-                        product.currentStock <= product.minStockLevel && "text-amber-600",
-                        product.currentStock === 0 && "text-red-600"
+                        product.currentStock < 0 && "text-red-600 font-bold",
+                        product.currentStock === 0 && "text-red-600",
+                        product.currentStock > 0 && product.currentStock <= product.minStockLevel && "text-amber-600"
                       )}>
                         {product.currentStock} {product.unit}
+                        {product.currentStock < 0 && ' ⚠️'}
                       </span>
                       <p className="text-xs text-muted-foreground">Min: {product.minStockLevel}</p>
                     </TableCell>
@@ -418,6 +422,12 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
               <span className="w-2 h-2 rounded-full bg-red-500" />
               Out: {outOfStockCount}
             </span>
+            {negativeStockCount > 0 && (
+              <span className="flex items-center gap-1 text-red-600 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-red-700" />
+                Negative: {negativeStockCount}
+              </span>
+            )}
           </div>
         </div>
       </div>

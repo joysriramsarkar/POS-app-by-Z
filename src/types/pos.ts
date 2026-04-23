@@ -149,6 +149,7 @@ export interface SyncQueueItem {
   payload: string;
   synced: boolean;
   syncedAt?: Date;
+  failed?: boolean;
   retryCount: number;
   error?: string;
   createdAt: Date;

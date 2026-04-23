@@ -359,16 +359,18 @@ export const SuppliersDB = {
 // ============================================================================
 
 export const CartDB = {
-  async getCurrent(): Promise<Cart | undefined> {
-    return getFromStore<Cart>(STORES.CARTS, 'current');
+  async getCurrent(userId?: string): Promise<Cart | undefined> {
+    return getFromStore<Cart>(STORES.CARTS, userId ? `current_${userId}` : 'current');
   },
 
-  async save(cart: Cart): Promise<void> {
-    await putToStore(STORES.CARTS, { ...cart, id: 'current' });
+  async save(cart: Cart, userId?: string): Promise<void> {
+    const key = userId ? `current_${userId}` : 'current';
+    await putToStore(STORES.CARTS, { ...cart, id: key });
   },
 
-  async clear(): Promise<void> {
-    await deleteFromStore(STORES.CARTS, 'current');
+  async clear(userId?: string): Promise<void> {
+    const key = userId ? `current_${userId}` : 'current';
+    await deleteFromStore(STORES.CARTS, key);
   },
 };
 
@@ -430,7 +432,7 @@ export const SyncQueueDB = {
 
     return new Promise((resolve, reject) => {
       const request = store.getAll();
-      request.onsuccess = () => resolve(request.result.filter((i: SyncQueueItem) => !i.synced));
+      request.onsuccess = () => resolve(request.result.filter((i: SyncQueueItem) => !i.synced && !i.failed));
       request.onerror = () => reject(request.error);
     });
   },
@@ -446,6 +448,20 @@ export const SyncQueueDB = {
       item.syncedAt = new Date();
       await putToStore(STORES.SYNC_QUEUE, item);
     }
+  },
+
+  async markFailed(id: string, error?: string): Promise<void> {
+    const item = await getFromStore<SyncQueueItem>(STORES.SYNC_QUEUE, id);
+    if (item) {
+      item.failed = true;
+      if (error) item.error = error;
+      await putToStore(STORES.SYNC_QUEUE, item);
+    }
+  },
+
+  async getFailed(): Promise<SyncQueueItem[]> {
+    const all = await getAllFromStore<SyncQueueItem>(STORES.SYNC_QUEUE);
+    return all.filter((i) => i.failed);
   },
 
   async incrementRetry(id: string, error?: string): Promise<void> {
