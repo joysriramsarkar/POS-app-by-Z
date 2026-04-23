@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import {
   Plus,
   Search,
   Edit,
+  Trash2,
   Filter,
   ArrowUpDown,
   X,
@@ -38,12 +40,17 @@ interface StockManagementProps {
   onAddProduct?: () => void;
   onEditProduct?: (product: Product) => void;
   onAddStock?: (product: Product) => void;
+  onDeleteProduct?: (product: Product) => void;
 }
 
 type SortField = 'name' | 'stock' | 'price' | 'category';
 type SortOrder = 'asc' | 'desc';
 
-export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: StockManagementProps) {
+export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDeleteProduct }: StockManagementProps) {
+  const { data: session } = useSession();
+  const userRole = (session?.user as { role?: string })?.role;
+  const canDelete = userRole === 'ADMIN' || userRole === 'MANAGER';
+
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [stockFilter, setStockFilter] = useState<'all' | 'low' | 'out'>('all');
@@ -51,59 +58,111 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
 
-  const products = useProductsStore((state) => state.products);
+  // Server-side search state
+  const [searchResults, setSearchResults] = useState<Product[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Infinite scroll state
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  const storeProducts = useProductsStore((state) => state.products);
+  const hasMore = useProductsStore((state) => state.hasMore);
+  const nextCursor = useProductsStore((state) => state.nextCursor);
+  const appendProducts = useProductsStore((state) => state.appendProducts);
   const categories = useProductsStore((state) => state.categories);
 
-  // Filter and sort products
+  // Use search results when actively searching, otherwise use store products
+  const products: Product[] = searchResults !== null ? searchResults : storeProducts;
+
+  // Server-side search with debounce
+  const handleSearchChange = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!query.trim()) {
+      setSearchResults(null);
+      return;
+    }
+    searchTimerRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/products?search=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const { data } = await res.json();
+          setSearchResults(data);
+        }
+      } catch {
+        // offline fallback: search local store
+        const lowerQuery = query.toLowerCase();
+        const normalizedQuery = convertBengaliToEnglishNumerals(query);
+        setSearchResults(storeProducts.filter(p =>
+          p.isActive && (
+            p.name.toLowerCase().includes(lowerQuery) ||
+            p.nameBn?.includes(query) ||
+            p.barcode?.includes(query) ||
+            convertBengaliToEnglishNumerals(p.barcode || '').includes(normalizedQuery)
+          )
+        ));
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  }, [storeProducts]);
+
+  // Infinite scroll: load more when sentinel is visible
+  const loadMore = useCallback(async () => {
+    if (isLoadingMore || !hasMore || !nextCursor || searchResults !== null) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await fetch(`/api/products?limit=50&cursor=${nextCursor}`);
+      if (res.ok) {
+        const { data, nextCursor: newCursor } = await res.json();
+        appendProducts(data, !!newCursor, newCursor ?? null);
+      }
+    } catch { /* silently fail */ } finally {
+      setIsLoadingMore(false);
+    }
+  }, [isLoadingMore, hasMore, nextCursor, searchResults, appendProducts]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore]);
+
+  // Filter and sort (client-side on already-loaded data)
   const filteredProducts = useMemo(() => {
     let result = products.filter(p => p.isActive);
 
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const normalizedQuery = convertBengaliToEnglishNumerals(searchQuery);
-      result = result.filter(p =>
-        p.name.toLowerCase().includes(query) ||
-        p.nameBn?.includes(query) ||
-        p.barcode?.includes(query) ||
-        convertBengaliToEnglishNumerals(p.barcode || '').includes(normalizedQuery)
-      );
-    }
-
-    // Category filter
     if (categoryFilter !== 'all') {
       result = result.filter(p => p.category === categoryFilter);
     }
 
-    // Stock filter
     if (stockFilter === 'low') {
       result = result.filter(p => p.currentStock <= p.minStockLevel && p.currentStock > 0);
     } else if (stockFilter === 'out') {
       result = result.filter(p => p.currentStock === 0);
     }
 
-    // Sort
     result.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
-        case 'name':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'stock':
-          comparison = a.currentStock - b.currentStock;
-          break;
-        case 'price':
-          comparison = a.sellingPrice - b.sellingPrice;
-          break;
-        case 'category':
-          comparison = a.category.localeCompare(b.category);
-          break;
+        case 'name': comparison = a.name.localeCompare(b.name); break;
+        case 'stock': comparison = a.currentStock - b.currentStock; break;
+        case 'price': comparison = a.sellingPrice - b.sellingPrice; break;
+        case 'category': comparison = a.category.localeCompare(b.category); break;
       }
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
     return result;
-  }, [products, searchQuery, categoryFilter, stockFilter, sortField, sortOrder]);
+  }, [products, categoryFilter, stockFilter, sortField, sortOrder]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -123,17 +182,13 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
   };
 
   const getStockStatus = (product: Product) => {
-    if (product.currentStock === 0) {
-      return { label: 'Out of Stock', variant: 'destructive' as const };
-    }
-    if (product.currentStock <= product.minStockLevel) {
-      return { label: 'Low Stock', variant: 'secondary' as const };
-    }
+    if (product.currentStock === 0) return { label: 'Out of Stock', variant: 'destructive' as const };
+    if (product.currentStock <= product.minStockLevel) return { label: 'Low Stock', variant: 'secondary' as const };
     return { label: 'In Stock', variant: 'default' as const };
   };
 
-  const lowStockCount = products.filter(p => p.currentStock <= p.minStockLevel && p.currentStock > 0).length;
-  const outOfStockCount = products.filter(p => p.currentStock === 0).length;
+  const lowStockCount = storeProducts.filter(p => p.currentStock <= p.minStockLevel && p.currentStock > 0).length;
+  const outOfStockCount = storeProducts.filter(p => p.currentStock === 0).length;
 
   return (
     <>
@@ -147,7 +202,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
               Inventory Management
             </h1>
             <p className="text-sm text-muted-foreground">
-              {products.length} items • {lowStockCount} low stock • {outOfStockCount} out of stock
+              {storeProducts.length} items • {lowStockCount} low stock • {outOfStockCount} out of stock
             </p>
           </div>
           <div className='flex gap-2'>
@@ -173,7 +228,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
               name="stock-search"
               placeholder="Search items..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-9"
               aria-label="Search items"
             />
@@ -182,7 +237,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
                 variant="ghost"
                 size="sm"
                 className="absolute right-2 md:right-1 top-1/2 -translate-y-1/2 h-8 w-8 md:h-7 md:w-7 p-0"
-                onClick={() => setSearchQuery('')}
+                onClick={() => { setSearchQuery(''); setSearchResults(null); }}
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -252,7 +307,13 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProducts.length === 0 ? (
+            {isSearching ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  Searching...
+                </TableCell>
+              </TableRow>
+            ) : filteredProducts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12">
                   <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -314,6 +375,16 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => onDeleteProduct?.(product)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -322,18 +393,22 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock }: Sto
             )}
           </TableBody>
         </Table>
+        {/* Infinite scroll sentinel */}
+        <div ref={sentinelRef} className="py-3 text-center text-sm text-muted-foreground">
+          {isLoadingMore && 'Loading more...'}
+        </div>
       </div>
 
       {/* Summary Footer */}
       <div className="shrink-0 border-t bg-muted/30 p-3">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            Showing {filteredProducts.length} of {products.length} items
+            Showing {filteredProducts.length}{searchResults !== null ? ' results' : ` of ${storeProducts.length} items`}
           </span>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-green-500" />
-              In Stock: {products.filter(p => p.currentStock > p.minStockLevel).length}
+              In Stock: {storeProducts.filter(p => p.currentStock > p.minStockLevel).length}
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-amber-500" />

@@ -25,7 +25,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "customers.view", "customers.create", "customers.edit",
   ],
   MANAGER: [
-    "products.view", "products.create", "products.edit",
+    "products.view", "products.create", "products.edit", "products.delete",
     "sales.view", "sales.create", "sales.edit",
     "stock.view", "stock.edit", "stock.import",
     "reports.view", "reports.export",

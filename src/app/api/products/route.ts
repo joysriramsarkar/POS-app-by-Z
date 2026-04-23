@@ -226,6 +226,11 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const userRole = (session.user as { role?: string })?.role;
+  if (userRole !== 'ADMIN' && userRole !== 'MANAGER') {
+    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

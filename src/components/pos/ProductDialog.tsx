@@ -23,11 +23,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Package, Barcode, RefreshCw, Languages } from 'lucide-react';
+import { Package, Barcode, RefreshCw, Languages, ScanLine } from 'lucide-react';
 import type { Product } from '@/types/pos';
 import { useProductsStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { CameraScannerDialog } from './CameraScannerDialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ProductDialogProps {
   open: boolean;
@@ -112,6 +114,9 @@ export function ProductDialog({
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+
+  const isMobile = useIsMobile();
 
   const { toast } = useToast();
   const categories = useProductsStore((state) => state.categories);
@@ -269,6 +274,17 @@ export function ProductDialog({
                 placeholder="Scan or enter barcode"
                 className="flex-1 font-mono"
               />
+              {isMobile && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsScannerOpen(true)}
+                  title="Scan barcode"
+                >
+                  <ScanLine className="w-4 h-4" />
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -430,6 +446,14 @@ export function ProductDialog({
             </p>
           )}
         </div>
+
+      <CameraScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onBarcodeScanned={(scanned) => { setBarcode(scanned); setIsScannerOpen(false); }}
+        title="Scan Product Barcode"
+        description="Position the barcode in the center of the frame"
+      />
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

@@ -36,6 +36,7 @@ export function ProductGrid({
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const storeProducts = useProductsStore((state) => state.products);
@@ -130,11 +131,22 @@ export function ProductGrid({
       const query = e.target.value;
       if (externalProducts) {
         setLocalSearchQuery(query);
-      } else {
-        setSearchQuery(query);
+        return;
       }
+      setSearchQuery(query);
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+      if (!query.trim()) return;
+      searchTimerRef.current = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/products?search=${encodeURIComponent(query)}`);
+          if (res.ok) {
+            const { data } = await res.json();
+            appendProducts(data, false, null);
+          }
+        } catch { /* offline — local filter handles it */ }
+      }, 300);
     },
-    [externalProducts, setSearchQuery]
+    [externalProducts, setSearchQuery, appendProducts]
   );
 
   const clearSearch = useCallback(() => {
@@ -399,7 +411,7 @@ export function ProductGrid({
               ))}
             </div>
           )}
-          {!externalProducts && hasMore && (
+          {!externalProducts && hasMore && !searchQuery && !selectedCategoryId && (
             <div className="flex justify-center mt-6 mb-4">
               <Button
                 variant="outline"

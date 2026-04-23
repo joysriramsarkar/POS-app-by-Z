@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
 
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import type { Product as ProductType } from '@/types/pos';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 const CartPanel = dynamic(() => import('@/components/pos/CartPanel'), { ssr: false });
 import { CameraScannerDialog } from '@/components/pos/CameraScannerDialog';
@@ -176,20 +177,42 @@ function POSDashboard() {
     }
   }, [userRole]);
 
-  // Mobile product search
-  const filteredMobileProducts = useMemo(() => {
-    if (!mobileSearchQuery) return [];
-    return products.filter((product) => {
-      if (!product.isActive) return false;
-      const lowerQuery = mobileSearchQuery.toLowerCase();
-      const normalizedQuery = convertBengaliToEnglishNumerals(mobileSearchQuery);
-      const matchesName = product.name.toLowerCase().includes(lowerQuery);
-      const matchesBengaliName = product.nameBn?.includes(mobileSearchQuery);
-      const matchesBarcode = product.barcode?.includes(mobileSearchQuery);
-      const matchesBarcodeNormalized = convertBengaliToEnglishNumerals(product.barcode || '').includes(normalizedQuery);
-      return matchesName || matchesBengaliName || matchesBarcode || matchesBarcodeNormalized;
-    });
-  }, [products, mobileSearchQuery]);
+  // Mobile product search - server-side with offline fallback
+  const [mobileSearchResults, setMobileSearchResults] = useState<ProductType[]>([]);
+  const [isMobileSearching, setIsMobileSearching] = useState(false);
+  const mobileSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMobileSearchChange = useCallback((query: string) => {
+    setMobileSearchQuery(query);
+    if (mobileSearchTimerRef.current) clearTimeout(mobileSearchTimerRef.current);
+    if (!query.trim()) {
+      setMobileSearchResults([]);
+      return;
+    }
+    mobileSearchTimerRef.current = setTimeout(async () => {
+      setIsMobileSearching(true);
+      try {
+        const res = await fetch(`/api/products?search=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const { data } = await res.json();
+          setMobileSearchResults(data);
+        }
+      } catch {
+        // offline fallback: search local cache
+        const lowerQuery = query.toLowerCase();
+        const normalizedQuery = convertBengaliToEnglishNumerals(query);
+        setMobileSearchResults(products.filter(p =>
+          p.isActive && (
+            p.name.toLowerCase().includes(lowerQuery) ||
+            p.nameBn?.includes(query) ||
+            convertBengaliToEnglishNumerals(p.barcode || '').includes(normalizedQuery)
+          )
+        ));
+      } finally {
+        setIsMobileSearching(false);
+      }
+    }, 300);
+  }, [products]);
 
   // Hydration tracking to prevent mismatches with store-dependent renders
   useEffect(() => {
@@ -835,6 +858,23 @@ function POSDashboard() {
     setIsProductDialogOpen(true);
   }, []);
 
+  // Delete product
+  const removeProduct = useProductsStore((state) => state.removeProduct);
+  const handleDeleteProduct = useCallback(async (product: Product) => {
+    if (!confirm(`"${product.name}" ডিলিট করবেন? এটি আর বিলিং বা স্টকে দেখাবে না।`)) return;
+    try {
+      const res = await fetch(`/api/products?id=${product.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const { error } = await res.json();
+        throw new Error(error || 'Failed to delete');
+      }
+      removeProduct(product.id);
+      toast({ title: 'ডিলিট সফল', description: `"${product.name}" সরিয়ে দেওয়া হয়েছে।` });
+    } catch (error) {
+      toast({ title: 'ডিলিট ব্যর্থ', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+    }
+  }, [removeProduct, toast]);
+
   // Render sidebar navigation
   const renderSidebar = () => (
     <nav className="flex flex-col h-full bg-slate-50 dark:bg-slate-900/50">
@@ -941,7 +981,7 @@ function POSDashboard() {
                       type="text"
                       placeholder="Search products by name or barcode..."
                       value={mobileSearchQuery}
-                      onChange={(e) => setMobileSearchQuery(e.target.value)}
+                      onChange={(e) => handleMobileSearchChange(e.target.value)}
                       className="pl-9 h-9 md:h-10 text-sm"
                     />
                     {mobileSearchQuery && (
@@ -949,7 +989,7 @@ function POSDashboard() {
                         variant="ghost"
                         size="sm"
                         className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 md:h-8 md:w-8 p-0"
-                        onClick={() => setMobileSearchQuery('')}
+                        onClick={() => { setMobileSearchQuery(''); setMobileSearchResults([]); }}
                       >
                         <X className="w-3 h-3 md:w-4 md:h-4" />
                       </Button>
@@ -966,18 +1006,21 @@ function POSDashboard() {
               {mobileSearchQuery && (
                 <div className="border-b bg-background max-h-48 overflow-y-auto">
                   <div className="p-3">
-                    <h3 className="text-sm font-medium mb-2">Search Results ({filteredMobileProducts.length})</h3>
-                    {filteredMobileProducts.length === 0 ? (
+                    <h3 className="text-sm font-medium mb-2">Search Results ({mobileSearchResults.length})</h3>
+                    {isMobileSearching ? (
+                      <p className="text-sm text-muted-foreground">Searching...</p>
+                    ) : mobileSearchResults.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No products found</p>
                     ) : (
                       <div className="space-y-2">
-                        {filteredMobileProducts.slice(0, 10).map((product) => (
+                        {mobileSearchResults.slice(0, 15).map((product) => (
                           <div
                             key={product.id}
                             className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 cursor-pointer"
                             onClick={() => {
                               addItem(product, 1);
                               setMobileSearchQuery('');
+                              setMobileSearchResults([]);
                             }}
                           >
                             <div className="flex-1 min-w-0">
@@ -1017,6 +1060,7 @@ function POSDashboard() {
             onAddProduct={handleAddProduct}
             onEditProduct={handleEditProduct}
             onAddStock={handleAddStock}
+            onDeleteProduct={handleDeleteProduct}
           />
         );
       case 'parties':
