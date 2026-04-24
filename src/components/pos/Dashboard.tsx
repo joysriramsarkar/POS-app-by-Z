@@ -141,8 +141,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             } else if (s.paymentMethod === 'Cash') {
               cashTotal += amtPaid;
             } else if (s.paymentMethod === 'Mixed') {
-              // Mixed payments currently stored without per-method split; count the paid amount into cash by default
-              cashTotal += amtPaid;
+              cashTotal += Number(s.cashAmount || 0);
+              upiTotal += Number(s.upiAmount || 0);
             }
 
             // accumulate any unpaid portion as today's due (fallback)

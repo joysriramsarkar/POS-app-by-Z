@@ -47,6 +47,8 @@ export interface PaymentData {
   amountPaid: number;
   change: number;
   paymentMethod: PaymentMethod;
+  cashAmount?: number;
+  upiAmount?: number;
   customerId?: string;
   subtotal: number;
   discount: number;
@@ -279,11 +281,26 @@ export function CheckoutDialog({
         }
     }
 
+    let finalCashAmount = 0;
+    let finalUpiAmount = 0;
+
+    if (finalPaymentMethod === 'Mixed') {
+        finalUpiAmount = Number(upiReceived) || 0;
+        finalCashAmount = (Number(cashReceived) || 0) - Math.max(0, change);
+        if (finalCashAmount < 0) finalCashAmount = 0;
+    } else if (finalPaymentMethod === 'Cash') {
+        finalCashAmount = amountPaidForSale;
+    } else if (finalPaymentMethod === 'UPI') {
+        finalUpiAmount = amountPaidForSale;
+    }
+
     const paymentData: PaymentData = {
       amountReceived: parsedAmount,
       amountPaid: amountPaidForSale,
       change: finalPaymentMethod === 'Due' ? 0 : Math.max(0, change),
       paymentMethod: finalPaymentMethod as any,
+      cashAmount: finalCashAmount,
+      upiAmount: finalUpiAmount,
       customerId,
       subtotal,
       discount,

@@ -187,6 +187,8 @@ export async function POST(request: NextRequest) {
         totalAmount,
         amountPaid: amountPaidValue,
         paymentMethod: paymentMethod || 'Cash',
+        cashAmount: validatedData.cashAmount ?? null,
+        upiAmount: validatedData.upiAmount ?? null,
         paymentStatus,
         status: 'Completed',
         notes: notes || null,

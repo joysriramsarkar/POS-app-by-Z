@@ -124,6 +124,8 @@ model Sale {
   paymentMethod String   @default("Cash") @map("payment_method") // Cash, UPI, Due
   paymentStatus String   @default("Paid") @map("payment_status") // Paid, Partial, Due
   status        String   @default("Completed") // Completed, Cancelled, Refunded
+  cashAmount    Float?   @map("cash_amount")
+  upiAmount     Float?   @map("upi_amount")
   notes         String?
   offlineSynced Boolean  @default(true) @map("offline_synced") // For offline-first
   createdAt     DateTime @default(now()) @map("created_at")

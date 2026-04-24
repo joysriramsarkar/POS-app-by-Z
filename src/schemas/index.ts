@@ -31,6 +31,8 @@ export const SaleInputSchema = z.object({
   customerId: z.string().nullable().optional(),
   paymentMethod: z.string().optional().default('Cash'),
   amountPaid: z.coerce.number().nonnegative().optional().default(0),
+  cashAmount: z.coerce.number().nonnegative().optional(),
+  upiAmount: z.coerce.number().nonnegative().optional(),
   discount: z.coerce.number().nonnegative().optional().default(0),
   tax: z.coerce.number().nonnegative().optional().default(0),
   notes: z.string().nullable().optional(),

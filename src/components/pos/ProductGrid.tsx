@@ -208,7 +208,7 @@ export function ProductGrid({
     if (isLoadingMore || !hasMore || !nextCursor || externalProducts) return;
     setIsLoadingMore(true);
     try {
-      const res = await fetch(`/api/products?limit=50&cursor=${nextCursor}`);
+      const res = await fetch(`/api/products?limit=10000&cursor=${nextCursor}`);
       if (res.ok) {
         const { data, nextCursor: newNextCursor } = await res.json();
         const hasMoreData = !!newNextCursor;

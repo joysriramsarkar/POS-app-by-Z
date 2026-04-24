@@ -11,8 +11,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { convertBengaliToEnglishNumerals, isValidEanUpcBarcode } from '@/lib/utils';
 
 const BARCODE_CHAR_REGEX = /^[0-9০-৯]$/;
-const MIN_INTER_KEY_TIME = 5; // ms
-const MAX_INTER_KEY_TIME = 80; // ms
+const MIN_INTER_KEY_TIME = 0; // ms
+const MAX_INTER_KEY_TIME = 200; // ms
 
 const normalizeBarcode = (raw: string) => convertBengaliToEnglishNumerals(raw.trim());
 
@@ -245,7 +245,7 @@ export function useSimpleBarcodeScanner({
       const lastTime = lastKeyTimeRef.current;
       const interKeyTime = lastTime ? currentTime - lastTime : 0;
 
-      if (lastTime && (interKeyTime < MIN_INTER_KEY_TIME || interKeyTime > MAX_INTER_KEY_TIME)) {
+      if (lastTime && interKeyTime > MAX_INTER_KEY_TIME) {
         bufferRef.current = [event.key];
       } else {
         bufferRef.current.push(event.key);
