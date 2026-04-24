@@ -4,8 +4,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { Share2 } from 'lucide-react';
 import { formatPrice, getPaymentStatusColor } from './utils';
 import { Transaction, TransactionItem } from './types';
+import { useState } from 'react';
+import { shareInvoiceAsPdf } from '@/lib/invoicePdf';
+import { useSettingsStore } from '@/stores/settings-store';
 
 interface TransactionDetailsDialogProps {
   transaction: Transaction | null;
@@ -20,7 +24,75 @@ export function TransactionDetailsDialog({
   onOpenChange,
   onUpdateStatus,
 }: TransactionDetailsDialogProps) {
+  const [isSharing, setIsSharing] = useState(false);
+  const { settings } = useSettingsStore();
+
   if (!transaction) return null;
+
+  const storeConfig = {
+    name: settings.store_name || 'Lakhan Bhandar',
+    nameBn: settings.store_name_bn || 'লক্ষ্মণ ভাণ্ডার',
+    address: settings.store_address || '',
+    phone: settings.store_phone || '',
+    gstNumber: settings.store_gst || '',
+  };
+
+  const handleShare = async () => {
+    setIsSharing(true);
+    try {
+      // Build a Sale-compatible object from transaction
+      const printFormat = 'a4' as const;
+
+      // Build plain HTML invoice for PDF (no React renderToString needed)
+      const itemRows = transaction.items.map((i, idx) =>
+        `<tr><td>${idx+1}</td><td>${i.productName}</td><td style="text-align:center">${i.quantity}</td><td style="text-align:right">₹${i.unitPrice.toFixed(2)}</td><td style="text-align:right">₹${i.totalPrice.toFixed(2)}</td></tr>`
+      ).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        body{font-family:Arial,sans-serif;padding:20px;color:#000;background:#fff}
+        h1{font-size:22px;margin:0}h2{font-size:14px;color:#555;margin:4px 0 0}
+        .header{display:flex;justify-content:space-between;margin-bottom:16px}
+        table{width:100%;border-collapse:collapse;margin:12px 0}
+        th{background:#f3f4f6;padding:8px;text-align:left;font-size:13px;border-bottom:2px solid #000}
+        td{padding:7px 8px;font-size:13px;border-bottom:1px solid #e5e7eb}
+        .total-row{font-weight:bold;font-size:15px;border-top:2px solid #000}
+        .footer{margin-top:24px;text-align:center;color:#666;font-size:12px}
+      </style></head><body>
+        <div class="header">
+          <div><h1>${storeConfig.name}</h1><h2>${storeConfig.nameBn}</h2><p style="font-size:12px;margin:4px 0">${storeConfig.address}</p><p style="font-size:12px;margin:0">Ph: ${storeConfig.phone}</p></div>
+          <div style="text-align:right"><div style="border:2px solid #000;padding:8px 16px;display:inline-block"><b>TAX INVOICE</b></div><p style="font-size:13px;margin:8px 0 2px">Invoice: <b>${transaction.invoiceNumber}</b></p><p style="font-size:12px;margin:0">${format(transaction.createdAt, 'dd/MM/yyyy HH:mm')}</p></div>
+        </div>
+        ${transaction.customer ? `<div style="background:#f9fafb;padding:10px;border-radius:6px;margin-bottom:12px"><b>Bill To:</b> ${transaction.customer.name}${transaction.customer.phone ? ` | ${transaction.customer.phone}` : ''}</div>` : ''}
+        <table><thead><tr><th>#</th><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${itemRows}</tbody></table>
+        <div style="display:flex;justify-content:flex-end"><table style="width:260px">
+          <tr><td>Subtotal:</td><td style="text-align:right">₹${(transaction.totalAmount + transaction.discount - transaction.tax).toFixed(2)}</td></tr>
+          ${transaction.discount > 0 ? `<tr><td style="color:green">Discount:</td><td style="text-align:right;color:green">-₹${transaction.discount.toFixed(2)}</td></tr>` : ''}
+          ${transaction.tax > 0 ? `<tr><td>Tax:</td><td style="text-align:right">₹${transaction.tax.toFixed(2)}</td></tr>` : ''}
+          <tr class="total-row"><td>Grand Total:</td><td style="text-align:right">₹${transaction.totalAmount.toFixed(2)}</td></tr>
+          <tr><td>Amount Paid:</td><td style="text-align:right">₹${transaction.amountPaid.toFixed(2)}</td></tr>
+          ${transaction.totalAmount - transaction.amountPaid > 0 ? `<tr><td style="color:red">Due:</td><td style="text-align:right;color:red">₹${(transaction.totalAmount - transaction.amountPaid).toFixed(2)}</td></tr>` : ''}
+        </table></div>
+        <p style="margin-top:12px;font-size:13px">Payment: <b>${transaction.paymentMethod}</b> (${transaction.paymentStatus})</p>
+        <div class="footer"><p>ধন্যবাদ! Thank you for shopping with us!</p></div>
+      </body></html>`;
+
+      const items = transaction.items.map(i => `• ${i.productName} x${i.quantity} = ₹${i.totalPrice.toFixed(2)}`).join('\n');
+      const fallbackText =
+        `*Invoice: ${transaction.invoiceNumber}*\n` +
+        `Date: ${format(transaction.createdAt, 'dd/MM/yyyy HH:mm')}\n` +
+        (transaction.customer ? `Customer: ${transaction.customer.name}\n` : '') +
+        `\n${items}\n\n` +
+        `*Total: ₹${transaction.totalAmount.toFixed(2)}*\n` +
+        `Payment: ${transaction.paymentMethod} (${transaction.paymentStatus})`;
+
+      await shareInvoiceAsPdf(html, printFormat, transaction.invoiceNumber, storeConfig.name, fallbackText);
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('Share failed:', err);
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -37,18 +109,13 @@ export function TransactionDetailsDialog({
             <Card className="bg-muted/30">
               <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">Customer</div>
-                <div className="font-semibold text-lg mt-1">
-                  {transaction.customer?.name || 'Walk-in'}
-                </div>
+                <div className="font-semibold text-lg mt-1">{transaction.customer?.name || 'Walk-in'}</div>
               </CardContent>
             </Card>
-
             <Card className="bg-muted/30">
               <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">Created By</div>
-                <div className="font-semibold text-lg mt-1">
-                  {transaction.user?.name || 'Unknown'}
-                </div>
+                <div className="font-semibold text-lg mt-1">{transaction.user?.name || 'Unknown'}</div>
               </CardContent>
             </Card>
           </div>
@@ -70,9 +137,7 @@ export function TransactionDetailsDialog({
                     <TableCell>{item.productName}</TableCell>
                     <TableCell className="text-right">{item.quantity}</TableCell>
                     <TableCell className="text-right">{formatPrice(item.unitPrice)}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {formatPrice(item.totalPrice)}
-                    </TableCell>
+                    <TableCell className="text-right font-semibold">{formatPrice(item.totalPrice)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -116,12 +181,9 @@ export function TransactionDetailsDialog({
             <Card className="bg-muted/30">
               <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">Payment Method</div>
-                <Badge variant="outline" className="mt-2">
-                  {transaction.paymentMethod}
-                </Badge>
+                <Badge variant="outline" className="mt-2">{transaction.paymentMethod}</Badge>
               </CardContent>
             </Card>
-
             <Card className="bg-muted/30">
               <CardContent className="pt-4">
                 <div className="text-sm text-muted-foreground">Payment Status</div>
@@ -132,27 +194,30 @@ export function TransactionDetailsDialog({
             </Card>
           </div>
 
-          {transaction.status === 'Completed' && (
-            <div className="flex flex-col gap-3 mt-4">
-              <div className="text-sm font-medium">Manage Order</div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="destructive"
-                  onClick={() => onUpdateStatus('Cancelled')}
-                  className="h-10"
-                >
-                  Cancel Order
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => onUpdateStatus('Refunded')}
-                  className="h-10"
-                >
-                  Refund Order
-                </Button>
-              </div>
+          <div className="flex flex-col gap-3 mt-4">
+            <div className="text-sm font-medium">Actions</div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={handleShare}
+                disabled={isSharing}
+                className="h-10 gap-2 border-green-500 text-green-600 hover:bg-green-50"
+              >
+                <Share2 className="w-4 h-4" />
+                {isSharing ? 'Sharing...' : 'Share / WhatsApp'}
+              </Button>
+              {transaction.status === 'Completed' && (
+                <>
+                  <Button variant="destructive" onClick={() => onUpdateStatus('Cancelled')} className="h-10">
+                    Cancel Order
+                  </Button>
+                  <Button variant="outline" onClick={() => onUpdateStatus('Refunded')} className="h-10">
+                    Refund Order
+                  </Button>
+                </>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

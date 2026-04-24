@@ -3,12 +3,7 @@
 import * as React from "react";
 import { renderToString } from "react-dom/server";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -20,10 +15,8 @@ import { InvoicePreview, PrintInvoice } from "./PrintInvoice";
 import type { Sale, PrintFormat } from "@/types/pos";
 import { printToIframe } from "@/lib/printUtility";
 import { useSettingsStore } from "@/stores/settings-store";
-
-// ============================================================================
-// TYPES
-// ============================================================================
+import { Share2, Printer } from "lucide-react";
+import { shareInvoiceAsPdf } from "@/lib/invoicePdf";
 
 interface PrintDialogProps {
   open: boolean;
@@ -32,118 +25,69 @@ interface PrintDialogProps {
   onPrint?: (format: PrintFormat) => void;
 }
 
-// ============================================================================
-// PRINT FORMAT OPTIONS
-// ============================================================================
-
-const PRINT_FORMATS: {
-  value: PrintFormat;
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-}[] = [
+const PRINT_FORMATS: { value: PrintFormat; label: string; description: string; icon: React.ReactNode }[] = [
   {
-    value: "thermal-58",
-    label: "Thermal 58mm",
-    description: "Small receipt printer",
-    icon: (
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-        />
-      </svg>
-    ),
+    value: "thermal-58", label: "Thermal 58mm", description: "Small receipt printer",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
   },
   {
-    value: "thermal-80",
-    label: "Thermal 80mm",
-    description: "Standard receipt printer",
-    icon: (
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-        />
-      </svg>
-    ),
+    value: "thermal-80", label: "Thermal 80mm", description: "Standard receipt printer",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>,
   },
   {
-    value: "a4",
-    label: "A4 Paper",
-    description: "Full page invoice",
-    icon: (
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-        />
-      </svg>
-    ),
+    value: "a4", label: "A4 Paper", description: "Full page invoice",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
   },
   {
-    value: "a5",
-    label: "A5 Paper",
-    description: "Half page invoice",
-    icon: (
-      <svg
-        className="w-5 h-5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-        />
-      </svg>
-    ),
+    value: "a5", label: "A5 Paper", description: "Half page invoice",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
   },
 ];
 
-// ============================================================================
-// PRINT DIALOG COMPONENT
-// ============================================================================
+function buildInvoiceHtml(
+  sale: Sale,
+  format: PrintFormat,
+  showLogo: boolean,
+  showGst: boolean,
+  footerMessage: string,
+  storeConfig: { name: string; nameBn: string; address: string; phone: string; gstNumber?: string },
+  pageStyle: string
+): string {
+  const container = document.createElement("div");
+  container.className = "print-invoice-container";
+  container.setAttribute("data-format", format);
+  container.innerHTML = renderToString(
+    <PrintInvoice sale={sale} format={format} showLogo={showLogo} showGst={showGst} footerMessage={footerMessage} storeConfig={storeConfig} />
+  );
 
-export function PrintDialog({
-  open,
-  onOpenChange,
-  sale,
-  onPrint,
-}: PrintDialogProps) {
+  const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+    .map(l => `<link rel="stylesheet" href="${(l as HTMLLinkElement).href}">`)
+    .join('\n');
+  const inlineStyles = Array.from(document.querySelectorAll('style'))
+    .map(s => `<style>${s.textContent}</style>`)
+    .join('\n');
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">${styleLinks}${inlineStyles}<style>${pageStyle}</style></head><body>${container.outerHTML}</body></html>`;
+}
+
+function getPageStyle(format: PrintFormat): string {
+  switch (format) {
+    case "thermal-58": return `@page{size:58mm auto;margin:0}body{width:58mm;max-width:58mm;margin:0;padding:0}.thermal-invoice{width:56mm!important;max-width:56mm!important}`;
+    case "thermal-80": return `@page{size:80mm auto;margin:0}body{width:80mm;max-width:80mm;margin:0;padding:0}.thermal-invoice{width:78mm!important;max-width:78mm!important}`;
+    case "a4": return `@page{size:A4 portrait;margin:0.5cm}body{width:210mm;max-width:210mm;margin:0;padding:0}`;
+    case "a5": return `@page{size:A5 portrait;margin:0.5cm}body{width:148mm;max-width:148mm;margin:0;padding:0}`;
+    default: return `@page{size:auto;margin:1cm}`;
+  }
+}
+
+export function PrintDialog({ open, onOpenChange, sale, onPrint }: PrintDialogProps) {
   const { settings } = useSettingsStore();
   const [selectedFormat, setSelectedFormat] = React.useState<PrintFormat>("thermal-80");
   const [showLogo, setShowLogo] = React.useState(true);
   const [showGst, setShowGst] = React.useState(false);
-  const [showPreview, setShowPreview] = React.useState(true);
-  const [footerMessage, setFooterMessage] = React.useState(
-    "This is a computer generated invoice."
-  );
+  const [footerMessage, setFooterMessage] = React.useState("This is a computer generated invoice.");
+  const [isSharing, setIsSharing] = React.useState(false);
 
-  // Create store config from settings
   const storeConfig = {
     name: settings.store_name || "Lakhan Bhandar",
     nameBn: settings.store_name_bn || "লক্ষ্মণ ভাণ্ডার",
@@ -152,132 +96,97 @@ export function PrintDialog({
     gstNumber: settings.store_gst || "",
   };
 
-  // Reset preview when dialog closes and show on open
   React.useEffect(() => {
-    if (open) {
-      setShowPreview(true);
-    } else {
-      setShowPreview(false);
-    }
+    if (!open) return;
   }, [open]);
 
   const handlePrint = () => {
     if (!sale) return;
-
-    // 1. Create a temporary container for the invoice
-    const printContainer = document.createElement("div");
-    printContainer.className = "print-invoice-container";
-    printContainer.setAttribute("data-format", selectedFormat);
-
-    // 2. Render the PrintInvoice component to an HTML string
-    const invoiceHtml = renderToString(
-      <PrintInvoice
-        sale={sale}
-        format={selectedFormat}
-        showLogo={showLogo}
-        showGst={showGst}
-        footerMessage={footerMessage}
-        storeConfig={storeConfig}
-      />
+    const container = document.createElement("div");
+    container.className = "print-invoice-container";
+    container.setAttribute("data-format", selectedFormat);
+    container.innerHTML = renderToString(
+      <PrintInvoice sale={sale} format={selectedFormat} showLogo={showLogo} showGst={showGst} footerMessage={footerMessage} storeConfig={storeConfig} />
     );
-    printContainer.innerHTML = invoiceHtml;
-
-    // 3. Define page-specific styles for the iframe
-    const getPageStyle = (format: PrintFormat) => {
-      switch (format) {
-        case "thermal-58":
-          return `
-            @page { size: 58mm auto; margin: 0; padding: 0; }
-            body { width: 58mm; max-width: 58mm; margin: 0; padding: 0; overflow: hidden; }
-            .thermal-invoice { width: 56mm !important; max-width: 56mm !important; overflow: hidden; }
-          `;
-        case "thermal-80":
-          return `
-            @page { size: 80mm auto; margin: 0; padding: 0; }
-            body { width: 80mm; max-width: 80mm; margin: 0; padding: 0; overflow: hidden; }
-            .thermal-invoice { width: 78mm !important; max-width: 78mm !important; overflow: hidden; }
-          `;
-        case "a4":
-          return `
-            @page { size: A4 portrait; margin: 0.5cm; }
-            body { width: 210mm; max-width: 210mm; margin: 0; padding: 0; }
-            .standard-invoice { width: 210mm !important; max-width: 210mm !important; }
-          `;
-        case "a5":
-          return `
-            @page { size: A5 portrait; margin: 0.5cm; }
-            body { width: 148mm; max-width: 148mm; margin: 0; padding: 0; }
-            .standard-invoice { width: 148mm !important; max-width: 148mm !important; }
-          `;
-        default:
-          return "@page { size: auto; margin: 1cm; }";
-      }
-    };
-
-    // 4. Use the iframe print utility with format parameter
     printToIframe({
-      printContent: printContainer,
+      printContent: container,
       pageStyle: getPageStyle(selectedFormat),
       format: selectedFormat,
       onAfterPrint: () => {
         onOpenChange(false);
-        if (onPrint) {
-          onPrint(selectedFormat);
-        }
+        onPrint?.(selectedFormat);
       },
     });
   };
 
-  if (!sale) {
-    return null;
-  }
+  // Share invoice as PDF via Web Share API or WhatsApp fallback
+  const handleShare = async () => {
+    if (!sale) return;
+    setIsSharing(true);
+    try {
+      const html = buildInvoiceHtml(sale, selectedFormat, showLogo, showGst, footerMessage, storeConfig, getPageStyle(selectedFormat));
+      const items = sale.items.map(i => `• ${i.productName} x${i.quantity} = ₹${i.totalPrice.toFixed(2)}`).join('\n');
+      const fallbackText =
+        `*Invoice: ${sale.invoiceNumber}*\n` +
+        `Date: ${new Date(sale.createdAt).toLocaleDateString('en-IN')}\n\n` +
+        `${items}\n\n` +
+        `*Total: ₹${sale.totalAmount.toFixed(2)}*\n` +
+        `Payment: ${sale.paymentMethod} (${sale.paymentStatus})\n\n` +
+        `— ${storeConfig.name}`;
+
+      await shareInvoiceAsPdf(html, selectedFormat, sale.invoiceNumber, storeConfig.name, fallbackText);
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('Share failed:', err);
+        // Last resort: just download the PDF
+        try {
+          const html = buildInvoiceHtml(sale, selectedFormat, showLogo, showGst, footerMessage, storeConfig, getPageStyle(selectedFormat));
+          const { generateInvoicePdf } = await import('@/lib/invoicePdf');
+          const blob = await generateInvoicePdf(html, selectedFormat);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = `Invoice-${sale.invoiceNumber}.pdf`; a.click();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+        } catch {}
+      }
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  if (!sale) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[95vw] md:max-w-4xl max-h-[95dvh] md:max-h-[90vh] overflow-hidden flex flex-col print-dialog-content p-4 md:p-6">
         <DialogHeader className="no-print">
-          <DialogTitle>Print Invoice</DialogTitle>
+          <DialogTitle>Print / Share Invoice</DialogTitle>
           <DialogDescription>
-            Select print format and options for invoice #{sale.invoiceNumber}
+            Select format for invoice #{sale.invoiceNumber}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex gap-6">
           {/* Left Side - Options */}
           <div className="w-80 shrink-0 space-y-4 no-print">
-            {/* Format Selection */}
             <div className="space-y-3">
               <Label className="text-base font-semibold">Print Format</Label>
               <RadioGroup
                 value={selectedFormat}
-                onValueChange={(value) => setSelectedFormat(value as PrintFormat)}
+                onValueChange={(v) => setSelectedFormat(v as PrintFormat)}
                 className="grid grid-cols-2 gap-2"
               >
-                {PRINT_FORMATS.map((format) => (
+                {PRINT_FORMATS.map((fmt) => (
                   <Label
-                    key={format.value}
-                    htmlFor={format.value}
-                    className={`
-                      flex flex-col items-center gap-2 p-3 rounded-lg border-2 cursor-pointer
-                      transition-all hover:bg-gray-50
-                      ${
-                        selectedFormat === format.value
-                          ? "border-primary bg-primary/5"
-                          : "border-gray-200"
-                      }
-                    `}
+                    key={fmt.value}
+                    htmlFor={fmt.value}
+                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-gray-50 ${selectedFormat === fmt.value ? "border-primary bg-primary/5" : "border-gray-200"}`}
                   >
-                    <RadioGroupItem
-                      value={format.value}
-                      id={format.value}
-                      className="sr-only"
-                    />
-                    {format.icon}
+                    <RadioGroupItem value={fmt.value} id={fmt.value} className="sr-only" />
+                    {fmt.icon}
                     <div className="text-center">
-                      <p className="font-medium text-sm">{format.label}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format.description}
-                      </p>
+                      <p className="font-medium text-sm">{fmt.label}</p>
+                      <p className="text-xs text-muted-foreground">{fmt.description}</p>
                     </div>
                   </Label>
                 ))}
@@ -286,40 +195,22 @@ export function PrintDialog({
 
             <Separator />
 
-            {/* Options */}
             <div className="space-y-4">
               <Label className="text-base font-semibold">Options</Label>
-
               <div className="flex items-center justify-between">
-                <Label htmlFor="show-logo" className="font-normal">
-                  Show Logo
-                </Label>
-                <Switch
-                  id="show-logo"
-                  checked={showLogo}
-                  onCheckedChange={setShowLogo}
-                />
+                <Label htmlFor="show-logo" className="font-normal">Show Logo</Label>
+                <Switch id="show-logo" checked={showLogo} onCheckedChange={setShowLogo} />
               </div>
-
               <div className="flex items-center justify-between">
-                <Label htmlFor="show-gst" className="font-normal">
-                  Show GST Number
-                </Label>
-                <Switch
-                  id="show-gst"
-                  checked={showGst}
-                  onCheckedChange={setShowGst}
-                />
+                <Label htmlFor="show-gst" className="font-normal">Show GST Number</Label>
+                <Switch id="show-gst" checked={showGst} onCheckedChange={setShowGst} />
               </div>
             </div>
 
             <Separator />
 
-            {/* Footer Message */}
             <div className="space-y-2">
-              <Label htmlFor="footer-message" className="text-base font-semibold">
-                Footer Message
-              </Label>
+              <Label htmlFor="footer-message" className="text-base font-semibold">Footer Message</Label>
               <textarea
                 id="footer-message"
                 value={footerMessage}
@@ -328,65 +219,45 @@ export function PrintDialog({
                 placeholder="Custom footer message..."
               />
             </div>
+
+            {/* Share info */}
+            <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">Share Invoice</p>
+              <p>On mobile: shares PDF via WhatsApp, Telegram, etc.</p>
+              <p>On desktop: downloads the PDF file.</p>
+            </div>
           </div>
 
           {/* Right Side - Preview */}
           <div className="flex-1 min-w-0">
-            {showPreview ? (
-              <ScrollArea className="h-[60vh] print-scroll-area">
-                <InvoicePreview
-                  sale={sale}
-                  format={selectedFormat}
-                  showLogo={showLogo}
-                  showGst={showGst}
-                  footerMessage={footerMessage}
-                  storeConfig={storeConfig}
-                />
-              </ScrollArea>
-            ) : (
-              <div className="h-[60vh] flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-200 no-print">
-                <div className="text-center text-gray-500">
-                  <svg
-                    className="w-12 h-12 mx-auto mb-3 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  <p className="font-medium">No Preview Available</p>
-                  <p className="text-sm">Click &quot;Preview Invoice&quot; to see the preview</p>
-                </div>
-              </div>
-            )}
+            <ScrollArea className="h-[60vh] print-scroll-area">
+              <InvoicePreview
+                sale={sale}
+                format={selectedFormat}
+                showLogo={showLogo}
+                showGst={showGst}
+                footerMessage={footerMessage}
+                storeConfig={storeConfig}
+              />
+            </ScrollArea>
           </div>
         </div>
 
         <Separator className="no-print" />
 
-        <DialogFooter className="gap-2 no-print">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+        <DialogFooter className="gap-2 no-print flex-wrap">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            variant="outline"
+            onClick={handleShare}
+            disabled={isSharing}
+            className="gap-2 border-green-500 text-green-600 hover:bg-green-50"
+          >
+            <Share2 className="w-4 h-4" />
+            {isSharing ? 'Sharing...' : 'Share / WhatsApp'}
           </Button>
-          <Button onClick={handlePrint} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 gap-2">
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-              />
-            </svg>
+          <Button onClick={handlePrint} className="bg-blue-600 text-white hover:bg-blue-700 gap-2">
+            <Printer className="w-4 h-4" />
             Print Invoice
           </Button>
         </DialogFooter>

@@ -1,43 +1,27 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  Legend,
-  ResponsiveContainer
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip as RechartsTooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Package,
-  Users,
-  AlertTriangle,
-  Download
+  TrendingUp, TrendingDown, DollarSign, Package, Users,
+  AlertTriangle, Download, BarChart2
 } from 'lucide-react';
+import { format, subDays } from 'date-fns';
+
+type ChartType = 'bar' | 'line';
+type DatePreset = '1' | '7' | '30' | '90' | 'custom';
+
+const PAYMENT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
 
 const Reports: React.FC = () => {
   const [salesData, setSalesData] = useState<any[]>([]);
@@ -47,76 +31,134 @@ const Reports: React.FC = () => {
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [chartType, setChartType] = useState<ChartType>('bar');
+
+  // Date filter state
+  const [preset, setPreset] = useState<DatePreset>('30');
+  const [customFrom, setCustomFrom] = useState(format(subDays(new Date(), 29), 'yyyy-MM-dd'));
+  const [customTo, setCustomTo] = useState(format(new Date(), 'yyyy-MM-dd'));
+
+  const isToday = preset === '1';
+
+  const dateParams = useMemo(() => {
+    if (preset !== 'custom') {
+      const days = parseInt(preset);
+      const from = days === 1 ? format(new Date(), 'yyyy-MM-dd') : format(subDays(new Date(), days - 1), 'yyyy-MM-dd');
+      const base = `from=${from}&to=${format(new Date(), 'yyyy-MM-dd')}`;
+      return days === 1 ? base + '&hourly=true' : base;
+    }
+    return `from=${customFrom}&to=${customTo}`;
+  }, [preset, customFrom, customTo]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
       const [salesResult, stockResult, duesResult, productsResult] = await Promise.allSettled([
-        fetch('/api/reports/sales?days=30'),
+        fetch(`/api/reports/sales?${dateParams}`),
         fetch('/api/reports/stock'),
         fetch('/api/reports/dues'),
-        fetch('/api/reports/products?days=30')
+        fetch(`/api/reports/products?${dateParams}`)
       ]);
 
       if (salesResult.status === 'fulfilled' && salesResult.value.ok) {
-        const salesJson = await salesResult.value.json();
-        setSummaryData(salesJson.summary);
-        setSalesData(salesJson.chartData);
-      } else {
-        console.warn('Sales API failed:', salesResult.status === 'fulfilled' ? salesResult.value.status : salesResult.reason);
+        const j = await salesResult.value.json();
+        setSummaryData(j.summary);
+        setSalesData(j.chartData);
       }
-
       if (stockResult.status === 'fulfilled' && stockResult.value.ok) {
-        const stockJson = await stockResult.value.json();
-        setStockData(stockJson.lowStockItems);
-      } else {
-        console.warn('Stock API failed:', stockResult.status === 'fulfilled' ? stockResult.value.status : stockResult.reason);
+        const j = await stockResult.value.json();
+        setStockData(j.lowStockItems);
       }
-
       if (duesResult.status === 'fulfilled' && duesResult.value.ok) {
-        const duesJson = await duesResult.value.json();
-        setDueData(duesJson.customersWithDues);
-      } else {
-        console.warn('Dues API failed:', duesResult.status === 'fulfilled' ? duesResult.value.status : duesResult.reason);
+        const j = await duesResult.value.json();
+        setDueData(j.customersWithDues);
       }
-
       if (productsResult.status === 'fulfilled' && productsResult.value.ok) {
-        const productsJson = await productsResult.value.json();
-        setTopProducts(productsJson.topProducts);
-      } else {
-        console.warn('Products API failed:', productsResult.status === 'fulfilled' ? productsResult.value.status : productsResult.reason);
+        const j = await productsResult.value.json();
+        setTopProducts(j.topProducts);
       }
 
       const allFailed = [salesResult, stockResult, duesResult, productsResult].every(
         r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
       );
-      if (allFailed) {
-        setErrorMessage('Failed to load report data. Please refresh the page and try again.');
-      }
+      if (allFailed) setErrorMessage('Failed to load report data. Please refresh and try again.');
     } catch (error) {
-      console.error("Unexpected error fetching report data", error);
       setErrorMessage('An unexpected error occurred while loading reports.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [dateParams]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleDownloadReport = useCallback(() => {
-    window.print();
-  }, []);
+  const outstandingDues = useMemo(
+    () => dueData?.reduce((acc, c) => acc + c.totalDue, 0).toFixed(2) || '0.00',
+    [dueData]
+  );
 
-  const outstandingDues = useMemo(() => {
-    return dueData?.reduce((acc, curr) => acc + curr.totalDue, 0).toFixed(2) || '0.00';
-  }, [dueData]);
+  const paymentBreakdown = useMemo(() => {
+    if (!summaryData?.paymentBreakdown) return [];
+    return Object.entries(summaryData.paymentBreakdown).map(([name, value]) => ({ name, value }));
+  }, [summaryData]);
+
+  // CSV export
+  const handleExportCSV = useCallback(() => {
+    if (!salesData.length) return;
+    const header = isToday ? ['Hour', 'Revenue', 'Profit', 'Orders'] : ['Date', 'Revenue', 'Profit', 'Orders'];
+    const rows = [
+      header,
+      ...salesData.map(d => [d.date, d.revenue.toFixed(2), d.profit.toFixed(2), d.count])
+    ];
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sales-report-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [salesData, isToday]);
+
+  const DateFilter = (
+    <div className="flex flex-wrap items-end gap-2 shrink-0">
+      {(['1', '7', '30', '90'] as DatePreset[]).map(p => (
+        <Button
+          key={p}
+          size="sm"
+          variant={preset === p ? 'default' : 'outline'}
+          className="min-h-9 text-xs"
+          onClick={() => setPreset(p)}
+        >
+          {p === '1' ? 'Today' : `${p}d`}
+        </Button>
+      ))}
+      <Button
+        size="sm"
+        variant={preset === 'custom' ? 'default' : 'outline'}
+        className="min-h-9 text-xs"
+        onClick={() => setPreset('custom')}
+      >
+        Custom
+      </Button>
+      {preset === 'custom' && (
+        <>
+          <div className="flex items-center gap-1">
+            <Label className="text-xs shrink-0">From</Label>
+            <Input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className="h-9 text-xs w-36" />
+          </div>
+          <div className="flex items-center gap-1">
+            <Label className="text-xs shrink-0">To</Label>
+            <Input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className="h-9 text-xs w-36" />
+          </div>
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-muted/20">
-      <div className="shrink-0 border-b bg-background p-4 flex items-center justify-between">
+      <div className="shrink-0 border-b bg-background p-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
             <TrendingUp className="w-6 h-6" />
@@ -124,30 +166,25 @@ const Reports: React.FC = () => {
           </h1>
           <p className="text-sm text-muted-foreground">Comprehensive business overview</p>
         </div>
-        <Button variant="outline" onClick={handleDownloadReport} className="gap-2 border-primary/20 hover:bg-primary/5 min-h-11 touch-manipulation">
-          <Download className="w-4 h-4" />
-          <span className="hidden sm:inline">Download PDF</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          {DateFilter}
+          <Button variant="outline" onClick={handleExportCSV} className="gap-2 border-primary/20 hover:bg-primary/5 min-h-9 touch-manipulation">
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">CSV</span>
+          </Button>
+        </div>
       </div>
 
       {errorMessage && (
         <div className="shrink-0 bg-destructive/10 border-b border-destructive/30 p-4 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-medium text-destructive">{errorMessage}</p>
-          </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={fetchData}
-            className="text-destructive hover:text-destructive min-h-11 touch-manipulation"
-          >
-            Retry
-          </Button>
+          <p className="text-sm font-medium text-destructive flex-1">{errorMessage}</p>
+          <Button variant="ghost" size="sm" onClick={fetchData} className="text-destructive hover:text-destructive min-h-9">Retry</Button>
         </div>
       )}
 
       <div className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-6 pb-24">
+        {/* Summary Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <Card className="rounded-xl">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -155,11 +192,15 @@ const Reports: React.FC = () => {
               <DollarSign className="w-4 h-4 text-primary" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg md:text-2xl font-bold">{`₹${summaryData?.totalRevenue?.toFixed(2) || '0.00'}`}</div>
+              <div className="text-lg md:text-2xl font-bold">₹{summaryData?.totalRevenue?.toFixed(2) || '0.00'}</div>
               <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                {summaryData?.revenueGrowth >= 0 ? <TrendingUp className="w-3 h-3 text-emerald-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />}
-                <span className={`font-medium ${summaryData?.revenueGrowth >= 0 ? "text-emerald-500" : "text-red-500"}`}>{summaryData?.revenueGrowth || "0"}%</span> 
-                <span className="hidden sm:inline"> from last period</span>
+                {(summaryData?.revenueGrowth ?? 0) >= 0
+                  ? <TrendingUp className="w-3 h-3 text-emerald-500" />
+                  : <TrendingDown className="w-3 h-3 text-red-500" />}
+                <span className={`font-medium ${(summaryData?.revenueGrowth ?? 0) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  {summaryData?.revenueGrowth || '0'}%
+                </span>
+                <span className="hidden sm:inline"> vs prev period</span>
               </p>
             </CardContent>
           </Card>
@@ -169,9 +210,9 @@ const Reports: React.FC = () => {
               <TrendingUp className="w-4 h-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg md:text-2xl font-bold text-emerald-600">{`₹${summaryData?.totalProfit?.toFixed(2) || '0.00'}`}</div>
-              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                <span className="text-emerald-500 font-medium">{summaryData?.profitMargin || "0"}%</span> margin
+              <div className="text-lg md:text-2xl font-bold text-emerald-600">₹{summaryData?.totalProfit?.toFixed(2) || '0.00'}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className="text-emerald-500 font-medium">{summaryData?.profitMargin || '0'}%</span> margin
               </p>
             </CardContent>
           </Card>
@@ -182,9 +223,7 @@ const Reports: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-lg md:text-2xl font-bold">{summaryData?.totalSalesCount || 0}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Invoices
-              </p>
+              <p className="text-xs text-muted-foreground mt-1">Invoices</p>
             </CardContent>
           </Card>
           <Card className="rounded-xl">
@@ -193,80 +232,157 @@ const Reports: React.FC = () => {
               <Users className="w-4 h-4 text-amber-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg md:text-2xl font-bold text-amber-600">{`₹${outstandingDues}`}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                To be collected
-              </p>
+              <div className="text-lg md:text-2xl font-bold text-amber-600">₹{outstandingDues}</div>
+              <p className="text-xs text-muted-foreground mt-1">To be collected</p>
             </CardContent>
           </Card>
         </div>
 
         <Tabs defaultValue="sales" className="w-full">
           <div className="w-full overflow-x-auto pb-2">
-            <TabsList className="w-full sm:w-auto mb-4 inline-grid grid-cols-4 sm:max-w-2xl gap-2">
+            <TabsList className="w-full sm:w-auto mb-4 inline-grid grid-cols-5 sm:max-w-2xl gap-2">
               <TabsTrigger className="min-h-11 touch-manipulation" value="sales">Sales</TabsTrigger>
+              <TabsTrigger className="min-h-11 touch-manipulation" value="payment">Payment</TabsTrigger>
               <TabsTrigger className="min-h-11 touch-manipulation" value="stock">Stock</TabsTrigger>
               <TabsTrigger className="min-h-11 touch-manipulation" value="dues">Dues</TabsTrigger>
               <TabsTrigger className="min-h-11 touch-manipulation" value="products">Top Items</TabsTrigger>
             </TabsList>
           </div>
+
+          {/* Sales Tab */}
           <TabsContent value="sales">
             <Card className="rounded-xl">
-              <CardHeader>
-                <CardTitle>Sales Trend</CardTitle>
-                <CardDescription>Daily sales and profit for the last 30 days</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle>Sales Trend</CardTitle>
+                  <CardDescription>{isToday ? 'Hourly sales for today' : 'Daily sales and profit for selected period'}</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 min-h-9"
+                  onClick={() => setChartType(t => t === 'bar' ? 'line' : 'bar')}
+                >
+                  <BarChart2 className="w-4 h-4" />
+                  {chartType === 'bar' ? 'Line' : 'Bar'}
+                </Button>
               </CardHeader>
-              <CardContent className="h-auto">
-                <div className="w-full h-62.5 md:h-87.5">
+              <CardContent>
+                <div className="w-full h-64 md:h-80">
                   {isLoading ? (
                     <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
                       <p className="text-muted-foreground">Loading chart data...</p>
                     </div>
-                  ) : salesData && salesData.length > 0 ? (
+                  ) : salesData?.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={salesData} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                        <XAxis
-                          dataKey="date"
-                          tickFormatter={(val) => {
-                            const date = new Date(val);
-                            return `${date.getDate()}/${date.getMonth() + 1}`;
-                          }}
-                          tick={{ fontSize: 12 }}
-                          tickLine={false}
-                          axisLine={false}
-                        />
-                        <YAxis
-                          tickFormatter={(val) => `₹${Math.round(val / 1000)}k`}
-                          tick={{ fontSize: 12 }}
-                          tickLine={false}
-                          axisLine={false}
-                          width={40}
-                        />
-                        <RechartsTooltip
-                          formatter={(value: number, name: string) => [`₹${value.toFixed(2)}`, name.charAt(0).toUpperCase() + name.slice(1)]}
-                          labelFormatter={(label) => new Date(label).toLocaleDateString()}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                        />
-                        <Legend wrapperStyle={{fontSize: "12px"}}/>
-                        <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                        <Bar dataKey="profit" name="Profit" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                      </BarChart>
+                      {chartType === 'bar' ? (
+                        <BarChart data={salesData} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                          <XAxis dataKey="date" tickFormatter={v => isToday ? v : (() => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; })()} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                          <YAxis tickFormatter={v => `₹${Math.round(v/1000)}k`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                          <RechartsTooltip formatter={(v: number, n: string) => [`₹${v.toFixed(2)}`, n.charAt(0).toUpperCase()+n.slice(1)]} labelFormatter={l => isToday ? `${l} hrs` : new Date(l).toLocaleDateString()} contentStyle={{ borderRadius: '8px' }} />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
+                          <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4,4,0,0]} maxBarSize={30} />
+                          <Bar dataKey="profit" name="Profit" fill="#10b981" radius={[4,4,0,0]} maxBarSize={30} />
+                        </BarChart>
+                      ) : (
+                        <LineChart data={salesData} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                          <XAxis dataKey="date" tickFormatter={v => isToday ? v : (() => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; })()} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                          <YAxis tickFormatter={v => `₹${Math.round(v/1000)}k`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                          <RechartsTooltip formatter={(v: number, n: string) => [`₹${v.toFixed(2)}`, n.charAt(0).toUpperCase()+n.slice(1)]} labelFormatter={l => isToday ? `${l} hrs` : new Date(l).toLocaleDateString()} contentStyle={{ borderRadius: '8px' }} />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
+                          <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="profit" name="Profit" stroke="#10b981" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      )}
                     </ResponsiveContainer>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
-                      <p className="text-muted-foreground">No sales data available for this period.</p>
+                      <p className="text-muted-foreground">No sales data for this period.</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Payment Breakdown Tab */}
+          <TabsContent value="payment">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="rounded-xl">
+                <CardHeader>
+                  <CardTitle>Payment Method Breakdown</CardTitle>
+                  <CardDescription>Revenue by payment method</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="w-full h-64">
+                    {paymentBreakdown.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
+                            {paymentBreakdown.map((_, i) => (
+                              <Cell key={i} fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip formatter={(v: number) => `₹${v.toFixed(2)}`} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
+                        <p className="text-muted-foreground">{isLoading ? 'Loading...' : 'No data.'}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="rounded-xl">
+                <CardHeader>
+                  <CardTitle>Payment Summary</CardTitle>
+                  <CardDescription>Totals per method</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Method</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {paymentBreakdown.length > 0 ? paymentBreakdown.map((p, i) => {
+                        const total = paymentBreakdown.reduce((s, x) => s + (x.value as number), 0);
+                        return (
+                          <TableRow key={p.name}>
+                            <TableCell className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full inline-block" style={{ background: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }} />
+                              {p.name}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">₹{(p.value as number).toFixed(2)}</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{total > 0 ? ((p.value as number / total) * 100).toFixed(1) : 0}%</TableCell>
+                          </TableRow>
+                        );
+                      }) : (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                            {isLoading ? 'Loading...' : 'No payment data.'}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Stock Tab */}
           <TabsContent value="stock">
             <Card className="rounded-xl">
               <CardHeader>
-                <CardTitle>Low Stock Alerts</CardTitle>
-                <CardDescription>Items running low on inventory</CardDescription>
+                <CardTitle>Stock Alerts</CardTitle>
+                <CardDescription>Items at or below minimum stock level</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -280,26 +396,25 @@ const Reports: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stockData && stockData.length > 0 ? (
-                        stockData.map((item: any) => (
-                          <TableRow key={item.id}>
-                            <TableCell className="font-medium">
-                              <div>
-                                <p className="text-sm">{item.name}</p>
-                                {item.nameBn && <p className="text-xs text-muted-foreground">{item.nameBn}</p>}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right text-red-500 font-bold">{item.currentStock} {item.unit}</TableCell>
-                            <TableCell className="hidden sm:table-cell text-right">{item.minStockLevel} {item.unit}</TableCell>
-                            <TableCell className="text-right">
-                              <Badge variant="destructive" className="ml-auto text-xs">Low</Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
+                      {stockData?.length > 0 ? stockData.map((item: any) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">
+                            <p className="text-sm">{item.name}</p>
+                            {item.nameBn && <p className="text-xs text-muted-foreground">{item.nameBn}</p>}
+                          </TableCell>
+                          <TableCell className="text-right text-red-500 font-bold">{item.currentStock} {item.unit}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-right">{item.minStockLevel} {item.unit}</TableCell>
+                          <TableCell className="text-right">
+                            {item.currentStock === 0
+                              ? <Badge variant="destructive" className="text-xs">Out of Stock</Badge>
+                              : <Badge variant="destructive" className="text-xs bg-orange-500 hover:bg-orange-600">Low</Badge>
+                            }
+                          </TableCell>
+                        </TableRow>
+                      )) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? "Loading stock data..." : "No stock alerts."}
+                          <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                            {isLoading ? 'Loading stock data...' : '✅ All items are well stocked.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -309,11 +424,13 @@ const Reports: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Dues Tab */}
           <TabsContent value="dues">
             <Card className="rounded-xl">
               <CardHeader>
                 <CardTitle>Outstanding Customer Dues</CardTitle>
-                <CardDescription>Customers with pending payments</CardDescription>
+                <CardDescription>Customers with pending payments — Total: ₹{outstandingDues}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -327,24 +444,22 @@ const Reports: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {dueData && dueData.length > 0 ? (
-                        dueData.map((customer: any) => (
-                          <TableRow key={customer.id}>
-                            <TableCell className="font-medium">
-                              <p className="text-sm">{customer.name}</p>
-                              <p className="text-xs text-muted-foreground">{customer.phone || 'N/A'}</p>
-                            </TableCell>
-                            <TableCell className="text-right text-amber-600 font-bold">₹{customer.totalDue.toFixed(2)}</TableCell>
-                            <TableCell className="hidden sm:table-cell text-right text-muted-foreground text-xs">{new Date(customer.updatedAt).toLocaleDateString()}</TableCell>
-                            <TableCell className="hidden sm:table-cell text-right">
-                              <Badge variant="outline">{customer._count?.sales || 0}</Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
+                      {dueData?.length > 0 ? dueData.map((c: any) => (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-medium">
+                            <p className="text-sm">{c.name}</p>
+                            <p className="text-xs text-muted-foreground">{c.phone || 'N/A'}</p>
+                          </TableCell>
+                          <TableCell className="text-right text-amber-600 font-bold">₹{c.totalDue.toFixed(2)}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-right text-muted-foreground text-xs">{new Date(c.updatedAt).toLocaleDateString()}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-right">
+                            <Badge variant="outline">{c._count?.sales || 0}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      )) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? "Loading customer dues..." : "No pending dues."}
+                          <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                            {isLoading ? 'Loading customer dues...' : '✅ No pending dues.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -354,40 +469,44 @@ const Reports: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Top Products Tab */}
           <TabsContent value="products">
             <Card className="rounded-xl">
               <CardHeader>
                 <CardTitle>Top Selling Products</CardTitle>
-                <CardDescription>Best performing items by quantity</CardDescription>
+                <CardDescription>Best performing items for selected period</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead>#</TableHead>
                         <TableHead>Product</TableHead>
                         <TableHead className="text-right">Qty Sold</TableHead>
                         <TableHead className="text-right">Revenue</TableHead>
+                        <TableHead className="text-right">Profit</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {topProducts && topProducts.length > 0 ? (
-                        topProducts.map((product: any) => (
-                          <TableRow key={product.id}>
-                            <TableCell className="font-medium">
-                              <div>
-                                <p className="text-sm">{product.name}</p>
-                                {product.nameBn && <p className="text-xs text-muted-foreground">{product.nameBn}</p>}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">{product.quantity} <span className="text-muted-foreground text-xs">{product.unit}</span></TableCell>
-                            <TableCell className="text-right font-medium">₹{product.revenue.toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))
-                      ) : (
+                      {topProducts?.length > 0 ? topProducts.map((p: any, i: number) => (
+                        <TableRow key={p.id}>
+                          <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
+                          <TableCell className="font-medium">
+                            <p className="text-sm">{p.name}</p>
+                            {p.nameBn && <p className="text-xs text-muted-foreground">{p.nameBn}</p>}
+                          </TableCell>
+                          <TableCell className="text-right">{p.quantity} <span className="text-muted-foreground text-xs">{p.unit}</span></TableCell>
+                          <TableCell className="text-right font-medium">₹{p.revenue.toFixed(2)}</TableCell>
+                          <TableCell className={`text-right font-medium ${p.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                            ₹{p.profit.toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      )) : (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? "Loading products data..." : "No product data."}
+                          <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                            {isLoading ? 'Loading products data...' : 'No product data.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -401,6 +520,6 @@ const Reports: React.FC = () => {
       </div>
     </div>
   );
-}
+};
 
 export default React.memo(Reports);
