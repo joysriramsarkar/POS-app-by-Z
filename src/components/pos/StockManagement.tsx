@@ -115,7 +115,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
     if (isLoadingMore || !hasMore || !nextCursor || searchResults !== null) return;
     setIsLoadingMore(true);
     try {
-      const res = await fetch(`/api/products?limit=50&cursor=${nextCursor}`);
+      const res = await fetch(`/api/products?limit=10000&cursor=${nextCursor}`);
       if (res.ok) {
         const { data, nextCursor: newCursor } = await res.json();
         appendProducts(data, !!newCursor, newCursor ?? null);

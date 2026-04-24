@@ -78,6 +78,8 @@ export interface Sale {
   totalAmount: number;
   amountPaid: number;
   paymentMethod: PaymentMethod;
+  cashAmount?: number;
+  upiAmount?: number;
   paymentStatus: PaymentStatus;
   status: SaleStatus;
   notes?: string;

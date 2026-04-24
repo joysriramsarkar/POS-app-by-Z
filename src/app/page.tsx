@@ -248,7 +248,7 @@ function POSDashboard() {
         const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
         
         try {
-          const res = await fetch('/api/products?limit=50', { signal: controller.signal });
+          const res = await fetch('/api/products?limit=10000', { signal: controller.signal });
           clearTimeout(timeoutId);
           
           if (res.ok) {
@@ -439,6 +439,8 @@ function POSDashboard() {
       customerId: paymentData.customerId,
       paymentMethod: paymentData.paymentMethod,
       amountPaid: paymentData.amountPaid,
+      cashAmount: paymentData.cashAmount,
+      upiAmount: paymentData.upiAmount,
       discount: paymentData.discount,
       tax: paymentData.tax,
       usePrepaid: paymentData.usePrepaid,
@@ -461,6 +463,8 @@ function POSDashboard() {
         totalAmount: paymentData.total,
         amountPaid: paymentData.amountPaid,
         paymentMethod: paymentData.paymentMethod,
+        cashAmount: paymentData.cashAmount,
+        upiAmount: paymentData.upiAmount,
         paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
         status: 'Completed',
         notes: undefined,
@@ -561,7 +565,7 @@ function POSDashboard() {
 
           // refresh products and customers from server
           const [productsResult, customersResult] = await Promise.allSettled([
-            fetch('/api/products?limit=50'),
+            fetch('/api/products?limit=10000'),
             fetch('/api/customers'),
           ]);
 
@@ -684,7 +688,7 @@ function POSDashboard() {
         updateProductStock(data.productId, data.quantity);
 
         // Refetch all products to sync database changes
-        const productsRes = await fetch('/api/products?limit=50');
+        const productsRes = await fetch('/api/products?limit=10000');
         if (productsRes.ok) {
           const { data: refreshedProducts, nextCursor } = await productsRes.json();
           const hasMore = !!nextCursor;
