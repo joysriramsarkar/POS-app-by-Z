@@ -314,3 +314,18 @@ model RolePermission {
   @@index([role])
   @@map("role_permissions")
 }
+
+// ============================================================================
+// EXPENSES
+// ============================================================================
+
+model Expense {
+  id          String   @id @default(cuid())
+  amount      Float
+  category    String
+  notes       String?
+  date        DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("expenses")
+}

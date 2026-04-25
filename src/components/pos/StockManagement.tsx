@@ -164,6 +164,12 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
     return result;
   }, [products, categoryFilter, stockFilter, sortField, sortOrder]);
 
+  const totalStockValue = useMemo(() => {
+    return products
+      .filter(p => p.isActive && p.currentStock > 0)
+      .reduce((sum, p) => sum + (p.currentStock * p.buyingPrice), 0);
+  }, [products]);
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -204,7 +210,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
               Inventory Management
             </h1>
             <p className="text-sm text-muted-foreground">
-              {storeProducts.length} items • {negativeStockCount > 0 && <span className="text-red-600 font-semibold">{negativeStockCount} negative stock • </span>}{lowStockCount} low stock • {outOfStockCount} out of stock
+              {storeProducts.length} items • Total Value: {formatPrice(totalStockValue)} • {negativeStockCount > 0 && <span className="text-red-600 font-semibold">{negativeStockCount} negative stock • </span>}{lowStockCount} low stock • {outOfStockCount} out of stock
             </p>
           </div>
           <div className='flex gap-2'>

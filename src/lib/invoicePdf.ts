@@ -58,6 +58,10 @@ export async function generateInvoicePdf(
   }
 }
 
+import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+
 export async function shareInvoiceAsPdf(
   invoiceHtml: string,
   format: PrintFormat,
@@ -68,7 +72,45 @@ export async function shareInvoiceAsPdf(
   const blob = await generateInvoicePdf(invoiceHtml, format);
   const fileName = `Invoice-${invoiceNumber}.pdf`;
 
-  // Mobile: Web Share API with PDF file (WhatsApp, Telegram, etc.)
+  const isNativePlatform = Capacitor.isNativePlatform();
+
+  if (isNativePlatform) {
+    try {
+      // Capacitor Native Share
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      await new Promise<void>((resolve, reject) => {
+        reader.onloadend = async () => {
+          try {
+            const base64data = reader.result as string;
+
+            // Save to filesystem to share
+            const savedFile = await Filesystem.writeFile({
+              path: fileName,
+              data: base64data,
+              directory: Directory.Cache
+            });
+
+            await Share.share({
+              title: `Invoice ${invoiceNumber}`,
+              text: `Invoice from ${storeName}`,
+              url: savedFile.uri,
+              dialogTitle: 'Share Invoice'
+            });
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
+        };
+        reader.onerror = reject;
+      });
+      return;
+    } catch (error) {
+      console.error('Capacitor share error:', error);
+    }
+  }
+
+  // Web fallback: Web Share API with PDF file (WhatsApp, Telegram, etc.)
   if (typeof navigator !== 'undefined' && 'share' in navigator && 'canShare' in navigator) {
     const file = new File([blob], fileName, { type: 'application/pdf' });
     const shareData = { title: `Invoice ${invoiceNumber}`, text: `Invoice from ${storeName}`, files: [file] };

@@ -53,7 +53,8 @@ export function ProductGrid({
   const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
 
   const { toast } = useToast();
-  const cartItems = useCartStore((state) => state.items);
+  const activeTab = useCartStore((state) => state.getActiveTab());
+  const cartItems = activeTab.items;
   const getTotal = useCartStore((state) => state.getTotal);
   const getItemCount = useCartStore((state) => state.getItemCount);
   const addItem = useCartStore((state) => state.addItem);

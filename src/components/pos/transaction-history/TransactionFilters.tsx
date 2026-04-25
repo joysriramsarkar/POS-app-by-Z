@@ -34,11 +34,11 @@ export function TransactionFilters({
       <CardContent className="p-2 md:pt-4 md:p-6 pb-2 md:pb-4">
         <div className="grid grid-cols-2 md:flex md:flex-row flex-nowrap items-end gap-2 md:overflow-x-auto w-full">
           <div className="col-span-2 md:col-span-1 w-full md:min-w-42.5 shrink-0 space-y-1">
-            <label className="text-xs md:text-sm font-medium">Search Invoice</label>
+            <label className="text-xs md:text-sm font-medium">Search</label>
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
               <Input
-                placeholder="Invoice number..."
+                placeholder="Invoice, Customer, Product..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-7 md:pl-8 h-8 md:h-9 text-xs md:text-sm"

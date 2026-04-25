@@ -52,10 +52,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Build where clause
-    const where: Record<string, unknown> = {};
+    const where: any = {};
     
     if (invoiceNumber) {
-      where.invoiceNumber = invoiceNumber;
+      // Extended search: check invoiceNumber OR customer name OR customer phone OR items productName
+      where.OR = [
+        { invoiceNumber: { contains: invoiceNumber, mode: 'insensitive' } },
+        { customer: { name: { contains: invoiceNumber, mode: 'insensitive' } } },
+        { customer: { phone: { contains: invoiceNumber, mode: 'insensitive' } } },
+        { items: { some: { productName: { contains: invoiceNumber, mode: 'insensitive' } } } }
+      ];
     }
     
     if (customerId) {

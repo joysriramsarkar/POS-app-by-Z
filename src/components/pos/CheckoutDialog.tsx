@@ -84,11 +84,12 @@ export function CheckoutDialog({
     }
   }, [showSuccess, lastSale, onCheckoutSuccess]);
 
-  const items = useCartStore((state) => state.items);
-  const discount = useCartStore((state) => state.discount);
-  const tax = useCartStore((state) => state.tax);
-  const customerId = useCartStore((state) => state.customerId);
-  const paymentMethod = useCartStore((state) => state.paymentMethod);
+  const activeTab = useCartStore((state) => state.getActiveTab());
+  const items = activeTab.items;
+  const discount = activeTab.discount;
+  const tax = activeTab.tax;
+  const customerId = activeTab.customerId;
+  const paymentMethod = activeTab.paymentMethod;
   const getSubtotal = useCartStore((state) => state.getSubtotal);
   const getTotal = useCartStore((state) => state.getTotal);
   const clearCart = useCartStore((state) => state.clearCart);
@@ -326,6 +327,8 @@ export function CheckoutDialog({
     change,
     usePrepaid,
     prepaidAmountToUse,
+    cashReceived,
+    upiReceived
   ]);
 
   const handlePrint = useCallback(() => {

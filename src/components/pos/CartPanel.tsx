@@ -29,11 +29,14 @@ import {
   Check,
   UserPlus,
   ScanLine,
+  Plus,
+  X,
 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import type { PaymentMethod, Customer } from '@/types/pos';
 import { useCartStore, useUIStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface CartPanelProps {
   onCheckout: () => void;
@@ -62,11 +65,19 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
     notes: '',
   });
 
-  const items = useCartStore((state) => state.items);
-  const discount = useCartStore((state) => state.discount);
-  const tax = useCartStore((state) => state.tax);
-  const customerName = useCartStore((state) => state.customerName);
-  const paymentMethod = useCartStore((state) => state.paymentMethod);
+  const tabs = useCartStore((state) => state.tabs);
+  const activeTabId = useCartStore((state) => state.activeTabId);
+  const addTab = useCartStore((state) => state.addTab);
+  const removeTab = useCartStore((state) => state.removeTab);
+  const setActiveTab = useCartStore((state) => state.setActiveTab);
+
+  // Note: These getters and primitive values now react to active tab changes naturally
+  const activeTab = useCartStore((state) => state.getActiveTab());
+  const items = activeTab.items;
+  const discount = activeTab.discount;
+  const tax = activeTab.tax;
+  const customerName = activeTab.customerName;
+  const paymentMethod = activeTab.paymentMethod;
   const getSubtotal = useCartStore((state) => state.getSubtotal);
   const getTotal = useCartStore((state) => state.getTotal);
   const getItemCount = useCartStore((state) => state.getItemCount);
@@ -212,12 +223,54 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
 
   return (
     <div className="flex flex-col h-full bg-background min-h-0">
+      {/* Tabs UI */}
+      <div className="flex flex-col border-b shrink-0 bg-muted/20">
+        <div className="flex items-center px-1 pt-1 overflow-hidden w-full">
+          <ScrollArea className="w-full max-w-full">
+            <div className="flex w-full items-center">
+              {tabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex items-center px-3 py-1.5 min-w-[80px] max-w-[120px] text-xs font-medium cursor-pointer border-t border-x rounded-t-lg mr-1 transition-colors select-none",
+                    activeTabId === tab.id
+                      ? "bg-background border-b-transparent text-primary relative z-10 -mb-[1px]"
+                      : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  <span className="truncate flex-1" title={tab.name}>{tab.name}</span>
+                  {tabs.length > 1 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeTab(tab.id); }}
+                      className="ml-1 opacity-60 hover:opacity-100 hover:text-destructive shrink-0"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={addTab}
+                className="h-7 px-2 ml-1 text-muted-foreground shrink-0 rounded-full"
+                title="New Bill"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            <ScrollBar orientation="horizontal" className="invisible" />
+          </ScrollArea>
+        </div>
+      </div>
+
       {/* Header */}
-      <div className="flex items-center justify-between p-2 md:p-4 border-b shrink-0">
+      <div className="flex items-center justify-between p-2 md:p-3 border-b shrink-0">
         <div className="flex items-center gap-2">
           <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" />
-          <h2 className="font-semibold text-base md:text-lg">Cart</h2>
-          <Badge variant="secondary" className="ml-1 text-xs">
+          <h2 className="font-semibold text-base">Cart</h2>
+          <Badge variant="secondary" className="ml-1 text-[10px]">
             {itemCountDisplay}
           </Badge>
         </div>
@@ -226,9 +279,9 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
             variant="ghost"
             size="sm"
             onClick={handleClearCart}
-            className="text-muted-foreground hover:text-destructive h-8 md:h-9 px-2 md:px-3 text-sm"
+            className="text-muted-foreground hover:text-destructive h-7 px-2 text-xs"
           >
-            <Trash2 className="w-3 h-3 md:w-4 md:h-4 mr-1" />
+            <Trash2 className="w-3 h-3 mr-1" />
             Clear
           </Button>
         )}

@@ -13,7 +13,9 @@ import Decimal from 'decimal.js';
 // CART STORE
 // ============================================================================
 
-interface CartState {
+interface TabState {
+  id: string;
+  name: string;
   items: CartItem[];
   discount: number;
   tax: number;
@@ -24,11 +26,25 @@ interface CartState {
   amountPaid: number;
   notes: string;
   lastScannedBarcode: string;
+}
+
+interface CartState {
+  tabs: TabState[];
+  activeTabId: string;
   isOfflineMode: boolean;
   pendingSyncCount: number;
 }
 
 interface CartActions {
+  addTab: () => void;
+  removeTab: (tabId: string) => void;
+  setActiveTab: (tabId: string) => void;
+
+  // Active tab getters
+  getActiveTab: () => TabState;
+  _updateActiveTab: (updates: Partial<TabState>) => void;
+
+  // Active tab actions
   addItem: (product: Product, quantity?: number) => void;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -40,14 +56,23 @@ interface CartActions {
   setAmountPaid: (amount: number) => void;
   setNotes: (notes: string) => void;
   setLastScannedBarcode: (barcode: string) => void;
+
+  // Global actions
   setOfflineMode: (isOffline: boolean) => void;
   setPendingSyncCount: (count: number) => void;
+
+  // Active tab calculated getters
   getSubtotal: () => number;
   getTotal: () => number;
   getItemCount: () => number;
+
 }
 
-const initialCartState: CartState = {
+export const useActiveTab = () => {
+  return useCartStore((state) => state.getActiveTab());
+};
+
+const initialTabState: Omit<TabState, 'id' | 'name'> = {
   items: [],
   discount: 0,
   tax: 0,
@@ -58,6 +83,11 @@ const initialCartState: CartState = {
   amountPaid: 0,
   notes: '',
   lastScannedBarcode: '',
+};
+
+const initialCartState: CartState = {
+  tabs: [{ id: 'tab-1', name: 'Bill 1', ...initialTabState }],
+  activeTabId: 'tab-1',
   isOfflineMode: false,
   pendingSyncCount: 0,
 };
@@ -67,8 +97,41 @@ export const useCartStore = create<CartState & CartActions>()(
     (set, get) => ({
       ...initialCartState,
 
+      getActiveTab: () => {
+        const { tabs, activeTabId } = get();
+        return tabs.find(t => t.id === activeTabId) || tabs[0];
+      },
+
+      addTab: () => set((state) => {
+        const newTabId = `tab-${uuidv4()}`;
+        const newTabNumber = state.tabs.length + 1;
+        return {
+          tabs: [...state.tabs, { id: newTabId, name: `Bill ${newTabNumber}`, ...initialTabState }],
+          activeTabId: newTabId,
+        };
+      }),
+
+      removeTab: (tabId: string) => set((state) => {
+        if (state.tabs.length === 1) return state; // Don't remove last tab
+        const newTabs = state.tabs.filter(t => t.id !== tabId);
+        let newActiveTabId = state.activeTabId;
+        if (state.activeTabId === tabId) {
+          newActiveTabId = newTabs[newTabs.length - 1].id;
+        }
+        return { tabs: newTabs, activeTabId: newActiveTabId };
+      }),
+
+      setActiveTab: (tabId: string) => set({ activeTabId: tabId }),
+
+      // --- Active Tab Actions ---
+
+      _updateActiveTab: (updates: Partial<TabState>) => set((state) => ({
+        tabs: state.tabs.map(tab => tab.id === state.activeTabId ? { ...tab, ...updates } : tab)
+      })),
+
       addItem: (product: Product, quantity: number = 1) => {
-        const currentItems = get().items;
+        const tab = get().getActiveTab();
+        const currentItems = tab.items;
         const existingItemIndex = currentItems.findIndex(
           (item) => item.productId === product.id
         );
@@ -83,7 +146,7 @@ export const useCartStore = create<CartState & CartActions>()(
             quantity: newQuantity,
             totalPrice: new Decimal(newQuantity).times(new Decimal(existingItem.unitPrice)).toNumber(),
           };
-          set({ items: updatedItems });
+          get()._updateActiveTab({ items: updatedItems });
         } else {
           const newItem: CartItem = {
             id: uuidv4(),
@@ -96,14 +159,14 @@ export const useCartStore = create<CartState & CartActions>()(
             unit: product.unit,
             availableStock: product.currentStock,
           };
-          set({ items: [...currentItems, newItem] });
+          get()._updateActiveTab({ items: [...currentItems, newItem] });
         }
       },
 
       removeItem: (itemId: string) => {
-        set((state) => ({
-          items: state.items.filter((item) => item.id !== itemId),
-        }));
+        get()._updateActiveTab({
+          items: get().getActiveTab().items.filter((item) => item.id !== itemId),
+        });
       },
 
       updateQuantity: (itemId: string, quantity: number) => {
@@ -111,42 +174,29 @@ export const useCartStore = create<CartState & CartActions>()(
           get().removeItem(itemId);
           return;
         }
-
-        set((state) => ({
-          items: state.items.map((item) =>
+        get()._updateActiveTab({
+          items: get().getActiveTab().items.map((item) =>
             item.id === itemId
               ? { ...item, quantity, totalPrice: new Decimal(quantity).times(new Decimal(item.unitPrice)).toNumber() }
               : item
           ),
-        }));
-      },
-
-      clearCart: () => {
-        set({
-          items: [],
-          discount: 0,
-          tax: 0,
-          customerId: undefined,
-          customerName: undefined,
-          customerPhone: undefined,
-          paymentMethod: 'Cash',
-          amountPaid: 0,
-          notes: '',
         });
       },
 
-      setDiscount: (discount: number) => set({ discount }),
-      setTax: (tax: number) => set({ tax }),
+      clearCart: () => get()._updateActiveTab(initialTabState),
+
+      setDiscount: (discount: number) => get()._updateActiveTab({ discount }),
+      setTax: (tax: number) => get()._updateActiveTab({ tax }),
 
       setCustomer: (customer: Customer | null) => {
         if (customer) {
-          set({
+          get()._updateActiveTab({
             customerId: customer.id,
             customerName: customer.name,
             customerPhone: customer.phone,
           });
         } else {
-          set({
+          get()._updateActiveTab({
             customerId: undefined,
             customerName: undefined,
             customerPhone: undefined,
@@ -154,40 +204,36 @@ export const useCartStore = create<CartState & CartActions>()(
         }
       },
 
-      setPaymentMethod: (method: PaymentMethod) => set({ paymentMethod: method }),
-      setAmountPaid: (amount: number) => set({ amountPaid: amount }),
-      setNotes: (notes: string) => set({ notes }),
-      setLastScannedBarcode: (barcode: string) => set({ lastScannedBarcode: barcode }),
+      setPaymentMethod: (method: PaymentMethod) => get()._updateActiveTab({ paymentMethod: method }),
+      setAmountPaid: (amount: number) => get()._updateActiveTab({ amountPaid: amount }),
+      setNotes: (notes: string) => get()._updateActiveTab({ notes: notes }),
+      setLastScannedBarcode: (barcode: string) => get()._updateActiveTab({ lastScannedBarcode: barcode }),
+
+      // Global Actions
       setOfflineMode: (isOffline: boolean) => set({ isOfflineMode: isOffline }),
       setPendingSyncCount: (count: number) => set({ pendingSyncCount: count }),
 
+      // Calculations based on active tab
       getSubtotal: () => {
-        return get().items.reduce((sum, item) => new Decimal(sum).plus(new Decimal(item.totalPrice)).toNumber(), 0);
+        return get().getActiveTab().items.reduce((sum, item) => new Decimal(sum).plus(new Decimal(item.totalPrice)).toNumber(), 0);
       },
 
       getTotal: () => {
         const subtotal = get().getSubtotal();
-        const { discount, tax } = get();
+        const { discount, tax } = get().getActiveTab();
         return new Decimal(subtotal).minus(new Decimal(discount)).plus(new Decimal(tax)).toNumber();
       },
 
       getItemCount: () => {
-        return get().items.reduce((sum, item) => sum + item.quantity, 0);
+        return get().getActiveTab().items.reduce((sum, item) => sum + item.quantity, 0);
       },
     }),
     {
-      name: 'lakhan-bhandar-cart',
+      name: 'lakhan-bhandar-cart-v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        items: state.items,
-        discount: state.discount,
-        tax: state.tax,
-        customerId: state.customerId,
-        customerName: state.customerName,
-        customerPhone: state.customerPhone,
-        paymentMethod: state.paymentMethod,
-        amountPaid: state.amountPaid,
-        notes: state.notes,
+        tabs: state.tabs,
+        activeTabId: state.activeTabId,
       }),
     }
   )

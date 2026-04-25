@@ -34,7 +34,8 @@ export function CameraScannerDialog({
 }: CameraScannerDialogProps) {
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const cartItems = useCartStore((state) => state.items);
+  const activeTab = useCartStore((state) => state.getActiveTab());
+  const cartItems = activeTab.items;
 
   const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
 

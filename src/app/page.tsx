@@ -41,6 +41,7 @@ import {
   ScanLine,
   UserCog,
   History,
+  Banknote,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
@@ -60,7 +61,9 @@ import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
-type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'transactions' | 'settings' | 'users' | 'menu';
+import { Expenses } from '@/components/pos/Expenses';
+
+type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'transactions' | 'expenses' | 'settings' | 'users' | 'menu';
 
 const navItems: { id: Exclude<PageType, 'menu'>; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -69,6 +72,7 @@ const navItems: { id: Exclude<PageType, 'menu'>; label: string; icon: React.Reac
   { id: 'parties', label: 'Parties', icon: <Users className="w-5 h-5" /> },
   { id: 'reports', label: 'Reports', icon: <FileText className="w-5 h-5" /> },
   { id: 'transactions', label: 'Transactions', icon: <History className="w-5 h-5" /> },
+  { id: 'expenses', label: 'Expenses', icon: <Banknote className="w-5 h-5" /> },
   { id: 'users', label: 'Users', icon: <UserCog className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
 ];
@@ -140,7 +144,8 @@ function POSDashboard() {
   const setLastScannedBarcode = useCartStore((state) => state.setLastScannedBarcode);
   const getItemCount = useCartStore((state) => state.getItemCount);
   const getTotal = useCartStore((state) => state.getTotal);
-  const cartItems = useCartStore((state) => state.items);
+  const activeTab = useCartStore((state) => state.getActiveTab());
+  const cartItems = activeTab.items;
 
   // Removed isOnline from useSyncStore - now using useOfflineContext above
   const setOnline = useSyncStore((state) => state.setOnline);
@@ -1073,6 +1078,8 @@ function POSDashboard() {
         return <Reports />;
       case 'transactions':
         return <TransactionHistory />;
+      case 'expenses':
+        return <Expenses />;
       case 'menu':
         return (
           <div className="p-4 overflow-y-auto h-full">
@@ -1084,7 +1091,7 @@ function POSDashboard() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {filteredNavItems
-                .filter((item) => ['reports', 'settings', 'parties', 'users', 'transactions'].includes(item.id))
+                .filter((item) => ['reports', 'settings', 'parties', 'users', 'transactions', 'expenses'].includes(item.id))
                 .map((item) => (
                   <button
                     key={item.id}
