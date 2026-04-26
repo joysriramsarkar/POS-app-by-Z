@@ -187,6 +187,19 @@ export async function PUT(request: NextRequest) {
 
     const { id, ...validatedData } = result.data;
 
+    // Check phone uniqueness (exclude current customer)
+    if (validatedData.phone) {
+      const existing = await db.customer.findFirst({
+        where: { phone: validatedData.phone, id: { not: body.id } },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { success: false, error: 'Another customer with this phone already exists' },
+          { status: 400 }
+        );
+      }
+    }
+
     const customer = await db.customer.update({
       where: { id: body.id },
       data: {

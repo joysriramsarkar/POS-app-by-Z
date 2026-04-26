@@ -266,7 +266,7 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between p-2 md:p-3 border-b shrink-0">
+      <div className="flex items-center justify-between p-1.5 md:p-2 border-b shrink-0">
         <div className="flex items-center gap-2">
           <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-primary" />
           <h2 className="font-semibold text-base">Cart</h2>
@@ -288,12 +288,12 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
       </div>
 
       {/* Customer Selector */}
-      <div className="p-2 md:p-3 border-b shrink-0 py-1.5 md:py-3">
-        <Label className="text-xs text-muted-foreground mb-1.5 block">Customer</Label>
+      <div className="px-2 border-b shrink-0 py-1 md:py-2">
+        <Label className="text-xs text-muted-foreground mb-1 block">Customer</Label>
         <div className="relative">
           <Button
             variant="outline"
-            className="w-full justify-between h-8 md:h-9 text-sm"
+            className="w-full justify-between h-7 md:h-9 text-xs"
             onClick={() => setCustomerSearchOpen(!customerSearchOpen)}
           >
             <div className="flex items-center gap-2">
@@ -371,13 +371,13 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
       </div>
 
       {/* Cart Items - Mobile: flex-1 overflow-y-auto, Desktop: normal */}
-      <div className="flex-1 min-h-0 overflow-y-auto pb-32 sm:pb-0">
-        <div className="p-1.5 md:p-3 space-y-1.5 md:space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto pb-28 sm:pb-0">
+        <div className="p-1 md:p-2 space-y-1">
           {isCartEmpty ? (
             <div className="flex flex-col items-center justify-center py-8 md:py-12 text-center">
-              <ShoppingCart className="w-10 h-10 md:w-12 md:h-12 text-muted-foreground mb-3 md:mb-4" />
-              <p className="text-muted-foreground text-sm md:text-base">Cart is empty</p>
-              <p className="text-xs text-muted-foreground mt-1 mb-4">
+              <ShoppingCart className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground mb-2" />
+              <p className="text-muted-foreground text-xs md:text-sm">Cart is empty</p>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-3">
                 Scan or tap products to add them
               </p>
               {isAndroidApp && onScan && (
@@ -396,9 +396,9 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
       {/* Payment Method & Totals - Mobile: Fixed at bottom, Desktop: In-flow */}
       <div className="flex-none mt-auto sm:relative bg-background border-t p-2 md:p-0 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)] md:shadow-none z-40 md:z-auto pb-[env(safe-area-inset-bottom)]">
         {/* Payment Method Selector - Visible Cards */}
-        <div className="p-3 md:p-4 border-b md:border-b-0">
-          <Label className="text-xs font-semibold text-muted-foreground mb-3 block uppercase tracking-wider">Payment Method</Label>
-          <div className="grid grid-cols-4 gap-1 sm:grid-cols-3 sm:gap-2 md:gap-3">
+        <div className="p-2 md:p-3 border-b md:border-b-0">
+          <Label className="text-[10px] font-semibold text-muted-foreground mb-1.5 block uppercase tracking-wider">Payment Method</Label>
+          <div className="grid grid-cols-4 gap-1">
             {paymentMethods
               .filter(({ method }) => method !== 'Due' || customerName) // Hide Due for walk-in customers
               .map(({ method, icon, label, color }) => (
@@ -407,7 +407,7 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
                 type="button"
                 onClick={() => setPaymentMethod(method)}
                 className={cn(
-                    'relative flex flex-col items-center justify-center min-w-0 max-w-full whitespace-nowrap rounded-xl border-2 transition-all duration-200 touch-manipulation h-10 sm:h-auto px-1 py-1 sm:px-2 sm:py-2 md:px-3 md:py-3',
+                    'relative flex flex-col items-center justify-center min-w-0 max-w-full whitespace-nowrap rounded-lg border-2 transition-all duration-200 touch-manipulation h-9 px-1 py-0.5',
                     paymentMethod === method
                       ? 'border-primary bg-primary/10 shadow-md shadow-primary/10 scale-[1.02]'
                       : 'border-border/50 bg-background hover:bg-muted/80 hover:border-primary/30'
@@ -434,13 +434,13 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
               ))}
           </div>
           {/* Subtotal */}
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-xs mt-1.5">
             <span className="text-muted-foreground font-medium">Subtotal</span>
             <span className="font-semibold">{formatPrice(subtotal)}</span>
           </div>
 
           {/* Discount */}
-          <div className="flex justify-between items-center text-sm">
+          <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground font-medium">Discount</span>
             <div className="flex items-center gap-1">
               {showDiscountInput ? (
@@ -448,7 +448,7 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
                   type="number"
                   value={discount || ''}
                   onChange={handleDiscountChange}
-                  className="w-20 h-7 text-right text-sm px-2 rounded-md border-primary/30 focus-visible:ring-primary/50"
+                  className="w-16 h-6 text-right text-xs px-1.5 rounded-md border-primary/30 focus-visible:ring-primary/50"
                   placeholder="0"
                   min={0}
                   max={subtotal}
@@ -459,7 +459,7 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-3 text-sm font-semibold text-primary hover:bg-primary/10 rounded-md"
+                  className="h-6 px-2 text-xs font-semibold text-primary hover:bg-primary/10 rounded-md"
                   onClick={() => setShowDiscountInput(true)}
                 >
                   {discount > 0 ? formatPrice(discount) : '+ Add'}
@@ -476,18 +476,18 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
             </div>
           )}
 
-          <Separator className="my-2.5 bg-border/60" />
+          <Separator className="my-1.5 bg-border/60" />
 
           {/* Total and Checkout Button in compact row */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             <div className="flex items-end justify-between">
-              <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-1">Total</span>
-              <span className="text-2xl md:text-3xl font-black text-primary tracking-tight">{formatPrice(total)}</span>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total</span>
+              <span className="text-xl md:text-2xl font-black text-primary tracking-tight">{formatPrice(total)}</span>
             </div>
             <Button
               size="lg"
               className={cn(
-                "w-full h-12 md:h-14 text-base md:text-lg font-bold rounded-xl shadow-lg transition-all duration-300 touch-manipulation flex items-center justify-center gap-2",
+                "w-full h-10 md:h-12 text-sm md:text-base font-bold rounded-xl shadow-lg transition-all duration-300 touch-manipulation flex items-center justify-center gap-2",
                 isCartEmpty || total <= 0
                   ? "bg-muted text-muted-foreground shadow-none"
                   : "bg-primary text-primary-foreground hover:bg-primary/90 hover:shadow-primary/25 hover:-translate-y-0.5 active:translate-y-0"

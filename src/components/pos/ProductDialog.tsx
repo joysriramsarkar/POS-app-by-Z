@@ -23,13 +23,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Package, Barcode, RefreshCw, Languages, ScanLine } from 'lucide-react';
+import { Package, Barcode, RefreshCw, Languages, ScanLine, X } from 'lucide-react';
 import type { Product } from '@/types/pos';
 import { useProductsStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { CameraScannerDialog } from './CameraScannerDialog';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useCameraBarcodeScanner } from '@/hooks/use-camera-barcode-scanner';
+import { Capacitor } from '@capacitor/core';
 
 interface ProductDialogProps {
   open: boolean;
@@ -115,8 +116,18 @@ export function ProductDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [isWebScannerOpen, setIsWebScannerOpen] = useState(false);
 
-  const isMobile = useIsMobile();
+  const isNativeApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
+
+  const { scannerId, isInitialized, startShutdown } = useCameraBarcodeScanner({
+    enabled: isWebScannerOpen,
+    onBarcodeDetected: (code) => {
+      setBarcode(code);
+      startShutdown();
+    },
+    onClose: () => setIsWebScannerOpen(false),
+  });
 
   const { toast } = useToast();
   const categories = useProductsStore((state) => state.categories);
@@ -274,17 +285,16 @@ export function ProductDialog({
                 placeholder="Scan or enter barcode"
                 className="flex-1 font-mono"
               />
-              {isMobile && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setIsScannerOpen(true)}
-                  title="Scan barcode"
-                >
-                  <ScanLine className="w-4 h-4" />
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => isNativeApp ? setIsScannerOpen(true) : setIsWebScannerOpen(true)}
+                title="Scan barcode"
+                className="md:hidden"
+              >
+                <ScanLine className="w-4 h-4" />
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -295,6 +305,27 @@ export function ProductDialog({
                 <RefreshCw className="w-4 h-4" />
               </Button>
             </div>
+
+            {/* Web camera scanner (non-native) */}
+            {isWebScannerOpen && (
+              <div className="relative border rounded-lg overflow-hidden bg-black">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 z-10 bg-black/50 text-white hover:bg-black/70 h-8 w-8"
+                  onClick={() => startShutdown()}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+                <div id={scannerId} className="w-full" />
+                {!isInitialized && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <p className="text-white text-sm">ক্যামেরা চালু হচ্ছে...</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Category */}
@@ -447,13 +478,16 @@ export function ProductDialog({
           )}
         </div>
 
-      <CameraScannerDialog
-        open={isScannerOpen}
-        onOpenChange={setIsScannerOpen}
-        onBarcodeScanned={(scanned) => { setBarcode(scanned); setIsScannerOpen(false); }}
-        title="Scan Product Barcode"
-        description="Position the barcode in the center of the frame"
-      />
+      {/* Native app barcode scanner */}
+      {isNativeApp && (
+        <CameraScannerDialog
+          open={isScannerOpen}
+          onOpenChange={setIsScannerOpen}
+          onBarcodeScanned={(scanned) => { setBarcode(scanned); setIsScannerOpen(false); }}
+          title="Scan Product Barcode"
+          description="Position the barcode in the center of the frame"
+        />
+      )}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>

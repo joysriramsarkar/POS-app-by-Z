@@ -50,9 +50,9 @@ export type SaleInput = z.infer<typeof SaleInputSchema>;
 export const CustomerInputSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1, 'Customer name is required'),
-  phone: z.string().nullable().optional(),
-  address: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
+  phone: z.string().nullable().optional().transform(v => v === '' ? null : v),
+  address: z.string().nullable().optional().transform(v => v === '' ? null : v),
+  notes: z.string().nullable().optional().transform(v => v === '' ? null : v),
   totalDue: z.coerce.number().optional(),
   totalPaid: z.coerce.number().optional(),
 });

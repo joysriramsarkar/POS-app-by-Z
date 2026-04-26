@@ -203,7 +203,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="shrink-0 border-b bg-background p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between gap-2 mb-4 flex-wrap">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
               <Package className="w-6 h-6" />

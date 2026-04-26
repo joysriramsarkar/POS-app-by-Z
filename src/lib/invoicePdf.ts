@@ -4,13 +4,13 @@ export async function generateInvoicePdf(
   invoiceHtml: string,
   format: PrintFormat
 ): Promise<Blob> {
-  const { default: html2canvas } = await import('html2canvas');
   const { default: jsPDF } = await import('jspdf');
 
   const isThermal = format.startsWith('thermal');
   const pdfWidthMm = format === 'thermal-58' ? 58 : format === 'thermal-80' ? 80 : format === 'a5' ? 148 : 210;
+  const pdfHeightMm = isThermal ? 400 : (format === 'a5' ? 210 : 297);
 
-  // Render inside a hidden iframe so all styles (Tailwind, fonts) load correctly
+  // Render inside a hidden iframe so all styles load correctly
   const iframe = document.createElement('iframe');
   iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:1200px;border:none;visibility:hidden;';
   document.body.appendChild(iframe);
@@ -23,34 +23,29 @@ export async function generateInvoicePdf(
     doc.close();
   });
 
-  // Extra wait for fonts/images inside iframe
   await new Promise(r => setTimeout(r, 600));
 
   try {
-    const iframeBody = iframe.contentDocument!.body;
-
-    const canvas = await html2canvas(iframeBody, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      logging: false,
-      windowWidth: iframe.contentDocument!.documentElement.scrollWidth,
-      windowHeight: iframe.contentDocument!.documentElement.scrollHeight,
-    });
-
-    const imgData = canvas.toDataURL('image/png');
-    // px → mm at 96dpi, accounting for scale:2
-    const pxToMm = (px: number) => (px / 2 / 96) * 25.4;
-    const imgHeightMm = pxToMm(canvas.height);
+    const iframeDoc = iframe.contentDocument!;
+    const invoiceEl = iframeDoc.querySelector<HTMLElement>('.print-invoice-container') || iframeDoc.body;
 
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
-      format: isThermal ? [pdfWidthMm, imgHeightMm] : (format === 'a5' ? 'a5' : 'a4'),
+      format: isThermal ? [pdfWidthMm, pdfHeightMm] : (format === 'a5' ? 'a5' : 'a4'),
     });
 
-    const docHeightMm = isThermal ? imgHeightMm : (format === 'a5' ? 210 : 297);
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, isThermal ? imgHeightMm : docHeightMm);
+    await new Promise<void>((resolve, reject) => {
+      pdf.html(invoiceEl, {
+        callback: (doc) => { resolve(); },
+        x: 0,
+        y: 0,
+        width: pdfWidthMm,
+        windowWidth: invoiceEl.scrollWidth || 600,
+        autoPaging: 'text',
+        margin: [0, 0, 0, 0],
+      });
+    });
 
     return pdf.output('blob');
   } finally {
@@ -58,9 +53,7 @@ export async function generateInvoicePdf(
   }
 }
 
-import { Capacitor } from '@capacitor/core';
-import { Share } from '@capacitor/share';
-import { Directory, Filesystem } from '@capacitor/filesystem';
+
 
 export async function shareInvoiceAsPdf(
   invoiceHtml: string,
@@ -72,25 +65,29 @@ export async function shareInvoiceAsPdf(
   const blob = await generateInvoicePdf(invoiceHtml, format);
   const fileName = `Invoice-${invoiceNumber}.pdf`;
 
-  const isNativePlatform = Capacitor.isNativePlatform();
+  let isNativePlatform = false;
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    isNativePlatform = Capacitor.isNativePlatform();
+  } catch { /* not a native platform */ }
 
   if (isNativePlatform) {
     try {
-      // Capacitor Native Share
+      const [{ Share }, { Directory, Filesystem }] = await Promise.all([
+        import('@capacitor/share'),
+        import('@capacitor/filesystem'),
+      ]);
       const reader = new FileReader();
       reader.readAsDataURL(blob);
       await new Promise<void>((resolve, reject) => {
         reader.onloadend = async () => {
           try {
             const base64data = reader.result as string;
-
-            // Save to filesystem to share
             const savedFile = await Filesystem.writeFile({
               path: fileName,
               data: base64data,
               directory: Directory.Cache
             });
-
             await Share.share({
               title: `Invoice ${invoiceNumber}`,
               text: `Invoice from ${storeName}`,

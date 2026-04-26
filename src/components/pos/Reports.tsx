@@ -296,12 +296,12 @@ const Reports: React.FC = () => {
 
         <Tabs defaultValue="sales" className="w-full">
           <div className="w-full overflow-x-auto pb-2">
-            <TabsList className="w-full sm:w-auto mb-4 inline-flex flex-wrap gap-2">
-              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="sales">Sales</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="payment">Payment</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="stock">Auto Restock</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="dues">Dues</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="products">Top Items</TabsTrigger>
+            <TabsList className="h-auto flex flex-wrap gap-1 bg-muted p-1 rounded-lg w-full sm:w-auto">
+              <TabsTrigger className="flex-1 sm:flex-none" value="sales">Sales</TabsTrigger>
+              <TabsTrigger className="flex-1 sm:flex-none" value="payment">Payment</TabsTrigger>
+              <TabsTrigger className="flex-1 sm:flex-none" value="stock">Auto Restock</TabsTrigger>
+              <TabsTrigger className="flex-1 sm:flex-none" value="dues">Dues</TabsTrigger>
+              <TabsTrigger className="flex-1 sm:flex-none" value="products">Top Items</TabsTrigger>
             </TabsList>
           </div>
 

@@ -128,7 +128,7 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
     <div
       ref={itemRef}
       className={cn(
-        'group flex items-center gap-2 p-1.5 md:p-3 rounded-lg border bg-card transition-all',
+        'group flex items-center gap-1.5 p-1 md:p-2 rounded-lg border bg-card transition-all',
         'hover:shadow-sm',
         isHighlighted && 'ring-2 ring-primary ring-offset-2',
         isOverStock && 'border-destructive bg-destructive/5'
@@ -145,9 +145,9 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <h4 className="font-medium text-xs md:text-base truncate">{item.productName}</h4>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs md:text-sm text-muted-foreground">
+            <h4 className="font-medium text-xs truncate">{item.productName}</h4>
+            <div className="flex items-center gap-1 mt-0">
+              <span className="text-[10px] text-muted-foreground">
                 {formatPrice(item.unitPrice)}/{item.unit}
               </span>
               {item.barcode && (
@@ -159,12 +159,12 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
           </div>
           {/* Total Price */}
           <div className="text-right shrink-0">
-            <p className="font-semibold text-sm md:text-base">{formatPrice(item.totalPrice)}</p>
+            <p className="font-semibold text-xs md:text-sm">{formatPrice(item.totalPrice)}</p>
           </div>
         </div>
 
         {/* Quantity Controls */}
-        <div className="flex items-center justify-between mt-1 md:mt-2">
+        <div className="flex items-center justify-between mt-0.5">
           <div
             className="flex items-center gap-1"
             role="group"
@@ -176,12 +176,12 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 w-8 md:h-8 md:w-8 p-0 touch-manipulation"
+              className="h-7 w-7 p-0 touch-manipulation"
               onClick={handleDecrement}
               disabled={item.quantity <= 1 && item.unit === 'piece'}
               aria-label="Decrease quantity"
             >
-              <Minus className="w-3 h-3 md:w-4 md:h-4" />
+              <Minus className="w-3 h-3" />
             </Button>
 
             {/* Quantity Input */}
@@ -189,12 +189,12 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
               id={`quantity-${item.id}`}
               name={`quantity-${item.id}`}
               type="number"
-              inputMode="decimal" // Hint for mobile keyboards
+              inputMode="decimal"
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleInputKeyDown}
               onBlur={commitInputValue}
-              className="w-12 md:w-16 h-8 md:h-8 text-center px-1 touch-manipulation text-sm"
+              className="w-10 h-7 text-center px-1 touch-manipulation text-xs"
               aria-label="Quantity"
               max={item.availableStock}
               min={0}
@@ -204,11 +204,11 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-8 w-8 md:h-8 md:w-8 p-0 touch-manipulation"
+              className="h-7 w-7 p-0 touch-manipulation"
               onClick={handleIncrement}
               aria-label="Increase quantity"
             >
-              <Plus className="w-3 h-3 md:w-4 md:h-4" />
+              <Plus className="w-3 h-3" />
             </Button>
           </div>
 
@@ -223,7 +223,7 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 w-8 md:h-8 md:w-8 p-0 text-muted-foreground hover:text-destructive touch-manipulation"
+            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive touch-manipulation"
             onClick={handleRemove}
             aria-label="Remove item"
           >

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +18,6 @@ import {
   TrendingDown,
   ArrowRight,
   LogOut,
-  ScanLine,
 } from 'lucide-react';
 import { useProductsStore, useCartStore } from '@/stores/pos-store';
 import { STORE_CONFIG, Sale } from '@/types/pos';
@@ -49,6 +49,10 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate }: DashboardProps) {
   const handleLogout = useLogout();
+  const { data: session } = useSession();
+  const userName = (session?.user as { name?: string; username?: string })?.name
+    || (session?.user as { username?: string })?.username
+    || 'User';
   const [stats, setStats] = useState<DashboardStats>({
     todaySales: 0,
     todayOrders: 0,
@@ -192,27 +196,47 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 border-b bg-background p-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{STORE_CONFIG.name}</h1>
-            <p className="text-muted-foreground">{STORE_CONFIG.nameBn}</p>
+      <div className="shrink-0 border-b bg-background px-4 pt-3 pb-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold leading-tight">{STORE_CONFIG.name}</h1>
+            <p className="text-xs text-muted-foreground">{STORE_CONFIG.nameBn}</p>
           </div>
-          
-
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Today</p>
-            <p className="font-semibold">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={handleLogout} className="gap-2 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/50">
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">লগ আউট (Logout)</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+              <p className="text-xs font-medium">{userName}</p>
+            </div>
+            <div className="flex flex-col items-end sm:hidden">
+              <p className="text-xs font-medium">{userName}</p>
+            </div>
+            <Button
+              onClick={handleLogout}
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/30 h-8"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="text-xs">Logout</span>
             </Button>
           </div>
         </div>
-        {/* New bottom breakdown section */}
-        <div className="p-4">
+        {/* Payment Breakdown - compact inline mobile, card on desktop */}
+        <div className="mt-2 grid grid-cols-3 gap-2 sm:hidden">
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-green-50/80 dark:bg-green-900/20 border border-green-100 dark:border-green-800/30">
+            <span className="text-[10px] text-green-700 dark:text-green-400 font-medium">UPI</span>
+            <span className="text-xs font-bold text-green-700 dark:text-green-400">{formatPrice(breakdown.upi)}</span>
+          </div>
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-blue-50/80 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30">
+            <span className="text-[10px] text-blue-700 dark:text-blue-400 font-medium">Cash</span>
+            <span className="text-xs font-bold text-blue-700 dark:text-blue-400">{formatPrice(breakdown.cash)}</span>
+          </div>
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-red-50/80 dark:bg-red-900/20 border border-red-100 dark:border-red-800/30">
+            <span className="text-[10px] text-red-700 dark:text-red-400 font-medium">Due</span>
+            <span className="text-xs font-bold text-red-700 dark:text-red-400">{formatPrice(breakdown.due)}</span>
+          </div>
+        </div>
+        <div className="hidden sm:block mt-3">
           <Card className="rounded-2xl shadow-sm border-border/50 bg-gradient-to-br from-card to-muted/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-bold">Today's Payments Breakdown</CardTitle>
@@ -319,7 +343,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
+              <div className="grid grid-cols-3 gap-3 md:gap-4">
                 <Button 
                   variant="outline" 
                   className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
@@ -340,8 +364,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   </div>
                   <span className="text-sm font-semibold">Add Stock</span>
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
                   onClick={() => handleQuickAction('parties')}
                 >
@@ -349,16 +373,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     <Users className="w-5 h-5 text-primary" />
                   </div>
                   <span className="text-sm font-semibold">Add Party</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-auto flex-col gap-3 py-5 rounded-xl border-border/50 hover:border-primary/30 hover:bg-primary/5 hover:text-primary transition-all shadow-xs group"
-                  onClick={() => handleQuickAction('scan')}
-                >
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <ScanLine className="w-5 h-5 text-primary" />
-                  </div>
-                  <span className="text-sm font-semibold">Scan Item</span>
                 </Button>
               </div>
             </CardContent>

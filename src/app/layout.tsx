@@ -57,7 +57,7 @@ export default function RootLayout({
   return (
     <html lang="bn" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${notoBengali.variable} antialiased bg-background text-foreground pt-[env(safe-area-inset-top)] lg:pt-0`}
+        className={`${geistSans.variable} ${geistMono.variable} ${notoBengali.variable} antialiased bg-background text-foreground`}
         suppressHydrationWarning
       >
         <SessionProvider>

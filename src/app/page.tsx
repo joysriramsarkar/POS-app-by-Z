@@ -982,8 +982,8 @@ function POSDashboard() {
 
             {/* Mobile billing: cart + scan button (no product list) */}
             <div className="flex-1 flex flex-col overflow-hidden w-full sm:hidden min-h-0">
-              <div className="p-2 md:p-3 border-b bg-background">
-                <div className="flex flex-row items-center gap-2 w-full mb-2">
+              <div className="p-1.5 border-b bg-background">
+                <div className="flex flex-row items-center gap-1.5 w-full">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -991,7 +991,7 @@ function POSDashboard() {
                       placeholder="Search products by name or barcode..."
                       value={mobileSearchQuery}
                       onChange={(e) => handleMobileSearchChange(e.target.value)}
-                      className="pl-9 h-9 md:h-10 text-sm"
+                      className="pl-9 h-8 text-sm"
                     />
                     {mobileSearchQuery && (
                       <Button
@@ -1004,7 +1004,7 @@ function POSDashboard() {
                       </Button>
                     )}
                   </div>
-                  <Button size="sm" className="shrink-0 h-9 w-9 p-0 md:h-10 md:w-auto md:px-4" onClick={handleOpenMobileScanner}>
+                  <Button size="sm" className="shrink-0 h-8 w-8 p-0" onClick={handleOpenMobileScanner}>
                     <ScanLine className="h-4 w-4 md:mr-2" />
                     <span className="hidden md:inline">Scan</span>
                   </Button>
@@ -1014,8 +1014,8 @@ function POSDashboard() {
               {/* Search Results */}
               {mobileSearchQuery && (
                 <div className="border-b bg-background max-h-48 overflow-y-auto">
-                  <div className="p-3">
-                    <h3 className="text-sm font-medium mb-2">Search Results ({mobileSearchResults.length})</h3>
+                  <div className="p-2">
+                    <h3 className="text-xs font-medium mb-1.5">Search Results ({mobileSearchResults.length})</h3>
                     {isMobileSearching ? (
                       <p className="text-sm text-muted-foreground">Searching...</p>
                     ) : mobileSearchResults.length === 0 ? (
@@ -1025,7 +1025,7 @@ function POSDashboard() {
                         {mobileSearchResults.slice(0, 15).map((product) => (
                           <div
                             key={product.id}
-                            className="flex items-center justify-between p-2 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                            className="flex items-center justify-between p-1.5 rounded-lg border hover:bg-muted/50 cursor-pointer"
                             onClick={() => {
                               addItem(product, 1);
                               setMobileSearchQuery('');
@@ -1124,7 +1124,7 @@ function POSDashboard() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
         {/* Mobile Header */}
-        <header className="lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] no-print sticky top-0 z-20">
+        <header className="lg:hidden shrink-0 border-b border-border/50 bg-card/80 backdrop-blur-md px-3 py-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] no-print sticky top-0 z-20">
           <div className="flex items-center justify-between gap-4">
             {/* Store Name */}
             <div className="flex items-center gap-2">

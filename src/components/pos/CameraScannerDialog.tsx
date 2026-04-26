@@ -1,21 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { BarcodeScanner, BarcodeFormat } from '@capacitor-mlkit/barcode-scanning';
 import { convertBengaliToEnglishNumerals, isValidEanUpcBarcode } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Camera, AlertCircle } from 'lucide-react';
-import { useCartStore } from '@/stores/pos-store';
+import { CheckCircle2, X, AlertCircle } from 'lucide-react';
 
 interface CameraScannerDialogProps {
   open: boolean;
@@ -29,125 +19,136 @@ export function CameraScannerDialog({
   open,
   onOpenChange,
   onBarcodeScanned,
-  title = 'Scan Barcode',
-  description = 'Position barcode within the frame',
 }: CameraScannerDialogProps) {
+  const [scanCount, setScanCount] = useState(0);
+  const [lastScanned, setLastScanned] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const activeTab = useCartStore((state) => state.getActiveTab());
-  const cartItems = activeTab.items;
+  const listenerRef = useRef<{ remove: () => Promise<void> } | null>(null);
+  const lastScannedRef = useRef<string>('');
+  const lastScannedTimeRef = useRef<number>(0);
 
   const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
 
-
-  const handleClose = useCallback(() => {
-    onOpenChange(false);
-  }, [onOpenChange]);
-
-  const startScan = useCallback(async () => {
-    if (!isAndroidApp) {
-      setError('Barcode scanning is available only in the Android app.');
-      return;
-    }
-
-    setIsScanning(true);
-    const { camera } = await BarcodeScanner.requestPermissions();
-    if (camera !== 'granted') {
-      setError('ক্যামেরার পারমিশন ছাড়া স্ক্যান সম্ভব নয়!');
-      setIsScanning(false);
-      return;
-    }
-    document.querySelector('body')?.classList.add('barcode-scanner-active');
+  const stopScanner = useCallback(async () => {
+    document.querySelector('body')?.classList.remove('barcode-scanner-active');
     try {
-      const { barcodes } = await BarcodeScanner.scan();
-      if (barcodes.length > 0 && barcodes[0].rawValue) {
-        const scannedCode = barcodes[0].rawValue.trim();
-        const normalizedBarcode = convertBengaliToEnglishNumerals(scannedCode);
-        if (isValidEanUpcBarcode(normalizedBarcode)) {
-          console.log('স্ক্যান করা কোড: ', normalizedBarcode);
-          onBarcodeScanned(normalizedBarcode);
-        } else {
-          setError('Invalid barcode detected. Please try again.');
-        }
-      }
-    } catch (err) {
-      setError('Scan failed: ' + (err as Error).message);
-    } finally {
-      document.querySelector('body')?.classList.remove('barcode-scanner-active');
-      setIsScanning(false);
+      await listenerRef.current?.remove();
+      listenerRef.current = null;
+      await BarcodeScanner.removeAllListeners();
+      await BarcodeScanner.stopScan();
+    } catch {
+      // ignore cleanup errors
     }
-  }, [onBarcodeScanned]);
+  }, []);
 
-  const handleCloseIntent = useCallback(() => {
-    onOpenChange(false);
+  const handleClose = useCallback(async () => {
+    await stopScanner();
+    setScanCount(0);
+    setLastScanned(null);
     setError(null);
-  }, [onOpenChange]);
+    onOpenChange(false);
+  }, [stopScanner, onOpenChange]);
+
+  useEffect(() => {
+    if (!open || !isAndroidApp) return;
+
+    const startScanner = async () => {
+      const { camera } = await BarcodeScanner.requestPermissions();
+      if (camera !== 'granted') {
+        setError('ক্যামেরার পারমিশন ছাড়া স্ক্যান সম্ভব নয়!');
+        return;
+      }
+
+      setScanCount(0);
+      setLastScanned(null);
+      setError(null);
+
+      listenerRef.current = await BarcodeScanner.addListener(
+        'barcodesScanned',
+        (event) => {
+          const barcode = event.barcodes?.[0];
+          if (!barcode?.rawValue) return;
+
+          const normalized = convertBengaliToEnglishNumerals(barcode.rawValue.trim());
+
+          const now = Date.now();
+          if (normalized === lastScannedRef.current && now - lastScannedTimeRef.current < 1500) return;
+          lastScannedRef.current = normalized;
+          lastScannedTimeRef.current = now;
+
+          if (isValidEanUpcBarcode(normalized)) {
+            onBarcodeScanned(normalized);
+            setLastScanned(normalized);
+            setScanCount((c) => c + 1);
+            if (navigator?.vibrate) navigator.vibrate(50);
+          } else {
+            setError('অবৈধ বারকোড: ' + normalized);
+          }
+        }
+      );
+
+      document.querySelector('body')?.classList.add('barcode-scanner-active');
+
+      await BarcodeScanner.startScan({
+        formats: [
+          BarcodeFormat.Ean13,
+          BarcodeFormat.Ean8,
+          BarcodeFormat.UpcA,
+          BarcodeFormat.UpcE,
+          BarcodeFormat.Code128,
+          BarcodeFormat.Code39,
+        ],
+      });
+    };
+
+    startScanner().catch((err) => setError('Scanner error: ' + err?.message));
+
+    return () => { stopScanner(); };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!open || !isAndroidApp) return null;
 
   return (
-    <Dialog open={open} onOpenChange={handleCloseIntent}>
-      <DialogContent className="sm:max-w-[425px] w-[95vw] p-4 md:p-6">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Camera className="w-5 h-5" />
-            {title}
-          </DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
+    <div className="barcode-scanner-overlay fixed inset-0 z-50 flex flex-col">
+      {/* Scanning frame */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="border-2 border-white/80 rounded-lg w-72 h-40 relative">
+          <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-lg" />
+          <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-white rounded-tr-lg" />
+          <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-white rounded-bl-lg" />
+          <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-white rounded-br-lg" />
+        </div>
+      </div>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs sm:text-sm">{error}</AlertDescription>
-          </Alert>
-        )}
-        {/* If not running inside Android app, inform the user and hide scanner UI */}
-        {!isAndroidApp ? (
-          <div className="p-4 text-center">
-            <p className="text-sm text-muted-foreground mb-3">Barcode scanning is available only in the Android app.</p>
+      {/* Bottom panel */}
+      <div className="bg-black/70 p-5 flex flex-col gap-3">
+        {error ? (
+          <div className="flex items-center justify-center gap-2 text-red-400 text-sm">
+            <AlertCircle className="w-4 h-4" />
+            {error}
           </div>
         ) : (
-          <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden border-2 border-gray-700">
-            <div className="flex items-center justify-center h-full">
-              <p className="text-sm text-white/80">Tap Scan to open the camera scanner.</p>
-            </div>
+          <p className="text-white/70 text-sm text-center">বারকোড ফ্রেমের মধ্যে ধরুন</p>
+        )}
 
-            {/* Live Cart Preview */}
-            {cartItems.length > 0 && (
-              <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-sm p-3 text-white">
-                <p className="text-xs font-semibold mb-2 opacity-80">Cart Preview (Last {Math.min(3, cartItems.length)} items)</p>
-                <div className="space-y-1 max-h-24 overflow-y-auto">
-                  {cartItems.slice(-3).reverse().map((item, i) => (
-                    <div key={i} className="flex justify-between items-center text-sm">
-                      <span className="truncate flex-1 pr-2">{item.productName}</span>
-                      <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded">x{item.quantity}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+        {scanCount > 0 && (
+          <div className="flex items-center justify-center gap-2 text-green-400 text-sm font-medium">
+            <CheckCircle2 className="w-4 h-4" />
+            {scanCount}টি আইটেম যোগ হয়েছে
+            {lastScanned && <span className="text-white/50 text-xs">({lastScanned})</span>}
           </div>
         )}
 
-        <DialogFooter className="flex gap-2">
-          {isAndroidApp && (
-            <Button
-              onClick={startScan}
-              className="w-full"
-              disabled={isScanning}
-            >
-              {isScanning ? 'Scanning...' : 'Scan'}
-            </Button>
-          )}
-          <Button
-            onClick={handleCloseIntent}
-            className="w-full"
-            disabled={isScanning}
-          >
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        <Button
+          onClick={handleClose}
+          variant="outline"
+          className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20"
+        >
+          <X className="w-4 h-4 mr-2" />
+          Done ({scanCount} scanned)
+        </Button>
+      </div>
+    </div>
   );
 }
 

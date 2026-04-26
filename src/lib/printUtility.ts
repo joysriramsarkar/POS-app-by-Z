@@ -138,41 +138,40 @@ export const printToIframe = (options: PrintOptions): void => {
              PAGE RULES: Zero margins for clean print
              ============================================================ */
           @page {
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0;
           }
 
           @page thermal-58 {
             size: 58mm auto;
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0;
           }
 
           @page thermal-80 {
             size: 80mm auto;
-            margin: 0 !important;
-            padding: 0 !important;
+            margin: 0;
           }
 
           @page a4-portrait {
             size: A4 portrait;
-            margin: 0.5cm !important;
-            padding: 0 !important;
+            margin: 1.5cm;
           }
 
           @page a5-portrait {
             size: A5 portrait;
-            margin: 0.5cm !important;
-            padding: 0 !important;
+            margin: 1.2cm;
           }
 
           /* ============================================================
-             UNIVERSAL RESET: Normalize all elements
+             UNIVERSAL RESET: Normalize all elements (thermal only)
              ============================================================ */
-          * {
-            margin: 0 !important;
-            padding: 0 !important;
+          .thermal-invoice * {
             box-sizing: border-box !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+
+          .standard-invoice * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             color-adjust: exact !important;
