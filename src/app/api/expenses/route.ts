@@ -34,12 +34,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Amount and category are required' }, { status: 400 });
     }
 
+    // Handle invalid dates (like those submitted in Bengali localized formats like DD/MM/YYYY)
+    let parsedDate = new Date();
+    if (date) {
+      // First normalize the date string if it contains Bengali numerals
+      const convertBengaliToEnglishNumerals = (input: string) => {
+        const bengaliToEnglish: { [key: string]: string } = {
+          '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
+          '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+        };
+        return input.replace(/[০-৯]/g, (match) => bengaliToEnglish[match] || match);
+      };
+
+      const normalizedDateStr = convertBengaliToEnglishNumerals(date);
+
+      // If the date looks like DD/MM/YYYY, convert to YYYY-MM-DD
+      const ddmmyyyyMatch = normalizedDateStr.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+      if (ddmmyyyyMatch) {
+        parsedDate = new Date(`${ddmmyyyyMatch[3]}-${ddmmyyyyMatch[2]}-${ddmmyyyyMatch[1]}`);
+      } else {
+        const attemptedDate = new Date(normalizedDateStr);
+        if (!isNaN(attemptedDate.getTime())) {
+          parsedDate = attemptedDate;
+        }
+      }
+    }
+
     const expense = await prisma.expense.create({
       data: {
         amount: parseFloat(amount),
         category,
         notes,
-        date: date ? new Date(date) : new Date(),
+        date: parsedDate,
       },
     });
 

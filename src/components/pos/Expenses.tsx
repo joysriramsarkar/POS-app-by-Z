@@ -39,10 +39,14 @@ export function Expenses() {
     if (!amount || !category) return;
     setIsLoading(true);
     try {
+      // Use convertBengaliToEnglishNumerals for robustness since user input might be in Bengali
+      const { convertBengaliToEnglishNumerals } = await import('@/lib/utils');
+      const normalizedAmount = convertBengaliToEnglishNumerals(amount);
+
       const res = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, category, notes, date }),
+        body: JSON.stringify({ amount: normalizedAmount, category, notes, date }),
       });
       if (res.ok) {
         toast({ title: 'Expense Added', description: 'Expense recorded successfully.' });
@@ -92,7 +96,8 @@ export function Expenses() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Amount (₹)</label>
-              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+              {/* Allow text input to support Bengali numerals, but it will be normalized before sending */}
+              <Input type="text" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Category</label>
