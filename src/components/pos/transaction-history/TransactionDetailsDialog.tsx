@@ -96,26 +96,26 @@ export function TransactionDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[85vh] w-[95vw] md:w-full overflow-y-auto p-4 md:p-6">
         <DialogHeader>
-          <DialogTitle>Transaction Details - {transaction.invoiceNumber}</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-lg md:text-xl">Transaction Details - {transaction.invoiceNumber}</DialogTitle>
+          <DialogDescription className="text-xs md:text-sm">
             {format(transaction.createdAt, 'dd MMMM yyyy HH:mm:ss')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <Card className="bg-muted/30">
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Customer</div>
-                <div className="font-semibold text-lg mt-1">{transaction.customer?.name || 'Walk-in'}</div>
+              <CardContent className="p-3 md:pt-4 md:p-6 pb-3 md:pb-4">
+                <div className="text-xs md:text-sm text-muted-foreground">Customer</div>
+                <div className="font-semibold text-base md:text-lg mt-1">{transaction.customer?.name || 'Walk-in'}</div>
               </CardContent>
             </Card>
             <Card className="bg-muted/30">
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Created By</div>
-                <div className="font-semibold text-lg mt-1">{transaction.user?.name || 'Unknown'}</div>
+              <CardContent className="p-3 md:pt-4 md:p-6 pb-3 md:pb-4">
+                <div className="text-xs md:text-sm text-muted-foreground">Created By</div>
+                <div className="font-semibold text-base md:text-lg mt-1">{transaction.user?.name || 'Unknown'}</div>
               </CardContent>
             </Card>
           </div>
@@ -144,7 +144,7 @@ export function TransactionDetailsDialog({
             </Table>
           </div>
 
-          <div className="space-y-2 border-t pt-4">
+          <div className="space-y-1.5 md:space-y-2 border-t pt-3 md:pt-4 text-sm md:text-base">
             <div className="flex justify-between">
               <span className="text-muted-foreground">Subtotal:</span>
               <span>{formatPrice(transaction.totalAmount + transaction.discount - transaction.tax)}</span>
@@ -161,7 +161,7 @@ export function TransactionDetailsDialog({
                 <span>{formatPrice(transaction.tax)}</span>
               </div>
             )}
-            <div className="flex justify-between font-semibold text-lg border-t pt-2 mt-2">
+            <div className="flex justify-between font-semibold text-base md:text-lg border-t pt-2 mt-2">
               <span>Total Amount:</span>
               <span>{formatPrice(transaction.totalAmount)}</span>
             </div>
@@ -177,16 +177,16 @@ export function TransactionDetailsDialog({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <Card className="bg-muted/30">
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Payment Method</div>
+              <CardContent className="p-3 md:pt-4 md:p-6 pb-3 md:pb-4">
+                <div className="text-xs md:text-sm text-muted-foreground">Payment Method</div>
                 <Badge variant="outline" className="mt-2">{transaction.paymentMethod}</Badge>
               </CardContent>
             </Card>
             <Card className="bg-muted/30">
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Payment Status</div>
+              <CardContent className="p-3 md:pt-4 md:p-6 pb-3 md:pb-4">
+                <div className="text-xs md:text-sm text-muted-foreground">Payment Status</div>
                 <Badge className={`mt-2 ${getPaymentStatusColor(transaction.paymentStatus)}`}>
                   {transaction.paymentStatus}
                 </Badge>

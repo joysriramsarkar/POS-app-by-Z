@@ -14,8 +14,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   TrendingUp, TrendingDown, DollarSign, Package, Users,
-  AlertTriangle, Download, BarChart2
+  AlertTriangle, Download, BarChart2, Lightbulb
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { format, subDays } from 'date-fns';
 
 type ChartType = 'bar' | 'line';
@@ -32,6 +39,9 @@ const Reports: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [chartType, setChartType] = useState<ChartType>('bar');
+  const [aiAdvice, setAiAdvice] = useState<string | null>(null);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
 
   // Date filter state
   const [preset, setPreset] = useState<DatePreset>('30');
@@ -167,6 +177,35 @@ const Reports: React.FC = () => {
           <p className="text-sm text-muted-foreground">Comprehensive business overview</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+            onClick={async () => {
+              if (!summaryData) return;
+              setIsAiDialogOpen(true);
+              setIsAiLoading(true);
+              try {
+                const res = await fetch('/api/ai', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ summary: summaryData }),
+                });
+                const data = await res.json();
+                if (data.success) {
+                  setAiAdvice(data.advice);
+                } else {
+                  setAiAdvice('Sorry, could not fetch AI advice right now.');
+                }
+              } catch (e) {
+                setAiAdvice('Sorry, could not fetch AI advice right now.');
+              } finally {
+                setIsAiLoading(false);
+              }
+            }}
+          >
+            <Lightbulb className="w-4 h-4" />
+            <span className="hidden sm:inline">Ask AI</span>
+          </Button>
           {DateFilter}
           <Button variant="outline" onClick={handleExportCSV} className="gap-2 border-primary/20 hover:bg-primary/5 min-h-9 touch-manipulation">
             <Download className="w-4 h-4" />
@@ -174,6 +213,23 @@ const Reports: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-indigo-600">
+              <Lightbulb className="w-5 h-5" />
+              AI Business Advisor
+            </DialogTitle>
+            <DialogDescription>
+              Personalized business advice based on your current reports.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 bg-muted/30 rounded-xl min-h-[100px] text-sm whitespace-pre-wrap">
+            {isAiLoading ? 'Analyzing your data and generating advice...' : aiAdvice}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {errorMessage && (
         <div className="shrink-0 bg-destructive/10 border-b border-destructive/30 p-4 flex items-center gap-3">
@@ -240,12 +296,12 @@ const Reports: React.FC = () => {
 
         <Tabs defaultValue="sales" className="w-full">
           <div className="w-full overflow-x-auto pb-2">
-            <TabsList className="w-full sm:w-auto mb-4 inline-grid grid-cols-5 sm:max-w-2xl gap-2">
-              <TabsTrigger className="min-h-11 touch-manipulation" value="sales">Sales</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation" value="payment">Payment</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation" value="stock">Stock</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation" value="dues">Dues</TabsTrigger>
-              <TabsTrigger className="min-h-11 touch-manipulation" value="products">Top Items</TabsTrigger>
+            <TabsList className="w-full sm:w-auto mb-4 inline-flex flex-wrap gap-2">
+              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="sales">Sales</TabsTrigger>
+              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="payment">Payment</TabsTrigger>
+              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="stock">Auto Restock</TabsTrigger>
+              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="dues">Dues</TabsTrigger>
+              <TabsTrigger className="min-h-11 touch-manipulation flex-1" value="products">Top Items</TabsTrigger>
             </TabsList>
           </div>
 
@@ -377,12 +433,27 @@ const Reports: React.FC = () => {
             </div>
           </TabsContent>
 
-          {/* Stock Tab */}
+          {/* Stock Alerts / Auto Restock Tab */}
           <TabsContent value="stock">
             <Card className="rounded-xl">
-              <CardHeader>
-                <CardTitle>Stock Alerts</CardTitle>
-                <CardDescription>Items at or below minimum stock level</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Auto Restock List</CardTitle>
+                  <CardDescription>Items at or below minimum stock level</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => {
+                  const itemsText = stockData.map((i: any) => `${i.name} - Stock: ${i.currentStock}`).join('\n');
+                  const blob = new Blob([itemsText], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `restock-list-${format(new Date(), 'yyyy-MM-dd')}.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download List
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">

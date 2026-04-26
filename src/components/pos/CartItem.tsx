@@ -79,8 +79,13 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
   const [inputValue, setInputValue] = useState<string>(String(item.quantity));
 
   useEffect(() => {
-    setInputValue(String(item.quantity));
-  }, [item.quantity]);
+    if (document.activeElement !== document.getElementById(`qty-${item.productId}`)) {
+      // Sync local input value with actual quantity only when it changes externally
+      if (inputValue !== String(item.quantity)) {
+        setTimeout(() => setInputValue(String(item.quantity)), 0);
+      }
+    }
+  }, [item.quantity, item.productId, inputValue]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
