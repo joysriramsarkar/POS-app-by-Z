@@ -56,6 +56,7 @@ export interface PaymentData {
   total: number;
   usePrepaid: boolean;
   prepaidAmountUsed: number;
+  addChangeAsPrepayment?: boolean;
 }
 
 const QUICK_AMOUNTS = [50, 100, 200, 500, 1000, 2000];
@@ -117,16 +118,20 @@ export function CheckoutDialog({
 
   const remainingTotal = useMemo(() => total - prepaidAmountToUse, [total, prepaidAmountToUse]);
 
-  const getInitialAmount = useCallback(() => {
-    if (paymentMethod === 'Cash') {
-      return Math.ceil(remainingTotal / 100) * 100;
-    }
-    return 0;
-  }, [paymentMethod, remainingTotal]);
-
   const [amountReceived, setAmountReceived] = useState<string>('');
   const [cashReceived, setCashReceived] = useState<string>('');
   const [upiReceived, setUpiReceived] = useState<string>('');
+  const [addAsPrePayment, setAddAsPrePayment] = useState(false);
+
+  // usePrepaid toggle করলে amount আপডেট করো
+  useEffect(() => {
+    if (!isOpen) return;
+    if (paymentMethod === 'Mixed') {
+      setCashReceived(remainingTotal.toString());
+    } else {
+      setAmountReceived(remainingTotal.toString());
+    }
+  }, [remainingTotal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const parsedAmount = useMemo(() => {
     if (paymentMethod === 'Mixed') {
@@ -160,26 +165,31 @@ export function CheckoutDialog({
     }).format(price);
   };
 
+  // Dialog açıldığında amount'u sıfırla
+  useEffect(() => {
+    if (isOpen && !prevOpenRef.current) {
+      setInputError(null);
+      setUsePrepaid(false);
+      setAddAsPrePayment(false);
+      if (paymentMethod === 'Mixed') {
+        setCashReceived(remainingTotal.toString());
+        setUpiReceived('');
+        setAmountReceived('');
+      } else {
+        setAmountReceived(remainingTotal.toString());
+        setCashReceived('');
+        setUpiReceived('');
+      }
+    }
+    prevOpenRef.current = isOpen;
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (open && !prevOpenRef.current) {
-        setInputError(null);
-        setUsePrepaid(false);
-        if (paymentMethod === 'Mixed') {
-          setCashReceived(getInitialAmount().toString());
-          setUpiReceived('');
-          setAmountReceived('');
-        } else {
-          setAmountReceived(getInitialAmount().toString());
-          setCashReceived('');
-          setUpiReceived('');
-        }
-      }
-      prevOpenRef.current = open;
       setOpen(open);
       if (!open) setCheckoutOpen(false);
     },
-    [getInitialAmount, setOpen, setCheckoutOpen, paymentMethod]
+    [setOpen, setCheckoutOpen]
   );
 
   const handleClose = useCallback(() => {
@@ -309,6 +319,7 @@ export function CheckoutDialog({
       total,
       usePrepaid,
       prepaidAmountUsed: prepaidAmountToUse,
+      addChangeAsPrepayment: addAsPrePayment && change > 0 && !!customerId,
     };
     
     onComplete(paymentData);
@@ -328,7 +339,8 @@ export function CheckoutDialog({
     usePrepaid,
     prepaidAmountToUse,
     cashReceived,
-    upiReceived
+    upiReceived,
+    addAsPrePayment,
   ]);
 
   const handlePrint = useCallback(() => {
@@ -394,6 +406,7 @@ export function CheckoutDialog({
             <Calculator className="w-5 h-5" />
             Checkout
           </DialogTitle>
+          <DialogDescription>Review your order and complete payment</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4 space-y-4">
@@ -501,11 +514,10 @@ export function CheckoutDialog({
                 </div>
               )}
 
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {QUICK_AMOUNTS.map((amount) => (
                   <Button key={amount} variant="outline" size="sm" onClick={() => handleQuickAmount(amount)} disabled={isProcessing} className="h-9">₹{amount}</Button>
                 ))}
-                <Button variant="outline" size="sm" onClick={handleExactAmount} disabled={isProcessing} className="h-9">Exact</Button>
               </div>
 
               {parsedAmount > 0 && (
@@ -515,6 +527,16 @@ export function CheckoutDialog({
                   ) : (
                     <><p className="text-sm flex items-center justify-center gap-1"><AlertCircle className="w-4 h-4" />Balance Due</p><p className="text-xl font-bold">{formatPrice(Math.abs(change))}</p></>
                   )}
+                </div>
+              )}
+
+              {change > 0 && customerId && (
+                <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Label htmlFor="add-prepayment" className="font-medium flex items-center gap-2 cursor-pointer">
+                    <Wallet className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm">Add {formatPrice(change)} as prepayment?</span>
+                  </Label>
+                  <Switch id="add-prepayment" checked={addAsPrePayment} onCheckedChange={setAddAsPrePayment} />
                 </div>
               )}
             </div>

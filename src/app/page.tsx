@@ -568,6 +568,15 @@ function POSDashboard() {
               updateCustomerDue(paymentData.customerId, dueAmount);
             }
           }
+
+          // Add change as prepayment if requested
+          if (paymentData.addChangeAsPrepayment && paymentData.customerId && paymentData.change > 0) {
+            await fetch('/api/prepayment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ customerId: paymentData.customerId, amount: paymentData.change }),
+            });
+          }
         } catch (fetchError) {
           if (fetchError instanceof Error) {
             // If database is unavailable, also fallback to offline

@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, Clock, User } from 'lucide-react';
+import { Download, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatPrice, getStatusColor, getPaymentStatusColor } from './utils';
 import { Transaction } from './types';
@@ -39,12 +39,12 @@ export function TransactionTable({
                 <TableHead className="w-24 text-right text-xs md:text-sm py-1 md:py-2">Paid</TableHead>
                 <TableHead className="w-28 text-xs md:text-sm py-1 md:py-2">Payment</TableHead>
                 <TableHead className="w-24 text-xs md:text-sm py-1 md:py-2">Status</TableHead>
-                <TableHead className="w-16 text-center text-xs md:text-sm py-1 md:py-2">Actions</TableHead>
+                <TableHead className="w-16 text-center text-xs md:text-sm py-1 md:py-2">Export</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {transactions.map((transaction: Transaction) => (
-                <TableRow key={transaction.id} className="hover:bg-muted/50 min-h-10 md:min-h-12">
+                <TableRow key={transaction.id} className="hover:bg-muted/50 min-h-10 md:min-h-12 cursor-pointer" onClick={() => onViewDetails(transaction)}>
                   <TableCell className="font-mono font-semibold text-xs md:text-sm py-1 md:py-2">
                     {transaction.invoiceNumber}
                   </TableCell>
@@ -98,26 +98,15 @@ export function TransactionTable({
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewDetails(transaction)}
-                        className="h-8 w-8 p-0"
-                        title="View details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onExport(transaction)}
-                        className="h-8 w-8 p-0"
-                        title="Export"
-                      >
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => { e.stopPropagation(); onExport(transaction); }}
+                      className="h-8 w-8 p-0"
+                      title="Export"
+                    >
+                      <Download className="w-4 h-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

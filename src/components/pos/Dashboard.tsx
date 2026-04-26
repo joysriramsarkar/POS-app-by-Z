@@ -23,6 +23,8 @@ import { useProductsStore, useCartStore } from '@/stores/pos-store';
 import { STORE_CONFIG, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { useLogout } from '@/hooks/use-logout';
+import { TransactionDetailsDialog } from '@/components/pos/transaction-history/TransactionDetailsDialog';
+import type { Transaction } from '@/components/pos/transaction-history/types';
 
 interface DashboardStats {
   todaySales: number;
@@ -62,6 +64,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   });
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   const [breakdown, setBreakdown] = useState<{ upi: number; cash: number; due: number }>({ upi: 0, cash: 0, due: 0 });
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [fullTransactions, setFullTransactions] = useState<Transaction[]>([]);
   
   const products = useProductsStore((state) => state.products);
   const lowStockProducts = products.filter(p => p.currentStock <= p.minStockLevel && p.isActive);
@@ -89,6 +94,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 createdAt: new Date(sale.createdAt),
               }));
               setTransactions(recentTransactions);
+              setFullTransactions(sales.map((sale: any) => ({ ...sale, createdAt: new Date(sale.createdAt) })));
             }
           } catch (parseErr) {
             console.error('Failed to parse sales response:', parseErr);
@@ -430,7 +436,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <Clock className="w-5 h-5 text-blue-500" />
                   Recent Transactions
                 </CardTitle>
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => handleQuickAction('reports')}>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => handleQuickAction('transactions')}>
                   View All <ArrowRight className="w-3 h-3 ml-1" />
                 </Button>
               </CardHeader>
@@ -440,7 +446,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     {transactions.map((txn) => (
                       <div
                         key={txn.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                        onClick={() => {
+                          const full = fullTransactions.find(t => t.id === txn.id);
+                          if (full) { setSelectedTransaction(full); setIsDetailOpen(true); }
+                        }}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -468,6 +478,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
       </div>
+
+      <TransactionDetailsDialog
+        transaction={selectedTransaction}
+        isOpen={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        onUpdateStatus={() => {}}
+      />
     </div>
   );
 }
