@@ -13,15 +13,17 @@ interface CameraScannerDialogProps {
   onBarcodeScanned: (barcode: string) => void;
   title?: string;
   description?: string;
+  singleScan?: boolean;
+  scannedProductNames?: string[];
 }
 
 export function CameraScannerDialog({
   open,
   onOpenChange,
   onBarcodeScanned,
+  singleScan = false,
+  scannedProductNames = [],
 }: CameraScannerDialogProps) {
-  const [scanCount, setScanCount] = useState(0);
-  const [lastScanned, setLastScanned] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const listenerRef = useRef<{ remove: () => Promise<void> } | null>(null);
   const lastScannedRef = useRef<string>('');
@@ -43,8 +45,6 @@ export function CameraScannerDialog({
 
   const handleClose = useCallback(async () => {
     await stopScanner();
-    setScanCount(0);
-    setLastScanned(null);
     setError(null);
     onOpenChange(false);
   }, [stopScanner, onOpenChange]);
@@ -59,8 +59,6 @@ export function CameraScannerDialog({
         return;
       }
 
-      setScanCount(0);
-      setLastScanned(null);
       setError(null);
 
       listenerRef.current = await BarcodeScanner.addListener(
@@ -78,9 +76,8 @@ export function CameraScannerDialog({
 
           if (isValidEanUpcBarcode(normalized)) {
             onBarcodeScanned(normalized);
-            setLastScanned(normalized);
-            setScanCount((c) => c + 1);
             if (navigator?.vibrate) navigator.vibrate(50);
+            if (singleScan) stopScanner().then(() => onOpenChange(false));
           } else {
             setError('অবৈধ বারকোড: ' + normalized);
           }
@@ -131,22 +128,37 @@ export function CameraScannerDialog({
           <p className="text-white/70 text-sm text-center">বারকোড ফ্রেমের মধ্যে ধরুন</p>
         )}
 
-        {scanCount > 0 && (
-          <div className="flex items-center justify-center gap-2 text-green-400 text-sm font-medium">
-            <CheckCircle2 className="w-4 h-4" />
-            {scanCount}টি আইটেম যোগ হয়েছে
-            {lastScanned && <span className="text-white/50 text-xs">({lastScanned})</span>}
+        {!singleScan && scannedProductNames.length > 0 && (
+          <div className="flex flex-col gap-1 max-h-28 overflow-y-auto">
+            {scannedProductNames.map((name, i) => (
+              <div key={i} className="flex items-center gap-2 text-green-400 text-sm">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{name}</span>
+              </div>
+            ))}
           </div>
         )}
 
-        <Button
-          onClick={handleClose}
-          variant="outline"
-          className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20"
-        >
-          <X className="w-4 h-4 mr-2" />
-          Done ({scanCount} scanned)
-        </Button>
+        {!singleScan && (
+          <Button
+            onClick={handleClose}
+            variant="outline"
+            className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20"
+          >
+            <X className="w-4 h-4 mr-2" />
+            Done ({scannedProductNames.length} scanned)
+          </Button>
+        )}
+        {singleScan && (
+          <Button
+            onClick={handleClose}
+            variant="outline"
+            className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20"
+          >
+            <X className="w-4 h-4 mr-2" />
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   );

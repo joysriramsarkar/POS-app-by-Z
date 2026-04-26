@@ -120,6 +120,7 @@ function POSDashboard() {
   const [completedCheckoutSale, setCompletedCheckoutSale] = useState<Sale | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isMobileScannerOpen, setIsMobileScannerOpen] = useState(false);
+  const [scannedProductNames, setScannedProductNames] = useState<string[]>([]);
   const [mobileSearchQuery, setMobileSearchQuery] = useState('');
 
   // Store hooks
@@ -377,7 +378,9 @@ function POSDashboard() {
       if (product) {
         addItem(product, 1);
         setLastScannedBarcode(barcode);
-        // Switch to billing page if not already there
+        if (isMobileScannerOpen) {
+          setScannedProductNames(prev => [product.name, ...prev]);
+        }
         if (currentPage !== 'billing') {
           setCurrentPage('billing');
         }
@@ -390,34 +393,12 @@ function POSDashboard() {
         console.log('Product not found for barcode:', barcode);
       }
     },
-    [getProductByBarcode, addItem, setLastScannedBarcode, currentPage]
+    [getProductByBarcode, addItem, setLastScannedBarcode, currentPage, isMobileScannerOpen]
   );
 
-  const handleOpenMobileScanner = useCallback(async () => {
-    if (Capacitor.isNativePlatform()) {
-      try {
-        const { camera } = await BarcodeScanner.requestPermissions();
-        if (camera === 'granted' || camera === 'limited') {
-          const { barcodes } = await BarcodeScanner.scan();
-          if (barcodes.length > 0 && barcodes[0].rawValue) {
-            handleBarcodeDetected(barcodes[0].rawValue);
-          }
-        } else {
-          toast({
-            title: 'Permission Denied',
-            description: 'Camera permission is required to scan barcodes.',
-            variant: 'destructive',
-          });
-          setIsMobileScannerOpen(true); // Fallback to dialog if they want to try again / see error there
-        }
-      } catch (error) {
-        console.error('Native barcode scan failed:', error);
-        setIsMobileScannerOpen(true); // Fallback to dialog
-      }
-    } else {
-      setIsMobileScannerOpen(true);
-    }
-  }, [handleBarcodeDetected, toast]);
+  const handleOpenMobileScanner = useCallback(() => {
+    setIsMobileScannerOpen(true);
+  }, []);
 
   // Initialize barcode scanner
   // It should be disabled when any major dialog is open that might interfere or consume input
@@ -1180,10 +1161,12 @@ function POSDashboard() {
       {/* Mobile Scanner Dialog */}
       <CameraScannerDialog
         open={isMobileScannerOpen}
-        onOpenChange={setIsMobileScannerOpen}
+        onOpenChange={(open) => {
+          setIsMobileScannerOpen(open);
+          if (!open) setScannedProductNames([]);
+        }}
         onBarcodeScanned={handleBarcodeDetected}
-        title="Scan Barcode"
-        description="Position barcode/QR code in the center of the frame"
+        scannedProductNames={scannedProductNames}
       />
 
       {/* Checkout Dialog */}

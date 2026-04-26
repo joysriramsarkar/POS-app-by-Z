@@ -297,35 +297,39 @@ export const printToIframe = (options: PrintOptions): void => {
       try {
         onBeforePrint?.();
 
-        // @ts-expect-error - cordova is injected at runtime
-        if (window.cordova && window.cordova.plugins && window.cordova.plugins.printer) {
-          // @ts-expect-error
-          window.cordova.plugins.printer.print(printHtml, { name: 'Lakhan_Bhandar_Invoice' });
-          onAfterPrint?.();
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
+        const printer = (window as any).cordova?.plugins?.printer;
+        if (printer) {
+          printer.print(
+            printHtml,
+            { name: 'Invoice', duplex: false, landscape: false },
+            () => {
+              onAfterPrint?.();
+              if (document.body.contains(iframe)) document.body.removeChild(iframe);
+            }
+          );
           return;
         }
 
-        if ('share' in navigator) {
-          const blob = new Blob([printHtml], { type: 'text/html' });
-          const file = new File([blob], 'invoice.html', { type: 'text/html' });
-          await (navigator as any).share({
-            title: 'Invoice',
-            text: 'Please print or save this invoice from the share sheet.',
-            files: [file],
-          });
-          onAfterPrint?.();
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-          return;
-        }
-
-        console.warn('[PrintUtil] Capacitor native print/share not available; falling back to iframe print.');
+        // Fallback: share HTML
+        const [{ Share }, { Directory, Filesystem }] = await Promise.all([
+          import('@capacitor/share'),
+          import('@capacitor/filesystem'),
+        ]);
+        const savedFile = await Filesystem.writeFile({
+          path: `Invoice-${Date.now()}.html`,
+          data: printHtml,
+          directory: Directory.Cache,
+          encoding: 'utf8' as any,
+        });
+        await Share.share({
+          title: 'Invoice',
+          url: savedFile.uri,
+          dialogTitle: 'Print / Share Invoice',
+        });
+        onAfterPrint?.();
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
       } catch (error) {
-        console.error('[PrintUtil] Capacitor native print failed:', error);
+        console.error('[PrintUtil] Capacitor print failed:', error);
       }
       return;
     }

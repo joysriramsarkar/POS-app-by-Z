@@ -486,6 +486,7 @@ export function ProductDialog({
           onBarcodeScanned={(scanned) => { setBarcode(scanned); setIsScannerOpen(false); }}
           title="Scan Product Barcode"
           description="Position the barcode in the center of the frame"
+          singleScan
         />
       )}
 

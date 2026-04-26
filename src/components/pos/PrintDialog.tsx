@@ -158,7 +158,7 @@ export function PrintDialog({ open, onOpenChange, sale, onPrint }: PrintDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[95vw] md:max-w-4xl max-h-[95dvh] md:max-h-[90vh] overflow-hidden flex flex-col print-dialog-content p-4 md:p-6">
+      <DialogContent className="sm:max-w-[95vw] md:max-w-4xl max-h-[95dvh] md:max-h-[90vh] overflow-hidden flex flex-col print-dialog-content p-3 md:p-6 w-[calc(100vw-1rem)] mx-auto">
         <DialogHeader className="no-print">
           <DialogTitle>Print / Share Invoice</DialogTitle>
           <DialogDescription>
@@ -166,9 +166,9 @@ export function PrintDialog({ open, onOpenChange, sale, onPrint }: PrintDialogPr
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden flex gap-6">
+        <div className="flex-1 overflow-hidden flex flex-col md:flex-row gap-4">
           {/* Left Side - Options */}
-          <div className="w-80 shrink-0 space-y-4 no-print">
+          <div className="w-full md:w-72 shrink-0 space-y-3 no-print overflow-y-auto">
             <div className="space-y-3">
               <Label className="text-base font-semibold">Print Format</Label>
               <RadioGroup
@@ -228,8 +228,8 @@ export function PrintDialog({ open, onOpenChange, sale, onPrint }: PrintDialogPr
             </div>
           </div>
 
-          {/* Right Side - Preview */}
-          <div className="flex-1 min-w-0">
+          {/* Right Side - Preview (hidden on mobile) */}
+          <div className="hidden md:block flex-1 min-w-0">
             <ScrollArea className="h-[60vh] print-scroll-area">
               <InvoicePreview
                 sale={sale}

@@ -1,6 +1,7 @@
 import type { PrintFormat } from '@/types/pos';
 
-export async function generateInvoicePdf(
+// Simple text-based PDF generation for Capacitor (no iframe/DOM rendering needed)
+async function generatePdfFromHtmlString(
   invoiceHtml: string,
   format: PrintFormat
 ): Promise<Blob> {
@@ -10,38 +11,31 @@ export async function generateInvoicePdf(
   const pdfWidthMm = format === 'thermal-58' ? 58 : format === 'thermal-80' ? 80 : format === 'a5' ? 148 : 210;
   const pdfHeightMm = isThermal ? 400 : (format === 'a5' ? 210 : 297);
 
-  // Render inside a hidden iframe so all styles load correctly
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:900px;height:1200px;border:none;visibility:hidden;';
-  document.body.appendChild(iframe);
-
-  await new Promise<void>((resolve) => {
-    iframe.onload = () => resolve();
-    const doc = iframe.contentDocument!;
-    doc.open();
-    doc.write(invoiceHtml);
-    doc.close();
+  const pdf = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: isThermal ? [pdfWidthMm, pdfHeightMm] : (format === 'a5' ? 'a5' : 'a4'),
   });
 
-  await new Promise(r => setTimeout(r, 600));
+  // Create a temporary div in the main document (not iframe) for Capacitor compatibility
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:' + (isThermal ? pdfWidthMm * 3.78 : 794) + 'px;background:white;';
+  container.innerHTML = invoiceHtml;
+  document.body.appendChild(container);
+
+  // Wait for fonts/layout
+  await new Promise(r => setTimeout(r, 400));
 
   try {
-    const iframeDoc = iframe.contentDocument!;
-    const invoiceEl = iframeDoc.querySelector<HTMLElement>('.print-invoice-container') || iframeDoc.body;
+    const invoiceEl = container.querySelector<HTMLElement>('.print-invoice-container') || container;
 
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: isThermal ? [pdfWidthMm, pdfHeightMm] : (format === 'a5' ? 'a5' : 'a4'),
-    });
-
-    await new Promise<void>((resolve, reject) => {
+    await new Promise<void>((resolve) => {
       pdf.html(invoiceEl, {
-        callback: (doc) => { resolve(); },
+        callback: () => resolve(),
         x: 0,
         y: 0,
         width: pdfWidthMm,
-        windowWidth: invoiceEl.scrollWidth || 600,
+        windowWidth: invoiceEl.scrollWidth || (isThermal ? pdfWidthMm * 3.78 : 794),
         autoPaging: 'text',
         margin: [0, 0, 0, 0],
       });
@@ -49,11 +43,16 @@ export async function generateInvoicePdf(
 
     return pdf.output('blob');
   } finally {
-    document.body.removeChild(iframe);
+    document.body.removeChild(container);
   }
 }
 
-
+export async function generateInvoicePdf(
+  invoiceHtml: string,
+  format: PrintFormat
+): Promise<Blob> {
+  return generatePdfFromHtmlString(invoiceHtml, format);
+}
 
 export async function shareInvoiceAsPdf(
   invoiceHtml: string,
@@ -62,8 +61,7 @@ export async function shareInvoiceAsPdf(
   storeName: string,
   fallbackText: string
 ): Promise<void> {
-  const blob = await generateInvoicePdf(invoiceHtml, format);
-  const fileName = `Invoice-${invoiceNumber}.pdf`;
+  const fileName = `Invoice-${invoiceNumber}`;
 
   let isNativePlatform = false;
   try {
@@ -72,44 +70,52 @@ export async function shareInvoiceAsPdf(
   } catch { /* not a native platform */ }
 
   if (isNativePlatform) {
-    try {
-      const [{ Share }, { Directory, Filesystem }] = await Promise.all([
-        import('@capacitor/share'),
-        import('@capacitor/filesystem'),
-      ]);
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
+    // Use cordova-plugin-printer for native print/PDF on Android
+    const printer = (window as any).cordova?.plugins?.printer;
+    if (printer) {
       await new Promise<void>((resolve, reject) => {
-        reader.onloadend = async () => {
-          try {
-            const base64data = reader.result as string;
-            const savedFile = await Filesystem.writeFile({
-              path: fileName,
-              data: base64data,
-              directory: Directory.Cache
-            });
-            await Share.share({
-              title: `Invoice ${invoiceNumber}`,
-              text: `Invoice from ${storeName}`,
-              url: savedFile.uri,
-              dialogTitle: 'Share Invoice'
-            });
-            resolve();
-          } catch (e) {
-            reject(e);
+        printer.print(
+          invoiceHtml,
+          {
+            name: `Invoice-${invoiceNumber}`,
+            duplex: false,
+            landscape: false,
+          },
+          (result: boolean) => {
+            if (result) resolve();
+            else reject(new Error('Print cancelled or failed'));
           }
-        };
-        reader.onerror = reject;
+        );
       });
       return;
-    } catch (error) {
-      console.error('Capacitor share error:', error);
     }
+
+    // Fallback: share HTML file
+    const [{ Share }, { Directory, Filesystem }] = await Promise.all([
+      import('@capacitor/share'),
+      import('@capacitor/filesystem'),
+    ]);
+    const savedFile = await Filesystem.writeFile({
+      path: `Invoice-${invoiceNumber}.html`,
+      data: invoiceHtml,
+      directory: Directory.Cache,
+      encoding: 'utf8' as any,
+    });
+    await Share.share({
+      title: `Invoice ${invoiceNumber}`,
+      text: `Invoice from ${storeName}`,
+      url: savedFile.uri,
+      dialogTitle: 'Share Invoice',
+    });
+    return;
   }
 
-  // Web fallback: Web Share API with PDF file (WhatsApp, Telegram, etc.)
+  // Web: generate PDF then share/download
+  const blob = await generatePdfFromHtmlString(invoiceHtml, format);
+  const pdfFileName = `${fileName}.pdf`;
+
   if (typeof navigator !== 'undefined' && 'share' in navigator && 'canShare' in navigator) {
-    const file = new File([blob], fileName, { type: 'application/pdf' });
+    const file = new File([blob], pdfFileName, { type: 'application/pdf' });
     const shareData = { title: `Invoice ${invoiceNumber}`, text: `Invoice from ${storeName}`, files: [file] };
     if ((navigator as any).canShare(shareData)) {
       await navigator.share(shareData);
@@ -117,11 +123,11 @@ export async function shareInvoiceAsPdf(
     }
   }
 
-  // Desktop fallback: download the PDF
+  // Desktop fallback: download
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = fileName;
+  a.download = pdfFileName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

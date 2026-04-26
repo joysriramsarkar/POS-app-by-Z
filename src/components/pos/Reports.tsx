@@ -335,7 +335,7 @@ const Reports: React.FC = () => {
                         <BarChart data={salesData} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                           <XAxis dataKey="date" tickFormatter={v => isToday ? v : (() => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; })()} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                          <YAxis tickFormatter={v => `₹${Math.round(v/1000)}k`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                          <YAxis tickFormatter={v => v >= 1000 ? `₹${(v/1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `₹${v}`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={50} />
                           <RechartsTooltip formatter={(v: number, n: string) => [`₹${v.toFixed(2)}`, n.charAt(0).toUpperCase()+n.slice(1)]} labelFormatter={l => isToday ? `${l} hrs` : new Date(l).toLocaleDateString()} contentStyle={{ borderRadius: '8px' }} />
                           <Legend wrapperStyle={{ fontSize: '12px' }} />
                           <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4,4,0,0]} maxBarSize={30} />
@@ -345,7 +345,7 @@ const Reports: React.FC = () => {
                         <LineChart data={salesData} margin={{ top: 20, right: 10, left: 0, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
                           <XAxis dataKey="date" tickFormatter={v => isToday ? v : (() => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; })()} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                          <YAxis tickFormatter={v => `₹${Math.round(v/1000)}k`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={40} />
+                          <YAxis tickFormatter={v => v >= 1000 ? `₹${(v/1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `₹${v}`} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={50} />
                           <RechartsTooltip formatter={(v: number, n: string) => [`₹${v.toFixed(2)}`, n.charAt(0).toUpperCase()+n.slice(1)]} labelFormatter={l => isToday ? `${l} hrs` : new Date(l).toLocaleDateString()} contentStyle={{ borderRadius: '8px' }} />
                           <Legend wrapperStyle={{ fontSize: '12px' }} />
                           <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#3b82f6" strokeWidth={2} dot={false} />
