@@ -3,8 +3,8 @@
 // Lakhan Bhandar POS - Autonomous Sync with Idempotency & Retry
 // ============================================================================
 
-import { SyncQueueDB } from './indexeddb';
-import type { SyncQueueItem } from '@/types/pos';
+import { SyncQueueDB } from "./indexeddb";
+import type { SyncQueueItem } from "@/types/pos";
 
 export interface SyncResult {
   success: boolean;
@@ -48,81 +48,175 @@ export class OfflineSyncWorker {
         return;
       }
 
+      // Helper to check for dependency conflicts between two items
+      const hasConflict = (
+        a: (typeof pendingItems)[0],
+        b: (typeof pendingItems)[0],
+      ) => {
+        try {
+          const aPayload = JSON.parse(a.payload);
+          const bPayload = JSON.parse(b.payload);
+
+          const getIds = (payload: any) => {
+            const ids = new Set<string>();
+            if (payload.id) ids.add(payload.id);
+            if (payload.customerId) ids.add(payload.customerId);
+            if (payload.productId) ids.add(payload.productId);
+            if (Array.isArray(payload.items)) {
+              payload.items.forEach((i: any) => {
+                if (i.productId) ids.add(i.productId);
+              });
+            }
+            return ids;
+          };
+
+          const aIds = getIds(aPayload);
+          const bIds = getIds(bPayload);
+
+          // If they share any IDs, they might conflict, must be sequential
+          for (const id of aIds) {
+            if (bIds.has(id)) return true;
+          }
+        } catch (e) {
+          return true; // if unparseable, assume conflict to be safe
+        }
+        return false;
+      };
+
+      // Group into conflict-free batches (max 5 per batch)
+      const batches: (typeof pendingItems)[] = [];
+      let currentBatch: typeof pendingItems = [];
+
       for (const item of pendingItems) {
-        // Skip permanently failed items
         if (item.retryCount >= 5) {
-          await SyncQueueDB.markFailed(item.id, 'Max retries exceeded');
+          await SyncQueueDB.markFailed(item.id, "Max retries exceeded");
           failureCount++;
           continue;
         }
 
-        try {
-          const actionType = this.mapQueueItemToActionType(item);
-          if (!actionType) {
-            throw new Error(`Unsupported sync item: ${item.entityType}.${item.action}`);
-          }
+        const conflict = currentBatch.some((batchItem) =>
+          hasConflict(item, batchItem),
+        );
 
-          const parsedPayload = JSON.parse(item.payload);
+        if (conflict || currentBatch.length >= 5) {
+          if (currentBatch.length > 0) batches.push(currentBatch);
+          currentBatch = [item];
+        } else {
+          currentBatch.push(item);
+        }
+      }
+      if (currentBatch.length > 0) batches.push(currentBatch);
 
-          const response = await fetch('/api/sync', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Idempotency-Key': item.id,
-            },
-            body: JSON.stringify({
-              idempotencyKey: item.id,
-              actionType,
-              payload: parsedPayload,
-            }),
-          });
+      let sessionExpired = false;
 
-          // Session expired — stop sync and force re-login
-          if (response.status === 401) {
-            window.dispatchEvent(new CustomEvent('syncSessionExpired'));
-            this.notifyUI({ synced: successCount, failed: failureCount, total: pendingItems.length });
-            return;
-          }
+      for (const batch of batches) {
+        if (sessionExpired) break;
 
-          if (!response.ok) {
-            const text = await response.text();
-            throw new Error(`HTTP ${response.status}: ${response.statusText} ${text}`);
-          }
+        const results = await Promise.allSettled(
+          batch.map(async (item) => {
+            const actionType = this.mapQueueItemToActionType(item);
+            if (!actionType) {
+              throw new Error(
+                `Unsupported sync item: ${item.entityType}.${item.action}`,
+              );
+            }
 
-          const result = await response.json();
-          if (!result.success) {
-            throw new Error(result.error || 'Sync API returned failure');
-          }
+            const parsedPayload = JSON.parse(item.payload);
 
-          await SyncQueueDB.markSynced(item.id);
-          successCount++;
-        } catch (error) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          const newRetryCount = item.retryCount + 1;
-          if (newRetryCount >= 5) {
-            await SyncQueueDB.markFailed(item.id, errorMsg);
+            const response = await fetch("/api/sync", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": item.id,
+              },
+              body: JSON.stringify({
+                idempotencyKey: item.id,
+                actionType,
+                payload: parsedPayload,
+              }),
+            });
+
+            if (response.status === 401) {
+              sessionExpired = true;
+              throw new Error("Unauthorized");
+            }
+
+            if (!response.ok) {
+              const text = await response.text();
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText} ${text}`,
+              );
+            }
+
+            const result = await response.json();
+            if (!result.success) {
+              throw new Error(result.error || "Sync API returned failure");
+            }
+
+            await SyncQueueDB.markSynced(item.id);
+            return item.id;
+          }),
+        );
+
+        for (let i = 0; i < batch.length; i++) {
+          const item = batch[i];
+          const result = results[i];
+
+          if (result.status === "fulfilled") {
+            successCount++;
           } else {
-            await SyncQueueDB.incrementRetry(item.id, errorMsg);
+            if (sessionExpired && result.reason.message === "Unauthorized") {
+              window.dispatchEvent(new CustomEvent("syncSessionExpired"));
+              continue; // don't increment failure for auth timeout
+            }
+
+            const errorMsg =
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason);
+            const newRetryCount = item.retryCount + 1;
+            if (newRetryCount >= 5) {
+              await SyncQueueDB.markFailed(item.id, errorMsg);
+            } else {
+              await SyncQueueDB.incrementRetry(item.id, errorMsg);
+            }
+            failureCount++;
           }
-          failureCount++;
+        }
+
+        if (sessionExpired) {
+          this.notifyUI({
+            synced: successCount,
+            failed: failureCount,
+            total: pendingItems.length,
+          });
+          return;
         }
       }
 
-      this.notifyUI({ synced: successCount, failed: failureCount, total: pendingItems.length });
+      this.notifyUI({
+        synced: successCount,
+        failed: failureCount,
+        total: pendingItems.length,
+      });
     } finally {
       this.isRunning = false;
     }
   }
 
   private mapQueueItemToActionType(item: SyncQueueItem): string | null {
-    if (item.entityType === 'Sale' && item.action === 'create') return 'sale:create';
-    if (item.entityType === 'Customer' && item.action === 'create') return 'customer:create';
-    if (item.entityType === 'Customer' && item.action === 'update') return 'customer:update';
-    if (item.entityType === 'Product' && item.action === 'create') return 'product:create';
-    if (item.entityType === 'Product' && item.action === 'update') {
+    if (item.entityType === "Sale" && item.action === "create")
+      return "sale:create";
+    if (item.entityType === "Customer" && item.action === "create")
+      return "customer:create";
+    if (item.entityType === "Customer" && item.action === "update")
+      return "customer:update";
+    if (item.entityType === "Product" && item.action === "create")
+      return "product:create";
+    if (item.entityType === "Product" && item.action === "update") {
       const payload = JSON.parse(item.payload);
-      if (payload.quantityChange !== undefined) return 'product:stock:update';
-      return 'product:update';
+      if (payload.quantityChange !== undefined) return "product:stock:update";
+      return "product:update";
     }
 
     return null;
@@ -143,31 +237,34 @@ export class OfflineSyncWorker {
   }
 
   /**
-   * NOTIFY START: Emit sync start event  
+   * NOTIFY START: Emit sync start event
    */
   private notifyStart(): void {
-    const event = new CustomEvent('offlineSyncStart', { detail: {} });
+    const event = new CustomEvent("offlineSyncStart", { detail: {} });
     window.dispatchEvent(event);
   }
 
   /**
    * NOTIFY UI: Emit sync state change (for UI updates)
    */
-  private notifyUI(stats: { synced: number; failed: number; total: number }): void {
+  private notifyUI(stats: {
+    synced: number;
+    failed: number;
+    total: number;
+  }): void {
     // Fire custom event that components can listen to
-    const event = new CustomEvent('offlineSyncComplete', { detail: stats });
+    const event = new CustomEvent("offlineSyncComplete", { detail: stats });
     window.dispatchEvent(event);
 
     // Also update localStorage with status
     localStorage.setItem(
-      'offline-sync-status',
+      "offline-sync-status",
       JSON.stringify({
         lastSyncAt: Date.now(),
         stats,
-      })
+      }),
     );
   }
-
 }
 
 // Singleton instance
