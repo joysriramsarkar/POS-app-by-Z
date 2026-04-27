@@ -115,8 +115,8 @@ export async function GET(request: NextRequest) {
       },
       chartData,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to fetch sales report:', error);
-    return NextResponse.json({ error: 'Failed to fetch sales report', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch sales report', details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }

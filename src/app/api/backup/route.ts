@@ -75,7 +75,7 @@ export async function GET() {
     };
 
     return NextResponse.json(backupData);
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error creating backup:", error);
     return NextResponse.json(
       { error: "Failed to create backup", message: error instanceof Error ? error.message : "Unknown error" },
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, message: "Database restored successfully" });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error restoring backup:", error);
     return NextResponse.json(
       { error: "Failed to restore database", message: error instanceof Error ? error.message : "Unknown error" },

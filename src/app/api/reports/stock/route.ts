@@ -35,10 +35,10 @@ export async function GET(request: NextRequest) {
       lowStockItems,
       totalCount: lowStockItems.length,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to fetch stock report:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch stock report', details: error.message },
+      { error: 'Failed to fetch stock report', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
