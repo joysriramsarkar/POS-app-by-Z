@@ -269,7 +269,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* Main Content */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="p-4 space-y-6">
+        <div className="p-4 space-y-6 pb-24">
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Today's Sales */}

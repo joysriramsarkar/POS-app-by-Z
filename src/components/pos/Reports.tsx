@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   TrendingUp, TrendingDown, DollarSign, Package, Users,
-  AlertTriangle, Download, BarChart2, Lightbulb
+  AlertTriangle, Download, BarChart2, Lightbulb, ChevronRight
 } from 'lucide-react';
 import {
   Dialog,
@@ -28,7 +28,15 @@ import { format, subDays } from 'date-fns';
 type ChartType = 'bar' | 'line';
 type DatePreset = '1' | '7' | '30' | '90' | 'custom';
 
-const PAYMENT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+const PAYMENT_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+function mergeSmallSlices(data: { name: string; value: number }[], threshold = 0.04) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const main = data.filter(d => d.value / total >= threshold);
+  const others = data.filter(d => d.value / total < threshold);
+  if (!others.length) return main;
+  return [...main, { name: 'Others', value: others.reduce((s, d) => s + d.value, 0) }];
+}
 
 const Reports: React.FC = () => {
   const [salesData, setSalesData] = useState<any[]>([]);
@@ -42,6 +50,11 @@ const Reports: React.FC = () => {
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
+  const [categoryData, setCategoryData] = useState<any[]>([]);
+  const [topCustomers, setTopCustomers] = useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
+  const [customerDetail, setCustomerDetail] = useState<any | null>(null);
+  const [isCustomerDetailLoading, setIsCustomerDetailLoading] = useState(false);
 
   // Date filter state
   const [preset, setPreset] = useState<DatePreset>('30');
@@ -89,7 +102,20 @@ const Reports: React.FC = () => {
         setTopProducts(j.topProducts);
       }
 
-      const allFailed = [salesResult, stockResult, duesResult, productsResult].every(
+      const [catResult, custResult] = await Promise.allSettled([
+        fetch(`/api/reports/categories?${dateParams}`),
+        fetch(`/api/reports/customers?${dateParams}`),
+      ]);
+      if (catResult.status === 'fulfilled' && catResult.value.ok) {
+        const j = await catResult.value.json();
+        setCategoryData(j.categories);
+      }
+      if (custResult.status === 'fulfilled' && custResult.value.ok) {
+        const j = await custResult.value.json();
+        setTopCustomers(j.topCustomers);
+      }
+
+      const allFailed = [salesResult, stockResult, duesResult, productsResult, catResult!, custResult!].every(
         r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
       );
       if (allFailed) setErrorMessage('Failed to load report data. Please refresh and try again.');
@@ -109,7 +135,7 @@ const Reports: React.FC = () => {
 
   const paymentBreakdown = useMemo(() => {
     if (!summaryData?.paymentBreakdown) return [];
-    return Object.entries(summaryData.paymentBreakdown).map(([name, value]) => ({ name, value }));
+    return Object.entries(summaryData.paymentBreakdown).map(([name, value]) => ({ name, value: value as number }));
   }, [summaryData]);
 
   // CSV export
@@ -225,7 +251,7 @@ const Reports: React.FC = () => {
               Personalized business advice based on your current reports.
             </DialogDescription>
           </DialogHeader>
-          <div className="p-4 bg-muted/30 rounded-xl min-h-[100px] text-sm whitespace-pre-wrap">
+          <div className="p-4 bg-muted/30 rounded-xl min-h-25 text-sm whitespace-pre-wrap">
             {isAiLoading ? 'Analyzing your data and generating advice...' : aiAdvice}
           </div>
         </DialogContent>
@@ -302,6 +328,8 @@ const Reports: React.FC = () => {
               <TabsTrigger className="flex-1 sm:flex-none" value="stock">Auto Restock</TabsTrigger>
               <TabsTrigger className="flex-1 sm:flex-none" value="dues">Dues</TabsTrigger>
               <TabsTrigger className="flex-1 sm:flex-none" value="products">Top Items</TabsTrigger>
+              <TabsTrigger className="flex-1 sm:flex-none" value="categories">Categories</TabsTrigger>
+              <TabsTrigger className="flex-1 sm:flex-none" value="customers">Customers</TabsTrigger>
             </TabsList>
           </div>
 
@@ -376,12 +404,15 @@ const Reports: React.FC = () => {
                     {paymentBreakdown.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                          <Pie data={paymentBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}>
-                            {paymentBreakdown.map((_, i) => (
+                          {(() => { const d = mergeSmallSlices(paymentBreakdown); return (
+                          <Pie data={d} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
+                            {d.map((_, i) => (
                               <Cell key={i} fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]} />
                             ))}
                           </Pie>
+                          ); })()}
                           <RechartsTooltip formatter={(v: number) => `₹${v.toFixed(2)}`} />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
                         </PieChart>
                       </ResponsiveContainer>
                     ) : (
@@ -587,10 +618,228 @@ const Reports: React.FC = () => {
               </CardContent>
             </Card>
           </TabsContent>
+          {/* Categories Tab */}
+          <TabsContent value="categories">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="rounded-xl">
+                <CardHeader>
+                  <CardTitle>Category Revenue</CardTitle>
+                  <CardDescription>Sales breakdown by product category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="w-full h-64">
+                    {categoryData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          {(() => { const d = mergeSmallSlices(categoryData.map(c => ({ name: c.name, value: c.revenue }))); return (
+                          <Pie data={d} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}>
+                            {d.map((_, i) => (
+                              <Cell key={i} fill={PAYMENT_COLORS[i % PAYMENT_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          ); })()}
+                          <RechartsTooltip formatter={(v: number) => `₹${v.toFixed(2)}`} />
+                          <Legend wrapperStyle={{ fontSize: '12px' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
+                        <p className="text-muted-foreground">{isLoading ? 'Loading...' : 'No data.'}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="rounded-xl">
+                <CardHeader>
+                  <CardTitle>Category Breakdown</CardTitle>
+                  <CardDescription>Revenue, profit & margin per category</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Category</TableHead>
+                          <TableHead className="text-right">Revenue</TableHead>
+                          <TableHead className="text-right">Margin</TableHead>
+                          <TableHead className="text-right">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {categoryData.length > 0 ? categoryData.map((c, i) => (
+                          <TableRow key={c.name}>
+                            <TableCell className="flex items-center gap-2">
+                              <span className="w-3 h-3 rounded-full inline-block shrink-0" style={{ background: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }} />
+                              {c.name}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">₹{c.revenue.toFixed(2)}</TableCell>
+                            <TableCell className="text-right text-emerald-600">{c.margin}%</TableCell>
+                            <TableCell className="text-right text-muted-foreground">{c.percentage}%</TableCell>
+                          </TableRow>
+                        )) : (
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
+                              {isLoading ? 'Loading...' : 'No category data.'}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Customers Tab */}
+          <TabsContent value="customers">
+            <Card className="rounded-xl">
+              <CardHeader>
+                <CardTitle>Top Customers</CardTitle>
+                <CardDescription>Highest spending customers for selected period</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead className="text-right">Spent</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">Orders</TableHead>
+                        <TableHead className="text-right hidden sm:table-cell">AOV</TableHead>
+                        <TableHead className="text-right"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topCustomers.length > 0 ? topCustomers.map((c, i) => (
+                        <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedCustomer(c)}>
+                          <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
+                          <TableCell className="font-medium">
+                            <p className="text-sm">{c.name}</p>
+                            <p className="text-xs text-muted-foreground">{c.phone || 'N/A'}</p>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">₹{c.totalSpent.toFixed(2)}</TableCell>
+                          <TableCell className="text-right hidden sm:table-cell"><Badge variant="outline">{c.orderCount}</Badge></TableCell>
+                          <TableCell className="text-right hidden sm:table-cell text-muted-foreground text-sm">₹{c.aov.toFixed(2)}</TableCell>
+                          <TableCell className="text-right"><ChevronRight className="w-4 h-4 text-muted-foreground" /></TableCell>
+                        </TableRow>
+                      )) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                            {isLoading ? 'Loading customers...' : 'No customer data.'}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
+
+      {/* Customer Detail Modal */}
+      <Dialog open={!!selectedCustomer} onOpenChange={(open) => {
+        if (!open) { setSelectedCustomer(null); setCustomerDetail(null); }
+      }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{selectedCustomer?.name}</DialogTitle>
+            <DialogDescription>{selectedCustomer?.phone || 'No phone'}</DialogDescription>
+          </DialogHeader>
+          <CustomerDetailContent
+            customer={selectedCustomer}
+            dateParams={dateParams}
+            detail={customerDetail}
+            setDetail={setCustomerDetail}
+            isLoading={isCustomerDetailLoading}
+            setIsLoading={setIsCustomerDetailLoading}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
+function CustomerDetailContent({ customer, dateParams, detail, setDetail, isLoading, setIsLoading }: {
+  customer: any;
+  dateParams: string;
+  detail: any;
+  setDetail: (d: any) => void;
+  isLoading: boolean;
+  setIsLoading: (v: boolean) => void;
+}) {
+  useEffect(() => {
+    if (!customer) return;
+    setIsLoading(true);
+    fetch(`/api/reports/customers?customerId=${customer.id}&${dateParams}`)
+      .then(r => r.json())
+      .then(setDetail)
+      .finally(() => setIsLoading(false));
+  }, [customer?.id, dateParams, setIsLoading, setDetail]);
+
+  if (isLoading) return <div className="py-10 text-center text-muted-foreground">Loading...</div>;
+  if (!detail) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Total Spent', value: `₹${detail.totalSpent.toFixed(2)}`, color: 'text-primary' },
+          { label: 'Orders', value: detail.orderCount, color: '' },
+          { label: 'Avg Order', value: `₹${detail.aov.toFixed(2)}`, color: '' },
+        ].map(s => (
+          <div key={s.label} className="bg-muted rounded-lg p-3 text-center">
+            <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {detail.monthlyTrend?.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-2">Monthly Spending</p>
+          <div className="h-40">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={detail.monthlyTrend} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                <XAxis dataKey="month" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}`} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={45} />
+                <RechartsTooltip formatter={(v: number) => `₹${v.toFixed(2)}`} contentStyle={{ borderRadius: '8px' }} />
+                <Bar dataKey="spent" fill="#3b82f6" radius={[4,4,0,0]} maxBarSize={24} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {detail.topProducts?.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-2">Top Products</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {detail.topProducts.map((p: any) => (
+                <TableRow key={p.id}>
+                  <TableCell className="text-sm">{p.name}</TableCell>
+                  <TableCell className="text-right text-sm">{p.qty}</TableCell>
+                  <TableCell className="text-right text-sm font-medium">₹{p.revenue.toFixed(2)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default React.memo(Reports);

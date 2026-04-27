@@ -79,7 +79,7 @@ export function Expenses() {
   };
 
   return (
-    <div className="flex flex-col h-full gap-4 p-4">
+    <div className="flex flex-col h-full overflow-y-auto gap-4 p-4 pb-24">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <Receipt className="w-6 h-6" />
