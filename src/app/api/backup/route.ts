@@ -163,11 +163,6 @@ export async function POST(request: NextRequest) {
       await tx.customer.deleteMany();
       await tx.supplier.deleteMany();
       await tx.setting.deleteMany();
-      // Keep users to prevent locking out the admin, unless we specifically want to replace them
-      // In a real scenario we might skip deleting users or ensure the current user isn't deleted.
-      // Let's delete all users EXCEPT the currently logged in user just in case?
-      // Actually, since they are uploading a full backup, let's just clear and restore users as well.
-      // But we risk locking them out if they import a DB with a different password.
       await tx.user.deleteMany();
 
       // RESTORE EVERYTHING (order matters for foreign keys)
