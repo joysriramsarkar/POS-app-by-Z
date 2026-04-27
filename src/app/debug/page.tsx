@@ -46,8 +46,8 @@ export default function CameraDebugPage() {
             appendLog(`   ${index + 1}. ${device.label || `Camera ${index + 1}`}`);
           });
         }
-      } catch (error: any) {
-        appendLog(`❌ Error enumerating devices: ${error?.message}`);
+      } catch (error) {
+        appendLog(`❌ Error enumerating devices: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       // Test 3: Request back camera
@@ -71,8 +71,8 @@ export default function CameraDebugPage() {
         }
         
         stream.getTracks().forEach(track => track.stop());
-      } catch (error: any) {
-        appendLog(`❌ Back camera failed: ${error?.message}`);
+      } catch (error) {
+        appendLog(`❌ Back camera failed: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       // Test 4: Request front camera
@@ -93,8 +93,8 @@ export default function CameraDebugPage() {
         }
         
         stream.getTracks().forEach(track => track.stop());
-      } catch (error: any) {
-        appendLog(`❌ Front camera failed: ${error?.message}`);
+      } catch (error) {
+        appendLog(`❌ Front camera failed: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       // Test 5: Raw video element test
@@ -125,8 +125,8 @@ export default function CameraDebugPage() {
           video.remove();
           appendLog('✅ Test video stopped');
         }, 5000);
-      } catch (error: any) {
-        appendLog(`❌ Raw video test failed: ${error?.message}`);
+      } catch (error) {
+        appendLog(`❌ Raw video test failed: ${error instanceof Error ? error.message : String(error)}`);
       }
 
       appendLog('');
@@ -214,9 +214,9 @@ export default function CameraDebugPage() {
             appendLog('⚠️  No barcode was scanned during test');
           }
         }, 10000);
-      } catch (error: any) {
-        appendLog(`❌ Failed to import/use html5-qrcode: ${error?.message}`);
-        appendLog(`Stack: ${error?.stack}`);
+      } catch (error) {
+        appendLog(`❌ Failed to import/use html5-qrcode: ${error instanceof Error ? error.message : String(error)}`);
+        appendLog(`Stack: ${error instanceof Error ? error.stack : 'N/A'}`);
       }
     } finally {
       setIsRunning(false);
