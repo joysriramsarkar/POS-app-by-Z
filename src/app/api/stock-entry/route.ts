@@ -6,16 +6,12 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { StockEntryInputSchema } from '@/schemas';
-
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requireRole } from '@/lib/api-middleware';
 
 // POST /api/stock-entry - Create stock entry (purchase)
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const roleCheck = await requireRole(request, ['ADMIN', 'MANAGER']);
+  if (roleCheck) return roleCheck;
 
   try {
     let body;
