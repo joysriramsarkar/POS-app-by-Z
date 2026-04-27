@@ -5,7 +5,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
@@ -27,7 +27,7 @@ export async function GET() {
       purchases,
       purchaseItems,
       settings,
-      users
+      users,
     ] = await Promise.all([
       db.product.findMany(),
       db.category.findMany(),
@@ -50,9 +50,9 @@ export async function GET() {
           role: true,
           isActive: true,
           createdAt: true,
-          updatedAt: true
-        }
-      })
+          updatedAt: true,
+        },
+      }),
     ]);
 
     const backupData = {
@@ -70,16 +70,19 @@ export async function GET() {
         purchases,
         purchaseItems,
         settings,
-        users
-      }
+        users,
+      },
     };
 
     return NextResponse.json(backupData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating backup:", error);
     return NextResponse.json(
-      { error: "Failed to create backup", message: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      {
+        error: "Failed to create backup",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }
@@ -95,11 +98,17 @@ export async function POST(request: Request) {
     try {
       backupData = await request.json();
     } catch (e) {
-      return NextResponse.json({ error: "Invalid JSON backup file" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid JSON backup file" },
+        { status: 400 },
+      );
     }
 
     if (!backupData || !backupData.data) {
-      return NextResponse.json({ error: "Invalid backup format" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid backup format" },
+        { status: 400 },
+      );
     }
 
     const {
@@ -114,7 +123,7 @@ export async function POST(request: Request) {
       purchases = [],
       purchaseItems = [],
       settings = [],
-      users = []
+      users = [],
     } = backupData.data;
 
     // Ensure all restored users have a secure password hash.
@@ -126,21 +135,23 @@ export async function POST(request: Request) {
     const CHUNK_SIZE = 5;
     for (let i = 0; i < users.length; i += CHUNK_SIZE) {
       const chunk = users.slice(i, i + CHUNK_SIZE);
-      const processedChunk = await Promise.all(chunk.map(async (user: any) => {
-        if (!user.password) {
-          // Generate a strong 32-character random hex string as the new temporary password
-          const randomPassword = crypto.randomBytes(16).toString('hex');
-          const secureRandomHash = await bcrypt.hash(randomPassword, 10);
-          return {
-            ...user,
-            password: secureRandomHash
-          };
-        }
-        return user;
-      }));
+      const processedChunk = await Promise.all(
+        chunk.map(async (user: any) => {
+          if (!user.password) {
+            // Generate a strong 32-character random hex string as the new temporary password
+            const randomPassword = crypto.randomBytes(16).toString("hex");
+            const secureRandomHash = await bcrypt.hash(randomPassword, 10);
+            return {
+              ...user,
+              password: secureRandomHash,
+            };
+          }
+          return user;
+        }),
+      );
       usersWithPassword.push(...processedChunk);
       // Yield to the event loop to ensure the server remains responsive
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
     // Use interactive transaction to sequentially clear and restore data to avoid foreign key issues
@@ -165,26 +176,41 @@ export async function POST(request: Request) {
       await tx.user.deleteMany();
 
       // RESTORE EVERYTHING (order matters for foreign keys)
-      if (usersWithPassword.length > 0) await tx.user.createMany({ data: usersWithPassword });
+      if (usersWithPassword.length > 0)
+        await tx.user.createMany({ data: usersWithPassword });
       if (settings.length > 0) await tx.setting.createMany({ data: settings });
-      if (categories.length > 0) await tx.category.createMany({ data: categories });
+      if (categories.length > 0)
+        await tx.category.createMany({ data: categories });
       if (products.length > 0) await tx.product.createMany({ data: products });
-      if (customers.length > 0) await tx.customer.createMany({ data: customers });
-      if (suppliers.length > 0) await tx.supplier.createMany({ data: suppliers });
+      if (customers.length > 0)
+        await tx.customer.createMany({ data: customers });
+      if (suppliers.length > 0)
+        await tx.supplier.createMany({ data: suppliers });
       if (sales.length > 0) await tx.sale.createMany({ data: sales });
-      if (saleItems.length > 0) await tx.saleItem.createMany({ data: saleItems });
-      if (purchases.length > 0) await tx.purchase.createMany({ data: purchases });
-      if (purchaseItems.length > 0) await tx.purchaseItem.createMany({ data: purchaseItems });
-      if (ledgerEntries.length > 0) await tx.ledgerEntry.createMany({ data: ledgerEntries });
-      if (stockHistory.length > 0) await tx.stockHistory.createMany({ data: stockHistory });
+      if (saleItems.length > 0)
+        await tx.saleItem.createMany({ data: saleItems });
+      if (purchases.length > 0)
+        await tx.purchase.createMany({ data: purchases });
+      if (purchaseItems.length > 0)
+        await tx.purchaseItem.createMany({ data: purchaseItems });
+      if (ledgerEntries.length > 0)
+        await tx.ledgerEntry.createMany({ data: ledgerEntries });
+      if (stockHistory.length > 0)
+        await tx.stockHistory.createMany({ data: stockHistory });
     });
 
-    return NextResponse.json({ success: true, message: "Database restored successfully" });
-  } catch (error: any) {
+    return NextResponse.json({
+      success: true,
+      message: "Database restored successfully",
+    });
+  } catch (error: unknown) {
     console.error("Error restoring backup:", error);
     return NextResponse.json(
-      { error: "Failed to restore database", message: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      {
+        error: "Failed to restore database",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
     );
   }
 }
