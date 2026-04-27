@@ -1,23 +1,25 @@
-export const dynamic = 'force-dynamic';
-import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { requirePermission } from "@/lib/api-middleware";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const authResponse = await requirePermission(request, "settings.view");
+    if (authResponse) return authResponse;
 
     const settings = await db.setting.findMany();
 
     // Convert array of key-value pairs into an object
-    const settingsObject = settings.reduce((acc: Record<string, string>, setting) => {
-      acc[setting.key] = setting.value;
-      return acc;
-    }, {});
+    const settingsObject = settings.reduce(
+      (acc: Record<string, string>, setting) => {
+        acc[setting.key] = setting.value;
+        return acc;
+      },
+      {},
+    );
 
     return NextResponse.json({ success: true, data: settingsObject });
   } catch (error: unknown) {
@@ -27,17 +29,15 @@ export async function GET() {
         error: "Failed to fetch settings",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const authResponse = await requirePermission(request, "settings.edit");
+    if (authResponse) return authResponse;
 
     let body;
     try {
@@ -47,7 +47,10 @@ export async function PUT(request: Request) {
     }
 
     if (typeof body !== "object" || body === null) {
-      return NextResponse.json({ error: "Invalid payload format" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid payload format" },
+        { status: 400 },
+      );
     }
 
     const entries = Object.entries(body);
@@ -64,11 +67,11 @@ export async function PUT(request: Request) {
         // Find existing keys to determine updates vs inserts
         const existingSettings = await tx.setting.findMany({
           where: { key: { in: keys } },
-          select: { key: true }
+          select: { key: true },
         });
         const existingKeys = new Set(existingSettings.map((s: any) => s.key));
 
-        const toCreate: { key: string, value: string }[] = [];
+        const toCreate: { key: string; value: string }[] = [];
 
         for (let i = 0; i < keys.length; i++) {
           const key = keys[i];
@@ -78,7 +81,7 @@ export async function PUT(request: Request) {
             // Using individual updates inside an interactive transaction is safe.
             await tx.setting.update({
               where: { key },
-              data: { value }
+              data: { value },
             });
           } else {
             toCreate.push({ key, value });
@@ -92,7 +95,10 @@ export async function PUT(request: Request) {
       });
     }
 
-    return NextResponse.json({ success: true, message: "Settings updated successfully" });
+    return NextResponse.json({
+      success: true,
+      message: "Settings updated successfully",
+    });
   } catch (error: unknown) {
     console.error("Error updating settings:", error);
     return NextResponse.json(
@@ -100,7 +106,7 @@ export async function PUT(request: Request) {
         error: "Failed to update settings",
         message: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
