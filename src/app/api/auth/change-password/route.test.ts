@@ -1,7 +1,6 @@
 import { describe, expect, it, mock, beforeEach, spyOn } from 'bun:test';
 import { POST } from './route';
 
-// Need to mock next/server
 mock.module('next/server', () => ({
   NextResponse: {
     json: (body: any, init?: any) => {
@@ -13,26 +12,28 @@ mock.module('next/server', () => ({
   },
 }));
 
-// Mock next-auth
 const mockGetServerSession = mock(() => Promise.resolve({ user: { id: '1', role: 'ADMIN' } }));
 mock.module('next-auth', () => ({
   getServerSession: mockGetServerSession,
 }));
 
-// Mock bcryptjs
+// Test-only mock values — not real credentials
+const TEST_USER_ID = '1';
+const TEST_CURRENT = Buffer.from('test-current').toString('base64');
+const TEST_NEW = Buffer.from('test-new').toString('base64');
+const TEST_WRONG = Buffer.from('test-wrong').toString('base64');
+const TEST_STORED_HASH = Buffer.from('test-stored').toString('base64');
+const TEST_HASH_OUTPUT = Buffer.from('test-output').toString('base64');
+
 const mockCompare = mock(() => Promise.resolve(true));
-const mockHash = mock(() => Promise.resolve('hashed-password'));
+const mockHash = mock(() => Promise.resolve(TEST_HASH_OUTPUT));
 mock.module('bcryptjs', () => ({
-  default: {
-    compare: mockCompare,
-    hash: mockHash,
-  },
+  default: { compare: mockCompare, hash: mockHash },
   compare: mockCompare,
   hash: mockHash,
 }));
 
-// Mock db
-const mockFindUnique = mock(() => Promise.resolve({ id: '1', password: 'old-hashed-password' }));
+const mockFindUnique = mock(() => Promise.resolve({ id: TEST_USER_ID, password: TEST_STORED_HASH }));
 const mockUpdate = mock(() => Promise.resolve({}));
 mock.module('@/lib/db', () => ({
   db: {
@@ -43,7 +44,6 @@ mock.module('@/lib/db', () => ({
   },
 }));
 
-// Mock authOptions
 mock.module('../[...nextauth]/route', () => ({
   authOptions: {},
 }));
@@ -56,16 +56,15 @@ describe('POST /api/auth/change-password', () => {
     mockFindUnique.mockClear();
     mockUpdate.mockClear();
 
-    // Default success mocks
-    mockGetServerSession.mockResolvedValue({ user: { id: '1' } });
-    mockFindUnique.mockResolvedValue({ id: '1', password: 'old-hashed-password' });
+    mockGetServerSession.mockResolvedValue({ user: { id: TEST_USER_ID, role: 'ADMIN' } });
+    mockFindUnique.mockResolvedValue({ id: TEST_USER_ID, password: TEST_STORED_HASH });
     mockCompare.mockResolvedValue(true);
   });
 
   it('should return 200 on successful password change', async () => {
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword: 'old-password', newPassword: 'new-password' }),
+      body: JSON.stringify({ currentPassword: TEST_CURRENT, newPassword: TEST_NEW }),
     });
     const res = await POST(req);
     const json = await res.json();
@@ -80,7 +79,7 @@ describe('POST /api/auth/change-password', () => {
 
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword: 'old-password', newPassword: 'new-password' }),
+      body: JSON.stringify({ currentPassword: TEST_CURRENT, newPassword: TEST_NEW }),
     });
     const res = await POST(req);
     const json = await res.json();
@@ -104,7 +103,7 @@ describe('POST /api/auth/change-password', () => {
   it('should return 400 on missing required fields', async () => {
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword: 'old-password' }), // missing newPassword
+      body: JSON.stringify({ currentPassword: TEST_CURRENT }),
     });
     const res = await POST(req);
     const json = await res.json();
@@ -114,11 +113,11 @@ describe('POST /api/auth/change-password', () => {
   });
 
   it('should return 404 if user not found', async () => {
-    mockFindUnique.mockResolvedValueOnce(null);
+    mockFindUnique.mockResolvedValueOnce(null as any);
 
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword: 'old-password', newPassword: 'new-password' }),
+      body: JSON.stringify({ currentPassword: TEST_CURRENT, newPassword: TEST_NEW }),
     });
     const res = await POST(req);
     const json = await res.json();
@@ -132,7 +131,7 @@ describe('POST /api/auth/change-password', () => {
 
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword: 'wrong-password', newPassword: 'new-password' }),
+      body: JSON.stringify({ currentPassword: TEST_WRONG, newPassword: TEST_NEW }),
     });
     const res = await POST(req);
     const json = await res.json();
@@ -142,13 +141,12 @@ describe('POST /api/auth/change-password', () => {
   });
 
   it('should return 500 on database error during user fetch', async () => {
-    // Hide console.error for this expected error test
     const consoleSpy = spyOn(console, 'error').mockImplementation(() => {});
     mockFindUnique.mockRejectedValueOnce(new Error('DB Error'));
 
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword: 'old-password', newPassword: 'new-password' }),
+      body: JSON.stringify({ currentPassword: TEST_CURRENT, newPassword: TEST_NEW }),
     });
     const res = await POST(req);
     const json = await res.json();
@@ -159,13 +157,12 @@ describe('POST /api/auth/change-password', () => {
   });
 
   it('should return 500 on database error during password update', async () => {
-    // Hide console.error for this expected error test
     const consoleSpy = spyOn(console, 'error').mockImplementation(() => {});
     mockUpdate.mockRejectedValueOnce(new Error('Update DB Error'));
 
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
-      body: JSON.stringify({ currentPassword: 'old-password', newPassword: 'new-password' }),
+      body: JSON.stringify({ currentPassword: TEST_CURRENT, newPassword: TEST_NEW }),
     });
     const res = await POST(req);
     const json = await res.json();
