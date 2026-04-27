@@ -18,14 +18,14 @@ export async function GET(request: Request) {
       timestamp: new Date(),
       environment: process.env.NODE_ENV,
     }, { status: 200 })
-  } catch (error: any) {
-    console.error('❌ [HEALTH CHECK] Database connection failed:', error.message)
+  } catch (error) {
+    console.error('❌ [HEALTH CHECK] Database connection failed:', (error instanceof Error ? error.message : String(error)))
     console.error('❌ [HEALTH CHECK] Full error:', error)
 
     return Response.json({
       status: 'error',
       database: 'failed',
-      error: error.message,
+      error: (error instanceof Error ? error.message : String(error)),
       timestamp: new Date(),
     }, { status: 500 })
   }

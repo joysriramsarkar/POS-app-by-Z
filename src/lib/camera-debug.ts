@@ -52,8 +52,8 @@ export async function testCameraAccess(): Promise<void> {
     }
     
     stream.getTracks().forEach(track => track.stop());
-  } catch (error: any) {
-    console.error('❌ Back camera access failed:', error?.message);
+  } catch (error) {
+    console.error('❌ Back camera access failed:', (error instanceof Error ? error.message : String(error)));
   }
 
   // Test 4: Request camera access with front (user) camera
@@ -76,8 +76,8 @@ export async function testCameraAccess(): Promise<void> {
     }
     
     stream.getTracks().forEach(track => track.stop());
-  } catch (error: any) {
-    console.error('❌ Front camera access failed:', error?.message);
+  } catch (error) {
+    console.error('❌ Front camera access failed:', (error instanceof Error ? error.message : String(error)));
   }
 
   // Test 5: Request camera access with no specific constraints
@@ -94,8 +94,8 @@ export async function testCameraAccess(): Promise<void> {
     }
     
     stream.getTracks().forEach(track => track.stop());
-  } catch (error: any) {
-    console.error('❌ Generic camera access failed:', error?.message);
+  } catch (error) {
+    console.error('❌ Generic camera access failed:', (error instanceof Error ? error.message : String(error)));
   }
 
   // Test 6: Check if html5-qrcode is available
@@ -103,8 +103,8 @@ export async function testCameraAccess(): Promise<void> {
   try {
     const { Html5Qrcode } = await import('html5-qrcode');
     console.log('✅ html5-qrcode library loaded successfully');
-  } catch (error: any) {
-    console.error('❌ Failed to load html5-qrcode:', error?.message);
+  } catch (error) {
+    console.error('❌ Failed to load html5-qrcode:', (error instanceof Error ? error.message : String(error)));
   }
 
   // Test 7: Simulate scanner initialization
@@ -157,8 +157,8 @@ export async function testCameraAccess(): Promise<void> {
       video.remove();
       console.log('✅ Test video stopped');
     }, 3000);
-  } catch (error: any) {
-    console.error('❌ Raw video test failed:', error?.message);
+  } catch (error) {
+    console.error('❌ Raw video test failed:', (error instanceof Error ? error.message : String(error)));
   }
 
   console.log('\n====== END DEBUG TEST ======\n');
@@ -220,9 +220,9 @@ export async function testHtml5Qrcode(): Promise<void> {
       console.log('✅ Scanner cleared');
     }, 10000);
     
-  } catch (error: any) {
-    console.error('❌ Html5QrcodeScanner test failed:', error?.message);
-    console.error('Stack:', error?.stack);
+  } catch (error) {
+    console.error('❌ Html5QrcodeScanner test failed:', (error instanceof Error ? error.message : String(error)));
+    console.error('Stack:', (error instanceof Error ? error.stack : String(error)));
   }
   
   console.log('====== END HTML5-QRCODE TEST ======\n');

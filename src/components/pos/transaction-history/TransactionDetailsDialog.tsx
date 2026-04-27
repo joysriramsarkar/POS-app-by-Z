@@ -85,8 +85,8 @@ export function TransactionDetailsDialog({
         `Payment: ${transaction.paymentMethod} (${transaction.paymentStatus})`;
 
       await shareInvoiceAsPdf(html, printFormat, transaction.invoiceNumber, storeConfig.name, fallbackText);
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
+    } catch (err) {
+      if ((err instanceof Error ? err.name : null) !== 'AbortError') {
         console.error('Share failed:', err);
       }
     } finally {

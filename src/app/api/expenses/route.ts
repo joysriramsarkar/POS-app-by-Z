@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       take: 100,
     });
     return NextResponse.json({ success: true, data: expenses });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to fetch expenses' }, { status: 500 });
   }
 }
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: expense });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to create expense' }, { status: 500 });
   }
 }
@@ -94,7 +94,7 @@ export async function DELETE(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, message: 'Expense deleted' });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to delete expense' }, { status: 500 });
   }
 }

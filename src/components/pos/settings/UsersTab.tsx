@@ -42,8 +42,8 @@ export default function UsersTab({ session }: UsersTabProps) {
       } else {
         throw new Error(data.error || "Failed to update password");
       }
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: (error instanceof Error ? error.message : String(error)) });
     } finally {
       setIsChangingPassword(false);
     }

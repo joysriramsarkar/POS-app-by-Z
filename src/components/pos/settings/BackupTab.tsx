@@ -28,8 +28,8 @@ export default function BackupTab() {
       window.URL.revokeObjectURL(url);
 
       toast({ title: "Backup Successful", description: "Your data has been downloaded." });
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Backup Failed", description: error.message });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Backup Failed", description: (error instanceof Error ? error.message : String(error)) });
     } finally {
       setIsBackuping(false);
     }
@@ -68,8 +68,8 @@ export default function BackupTab() {
       } else {
         throw new Error(data.error || "Failed to restore");
       }
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Restore Failed", description: error.message });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Restore Failed", description: (error instanceof Error ? error.message : String(error)) });
     } finally {
       setIsRestoring(false);
       if (fileInputRef.current) fileInputRef.current.value = "";

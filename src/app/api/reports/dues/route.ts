@@ -39,10 +39,10 @@ export async function GET(request: NextRequest) {
       totalOutstandingDue,
       count: customersWithDues.length,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Failed to fetch due report:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch due report', details: error.message },
+      { error: 'Failed to fetch due report', details: (error instanceof Error ? error.message : String(error)) },
       { status: 500 }
     );
   }

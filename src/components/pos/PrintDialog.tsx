@@ -135,8 +135,8 @@ export function PrintDialog({ open, onOpenChange, sale, onPrint }: PrintDialogPr
         `— ${storeConfig.name}`;
 
       await shareInvoiceAsPdf(html, selectedFormat, sale.invoiceNumber, storeConfig.name, fallbackText);
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
+    } catch (err) {
+      if ((err instanceof Error ? err.name : null) !== 'AbortError') {
         console.error('Share failed:', err);
         // Last resort: just download the PDF
         try {

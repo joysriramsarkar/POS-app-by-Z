@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     advice += "\nTip: Always monitor the Auto-Restock list daily to never miss out on sales due to zero inventory.";
 
     return NextResponse.json({ success: true, advice });
-  } catch (error: any) {
+  } catch (error) {
     return NextResponse.json({ success: false, error: 'Failed to get AI advice' }, { status: 500 });
   }
 }

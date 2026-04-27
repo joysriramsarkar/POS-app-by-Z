@@ -37,7 +37,7 @@ function getErrorMessage(error: any): string {
   if (error.name === 'NotReadableError' || error.code === 'DEVICE_IN_USE') {
     return 'Camera is already in use by another application. Please close other camera apps.';
   }
-  return error?.message || 'An unknown camera error occurred. Please try again.';
+  return (error instanceof Error ? error.message : String(error)) || 'An unknown camera error occurred. Please try again.';
 }
 
 function playSuccessBeep() {
@@ -223,7 +223,7 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
       };
 
       const handleScanFailure = (error: any) => {
-        const errorMsg = typeof error === 'string' ? error : error?.message;
+        const errorMsg = typeof error === 'string' ? error : (error instanceof Error ? error.message : String(error));
         // Avoid logging noisy scan failures that happen on every frame.
         if (
           errorMsg &&
@@ -300,7 +300,7 @@ export function useCameraBarcodeScanner(config: CameraBarcodeScannerConfig) {
         scanner.clear();
       }
 
-    } catch (error: any) {
+    } catch (error) {
       const errorMessage = getErrorMessage(error);
       console.error('[Scanner] ❌ Initialization failed:', errorMessage, error);
       if (isMountedRef.current) {
