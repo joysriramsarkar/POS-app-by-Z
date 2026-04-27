@@ -69,20 +69,30 @@ export async function PUT(request: Request) {
         const existingKeys = new Set(existingSettings.map((s: any) => s.key));
 
         const toCreate: { key: string, value: string }[] = [];
+        const keysToUpdate: string[] = [];
+        const valuesToUpdate: string[] = [];
 
         for (let i = 0; i < keys.length; i++) {
           const key = keys[i];
           const value = values[i];
           if (existingKeys.has(key)) {
-            // Update individual existing settings. Prisma does not have an updateMany for different values.
-            // Using individual updates inside an interactive transaction is safe.
-            await tx.setting.update({
-              where: { key },
-              data: { value }
-            });
+            keysToUpdate.push(key);
+            valuesToUpdate.push(value);
           } else {
             toCreate.push({ key, value });
           }
+        }
+
+        // Batch update existing settings using Promise.all to prevent sequential N+1 queries
+        if (keysToUpdate.length > 0) {
+          await Promise.all(
+            keysToUpdate.map((key, index) =>
+              tx.setting.update({
+                where: { key },
+                data: { value: valuesToUpdate[index] }
+              })
+            )
+          );
         }
 
         // Batch insert new settings
