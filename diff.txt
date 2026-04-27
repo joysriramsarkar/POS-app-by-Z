@@ -1,0 +1,191 @@
+<<<<<<< SEARCH
+      for (const item of pendingItems) {
+        // Skip permanently failed items
+        if (item.retryCount >= 5) {
+          await SyncQueueDB.markFailed(item.id, 'Max retries exceeded');
+          failureCount++;
+          continue;
+        }
+
+        try {
+          const actionType = this.mapQueueItemToActionType(item);
+          if (!actionType) {
+            throw new Error(`Unsupported sync item: ${item.entityType}.${item.action}`);
+          }
+
+          const parsedPayload = JSON.parse(item.payload);
+
+          const response = await fetch('/api/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Idempotency-Key': item.id,
+            },
+            body: JSON.stringify({
+              idempotencyKey: item.id,
+              actionType,
+              payload: parsedPayload,
+            }),
+          });
+
+          // Session expired — stop sync and force re-login
+          if (response.status === 401) {
+            window.dispatchEvent(new CustomEvent('syncSessionExpired'));
+            this.notifyUI({ synced: successCount, failed: failureCount, total: pendingItems.length });
+            return;
+          }
+
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(`HTTP ${response.status}: ${response.statusText} ${text}`);
+          }
+
+          const result = await response.json();
+          if (!result.success) {
+            throw new Error(result.error || 'Sync API returned failure');
+          }
+
+          await SyncQueueDB.markSynced(item.id);
+          successCount++;
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          const newRetryCount = item.retryCount + 1;
+          if (newRetryCount >= 5) {
+            await SyncQueueDB.markFailed(item.id, errorMsg);
+          } else {
+            await SyncQueueDB.incrementRetry(item.id, errorMsg);
+          }
+          failureCount++;
+        }
+      }
+=======
+      // Helper to check for dependency conflicts between two items
+      const hasConflict = (a: typeof pendingItems[0], b: typeof pendingItems[0]) => {
+        try {
+          const aPayload = JSON.parse(a.payload);
+          const bPayload = JSON.parse(b.payload);
+
+          const getIds = (payload: any) => {
+            const ids = new Set<string>();
+            if (payload.id) ids.add(payload.id);
+            if (payload.customerId) ids.add(payload.customerId);
+            if (payload.productId) ids.add(payload.productId);
+            if (Array.isArray(payload.items)) {
+              payload.items.forEach((i: any) => {
+                if (i.productId) ids.add(i.productId);
+              });
+            }
+            return ids;
+          };
+
+          const aIds = getIds(aPayload);
+          const bIds = getIds(bPayload);
+
+          // If they share any IDs, they might conflict, must be sequential
+          for (const id of aIds) {
+            if (bIds.has(id)) return true;
+          }
+        } catch (e) {
+          return true; // if unparseable, assume conflict to be safe
+        }
+        return false;
+      };
+
+      // Group into conflict-free batches (max 5 per batch)
+      const batches: (typeof pendingItems)[] = [];
+      let currentBatch: typeof pendingItems = [];
+
+      for (const item of pendingItems) {
+        if (item.retryCount >= 5) {
+          await SyncQueueDB.markFailed(item.id, 'Max retries exceeded');
+          failureCount++;
+          continue;
+        }
+
+        const conflict = currentBatch.some(batchItem => hasConflict(item, batchItem));
+
+        if (conflict || currentBatch.length >= 5) {
+          if (currentBatch.length > 0) batches.push(currentBatch);
+          currentBatch = [item];
+        } else {
+          currentBatch.push(item);
+        }
+      }
+      if (currentBatch.length > 0) batches.push(currentBatch);
+
+      let sessionExpired = false;
+
+      for (const batch of batches) {
+        if (sessionExpired) break;
+
+        const results = await Promise.allSettled(
+          batch.map(async (item) => {
+            const actionType = this.mapQueueItemToActionType(item);
+            if (!actionType) {
+              throw new Error(`Unsupported sync item: ${item.entityType}.${item.action}`);
+            }
+
+            const parsedPayload = JSON.parse(item.payload);
+
+            const response = await fetch('/api/sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Idempotency-Key': item.id,
+              },
+              body: JSON.stringify({
+                idempotencyKey: item.id,
+                actionType,
+                payload: parsedPayload,
+              }),
+            });
+
+            if (response.status === 401) {
+              sessionExpired = true;
+              throw new Error('Unauthorized');
+            }
+
+            if (!response.ok) {
+              const text = await response.text();
+              throw new Error(`HTTP ${response.status}: ${response.statusText} ${text}`);
+            }
+
+            const result = await response.json();
+            if (!result.success) {
+              throw new Error(result.error || 'Sync API returned failure');
+            }
+
+            await SyncQueueDB.markSynced(item.id);
+            return item.id;
+          })
+        );
+
+        for (let i = 0; i < batch.length; i++) {
+          const item = batch[i];
+          const result = results[i];
+
+          if (result.status === 'fulfilled') {
+            successCount++;
+          } else {
+            if (sessionExpired && result.reason.message === 'Unauthorized') {
+              window.dispatchEvent(new CustomEvent('syncSessionExpired'));
+              continue; // don't increment failure for auth timeout
+            }
+
+            const errorMsg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+            const newRetryCount = item.retryCount + 1;
+            if (newRetryCount >= 5) {
+              await SyncQueueDB.markFailed(item.id, errorMsg);
+            } else {
+              await SyncQueueDB.incrementRetry(item.id, errorMsg);
+            }
+            failureCount++;
+          }
+        }
+
+        if (sessionExpired) {
+           this.notifyUI({ synced: successCount, failed: failureCount, total: pendingItems.length });
+           return;
+        }
+      }
+>>>>>>> REPLACE
