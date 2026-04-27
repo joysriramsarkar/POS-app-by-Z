@@ -1,10 +1,10 @@
-export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from 'next/server';
-import { db as prisma } from '@/lib/db';
-import { requirePermission } from '@/lib/api-middleware';
+export const dynamic = "force-dynamic";
+import { NextRequest, NextResponse } from "next/server";
+import { db as prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/api-middleware";
 
 export async function GET(request: NextRequest) {
-  const authResponse = await requirePermission(request, 'reports.view');
+  const authResponse = await requirePermission(request, "reports.view");
   if (authResponse) return authResponse;
 
   try {
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         barcode: true,
       },
       orderBy: {
-        currentStock: 'asc',
+        currentStock: "asc",
       },
       take: 50,
     });
@@ -35,11 +35,11 @@ export async function GET(request: NextRequest) {
       lowStockItems,
       totalCount: lowStockItems.length,
     });
-  } catch (error: any) {
-    console.error('Failed to fetch stock report:', error);
+  } catch (error: unknown) {
+    console.error("Failed to fetch stock report:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch stock report', details: error.message },
-      { status: 500 }
+      { error: "Failed to fetch stock report", details: (error instanceof Error ? error.message : "Unknown error") },
+      { status: 500 },
     );
   }
 }
