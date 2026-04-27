@@ -24,11 +24,11 @@ export const getStatusColor = (status: string) => {
   }
 };
 
-export const formatPrice = (price: number) => {
+export const formatPrice = (price: number | null | undefined) => {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  }).format(price);
+  }).format(price ?? 0);
 };

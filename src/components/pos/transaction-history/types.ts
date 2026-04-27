@@ -1,18 +1,18 @@
 export interface TransactionItem {
   id: string;
   productName: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
+  quantity: number | null;
+  unitPrice: number | null;
+  totalPrice: number | null;
 }
 
 export interface Transaction {
   id: string;
   invoiceNumber: string;
-  totalAmount: number;
-  amountPaid: number;
-  discount: number;
-  tax: number;
+  totalAmount: number | null;
+  amountPaid: number | null;
+  discount: number | null;
+  tax: number | null;
   paymentMethod: string;
   paymentStatus: string;
   status: string;

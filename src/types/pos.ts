@@ -71,12 +71,12 @@ export interface Sale {
   id: string;
   invoiceNumber: string;
   customerId?: string;
-  userId?: string; // Track which user created this sale
-  subtotal: number;
-  discount: number;
-  tax: number;
-  totalAmount: number;
-  amountPaid: number;
+  userId?: string;
+  subtotal: number | null;
+  discount: number | null;
+  tax: number | null;
+  totalAmount: number | null;
+  amountPaid: number | null;
   paymentMethod: PaymentMethod;
   cashAmount?: number;
   upiAmount?: number;
@@ -96,9 +96,9 @@ export interface SaleItem {
   saleId: string;
   productId: string;
   productName: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
+  quantity: number | null;
+  unitPrice: number | null;
+  totalPrice: number | null;
   createdAt: Date;
 }
 

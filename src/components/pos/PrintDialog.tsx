@@ -245,14 +245,14 @@ export function PrintDialog({
       const items = sale.items
         .map(
           (i) =>
-            `• ${i.productName} x${i.quantity} = ₹${i.totalPrice.toFixed(2)}`,
+            `• ${i.productName} x${i.quantity ?? 0} = ₹${(i.totalPrice ?? 0).toFixed(2)}`,
         )
         .join("\n");
       const fallbackText =
         `*Invoice: ${sale.invoiceNumber}*\n` +
         `Date: ${new Date(sale.createdAt).toLocaleDateString("en-IN")}\n\n` +
         `${items}\n\n` +
-        `*Total: ₹${sale.totalAmount.toFixed(2)}*\n` +
+        `*Total: ₹${(sale.totalAmount ?? 0).toFixed(2)}*\n` +
         `Payment: ${sale.paymentMethod} (${sale.paymentStatus})\n\n` +
         `— ${storeConfig.name}`;
 

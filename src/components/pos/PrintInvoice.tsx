@@ -28,8 +28,8 @@ interface PrintInvoiceProps {
 // HELPER FUNCTIONS
 // ============================================================================
 
-const formatCurrency = (amount: number): string => {
-  return `₹${amount.toFixed(2)}`;
+const formatCurrency = (amount: number | null | undefined): string => {
+  return `₹${(amount ?? 0).toFixed(2)}`;
 };
 
 const formatDate = (date: Date): string => {
@@ -163,8 +163,8 @@ function ThermalInvoice({
               <tr key={item.id} style={{ borderBottom: '1px dotted #ccc' }}>
                 <td className="w-[52%] pr-1 align-top py-0.5 whitespace-normal">{item.productName}</td>
                 <td className="w-[16%] text-right align-top py-0.5">{item.quantity}</td>
-                <td className="w-[16%] text-right align-top py-0.5">{item.unitPrice.toFixed(0)}</td>
-                <td className="w-[16%] text-right align-top py-0.5 font-medium">{item.totalPrice.toFixed(0)}</td>
+                <td className="w-[16%] text-right align-top py-0.5">{(item.unitPrice ?? 0).toFixed(0)}</td>
+                <td className="w-[16%] text-right align-top py-0.5 font-medium">{(item.totalPrice ?? 0).toFixed(0)}</td>
               </tr>
             ))}
           </tbody>
@@ -176,13 +176,13 @@ function ThermalInvoice({
             <span className="text-gray-500">Subtotal</span>
             <span className="font-medium">{formatCurrency(sale.subtotal)}</span>
           </div>
-          {sale.discount > 0 && (
+          {(sale.discount ?? 0) > 0 && (
             <div className="flex justify-between min-w-0">
               <span className="text-gray-500">Discount</span>
               <span className="font-medium">-{formatCurrency(sale.discount)}</span>
             </div>
           )}
-          {sale.tax > 0 && (
+          {(sale.tax ?? 0) > 0 && (
             <div className="flex justify-between min-w-0">
               <span className="text-gray-500">Tax</span>
               <span className="font-medium">+{formatCurrency(sale.tax)}</span>
@@ -211,10 +211,10 @@ function ThermalInvoice({
           <span className="text-gray-500">Status</span>
           <span className="font-semibold">{sale.paymentStatus}</span>
         </div>
-        {sale.amountPaid < sale.totalAmount && (
+        {(sale.amountPaid ?? 0) < (sale.totalAmount ?? 0) && (
           <div className="flex justify-between min-w-0">
             <span className="text-gray-500">Due</span>
-            <span className="font-bold">{formatCurrency(sale.totalAmount - sale.amountPaid)}</span>
+            <span className="font-bold">{formatCurrency((sale.totalAmount ?? 0) - (sale.amountPaid ?? 0))}</span>
           </div>
         )}
       </div>
@@ -333,13 +333,13 @@ function StandardInvoice({
             <span style={{ color: '#666' }}>Subtotal</span>
             <span>{formatCurrency(sale.subtotal)}</span>
           </div>
-          {sale.discount > 0 && (
+          {(sale.discount ?? 0) > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #e5e5e5', color: '#16a34a' }}>
               <span>Discount</span>
               <span>-{formatCurrency(sale.discount)}</span>
             </div>
           )}
-          {sale.tax > 0 && (
+          {(sale.tax ?? 0) > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid #e5e5e5' }}>
               <span style={{ color: '#666' }}>Tax</span>
               <span>+{formatCurrency(sale.tax)}</span>
@@ -349,10 +349,10 @@ function StandardInvoice({
             <span>Grand Total</span>
             <span>{formatCurrency(sale.totalAmount)}</span>
           </div>
-          {sale.amountPaid < sale.totalAmount && (
+          {(sale.amountPaid ?? 0) < (sale.totalAmount ?? 0) && (
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 10px', background: '#fee2e2', color: '#b91c1c', fontWeight: 700, fontSize: 12, marginTop: 2, borderRadius: 2 }}>
               <span>Due</span>
-              <span>{formatCurrency(sale.totalAmount - sale.amountPaid)}</span>
+              <span>{formatCurrency((sale.totalAmount ?? 0) - (sale.amountPaid ?? 0))}</span>
             </div>
           )}
         </div>

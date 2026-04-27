@@ -150,7 +150,7 @@ export function Expenses() {
                       <TableCell>{format(new Date(exp.date), 'dd MMM yyyy')}</TableCell>
                       <TableCell>{exp.category}</TableCell>
                       <TableCell>{exp.notes || '-'}</TableCell>
-                      <TableCell className="text-right font-medium">₹{exp.amount.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium">₹{(exp.amount ?? 0).toFixed(2)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteExpense(exp.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10">
                           <Trash2 className="w-4 h-4" />
