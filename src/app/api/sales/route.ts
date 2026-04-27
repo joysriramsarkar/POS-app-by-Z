@@ -1,13 +1,13 @@
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 // ============================================================================
 // Sales API Route - Lakhan Bhandar POS
 // ============================================================================
 
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
-import { generateServerInvoiceNumber } from '@/lib/invoice';
-import { v4 as uuidv4 } from 'uuid';
-import { SaleInputSchema, SaleItemInput } from '@/schemas';
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { generateServerInvoiceNumber } from "@/lib/invoice";
+import { v4 as uuidv4 } from "uuid";
+import { SaleInputSchema, SaleItemInput } from "@/schemas";
 
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
@@ -16,19 +16,22 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   try {
     const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    const invoiceNumber = searchParams.get('invoiceNumber');
-    const customerId = searchParams.get('customerId');
-    const status = searchParams.get('status');
-    const dateFrom = searchParams.get('dateFrom');
-    const dateTo = searchParams.get('dateTo');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const id = searchParams.get("id");
+    const invoiceNumber = searchParams.get("invoiceNumber");
+    const customerId = searchParams.get("customerId");
+    const status = searchParams.get("status");
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "50");
 
     // If specific ID requested
     if (id) {
@@ -43,8 +46,8 @@ export async function GET(request: NextRequest) {
 
       if (!sale) {
         return NextResponse.json(
-          { success: false, error: 'Sale not found' },
-          { status: 404 }
+          { success: false, error: "Sale not found" },
+          { status: 404 },
         );
       }
 
@@ -53,32 +56,48 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: any = {};
-    
+
     if (invoiceNumber) {
       // Extended search: check invoiceNumber OR customer name OR customer phone OR items productName
       where.OR = [
-        { invoiceNumber: { contains: invoiceNumber, mode: 'insensitive' } },
-        { customer: { name: { contains: invoiceNumber, mode: 'insensitive' } } },
-        { customer: { phone: { contains: invoiceNumber, mode: 'insensitive' } } },
-        { items: { some: { productName: { contains: invoiceNumber, mode: 'insensitive' } } } }
+        { invoiceNumber: { contains: invoiceNumber, mode: "insensitive" } },
+        {
+          customer: { name: { contains: invoiceNumber, mode: "insensitive" } },
+        },
+        {
+          customer: { phone: { contains: invoiceNumber, mode: "insensitive" } },
+        },
+        {
+          items: {
+            some: {
+              productName: { contains: invoiceNumber, mode: "insensitive" },
+            },
+          },
+        },
       ];
     }
-    
+
     if (customerId) {
       where.customerId = customerId;
     }
-    
+
     if (status) {
       where.status = status;
     }
-    
+
     if (dateFrom || dateTo) {
       where.createdAt = {};
       if (dateFrom) {
-        where.createdAt = { ...where.createdAt as object, gte: new Date(dateFrom) };
+        where.createdAt = {
+          ...(where.createdAt as object),
+          gte: new Date(dateFrom),
+        };
       }
       if (dateTo) {
-        where.createdAt = { ...where.createdAt as object, lte: new Date(dateTo) };
+        where.createdAt = {
+          ...(where.createdAt as object),
+          lte: new Date(dateTo),
+        };
       }
     }
 
@@ -90,7 +109,7 @@ export async function GET(request: NextRequest) {
           customer: true,
           user: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -108,10 +127,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error fetching sales:', error);
+    console.error("Error fetching sales:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch sales' },
-      { status: 500 }
+      { success: false, error: "Failed to fetch sales" },
+      { status: 500 },
     );
   }
 }
@@ -120,7 +139,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   try {
@@ -129,8 +151,8 @@ export async function POST(request: NextRequest) {
       body = await request.json();
     } catch (parseError) {
       return NextResponse.json(
-        { success: false, error: 'Invalid request body: JSON parsing failed' },
-        { status: 400 }
+        { success: false, error: "Invalid request body: JSON parsing failed" },
+        { status: 400 },
       );
     }
 
@@ -139,131 +161,149 @@ export async function POST(request: NextRequest) {
     if (!result.success) {
       const errors = Object.values(result.error.flatten().fieldErrors)
         .flat()
-        .join(', ');
+        .join(", ");
       return NextResponse.json(
-        { success: false, error: errors || 'Validation failed' },
-        { status: 400 }
+        { success: false, error: errors || "Validation failed" },
+        { status: 400 },
       );
     }
 
     const validatedData = result.data;
-    const { items: validatedItems, customerId, paymentMethod, notes } = validatedData;
+    const {
+      items: validatedItems,
+      customerId,
+      paymentMethod,
+      notes,
+    } = validatedData;
 
     // Calculate totals with validated numeric values
-    const subtotal = validatedItems.reduce((sum: number, item: { totalPrice: number }) => sum + item.totalPrice, 0);
+    const subtotal = validatedItems.reduce(
+      (sum: number, item: { totalPrice: number }) => sum + item.totalPrice,
+      0,
+    );
     const discountAmount = Math.max(0, validatedData.discount);
     const taxAmount = Math.max(0, validatedData.tax);
     const totalAmount = subtotal - discountAmount + taxAmount;
     const amountPaidValue = Math.max(0, validatedData.amountPaid);
 
     // Validate payment status based on customer type
-    let paymentStatus = 'Paid';
+    let paymentStatus = "Paid";
     if (customerId) {
       // For regular customers, can have partial/due payments
       if (amountPaidValue === 0) {
-        paymentStatus = 'Due';
+        paymentStatus = "Due";
       } else if (amountPaidValue > 0 && amountPaidValue < totalAmount) {
-        paymentStatus = 'Partial';
+        paymentStatus = "Partial";
       }
     } else {
       // Walk-in customers must pay full amount
       if (amountPaidValue < totalAmount) {
         return NextResponse.json(
-          { success: false, error: 'Walk-in customers must pay the full amount' },
-          { status: 400 }
+          {
+            success: false,
+            error: "Walk-in customers must pay the full amount",
+          },
+          { status: 400 },
         );
       }
-      paymentStatus = 'Paid';
+      paymentStatus = "Paid";
     }
 
     // Generate invoice number (now async, must be done before transaction)
     const invoiceNumber = await generateServerInvoiceNumber();
-    
+
     // Get current user ID from session
     const userId = (session?.user as { id?: string })?.id || null;
 
     // Create sale with items in transaction (30 second timeout for complex operations)
-    const sale = await db.$transaction(async (tx) => {
-      // Create sale with proper Prisma syntax
-      const saleCreateData: any = {
-        invoiceNumber,
-        subtotal,
-        discount: discountAmount,
-        tax: taxAmount,
-        totalAmount,
-        amountPaid: amountPaidValue,
-        paymentMethod: paymentMethod || 'Cash',
-        cashAmount: validatedData.cashAmount ?? null,
-        upiAmount: validatedData.upiAmount ?? null,
-        paymentStatus,
-        status: 'Completed',
-        notes: notes || null,
-        offlineSynced: true,
-        items: {
-          create: validatedItems.map((item) => ({
-            productId: item.productId,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.totalPrice,
-          })),
-        },
-      };
-
-      if (customerId) {
-        saleCreateData.customer = {
-          connect: { id: customerId },
+    const sale = await db.$transaction(
+      async (tx) => {
+        // Create sale with proper Prisma syntax
+        const saleCreateData: any = {
+          invoiceNumber,
+          subtotal,
+          discount: discountAmount,
+          tax: taxAmount,
+          totalAmount,
+          amountPaid: amountPaidValue,
+          paymentMethod: paymentMethod || "Cash",
+          cashAmount: validatedData.cashAmount ?? null,
+          upiAmount: validatedData.upiAmount ?? null,
+          paymentStatus,
+          status: "Completed",
+          notes: notes || null,
+          offlineSynced: true,
+          items: {
+            create: validatedItems.map((item) => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+            })),
+          },
         };
-      }
 
-      if (userId) {
-        saleCreateData.user = {
-          connect: { id: userId },
-        };
-      }
-
-      const newSale = await tx.sale.create({
-        data: saleCreateData,
-        include: {
-          items: true,
-          customer: true,
-          user: true,
-        },
-      });
-
-      // Validate and update stock for each item BEFORE using customer data
-      // Check all items in a single batch query for better performance
-      const productIds = validatedItems.map(item => item.productId);
-      const productsInDb = await tx.product.findMany({
-        where: {
-          id: { in: productIds },
-        },
-        select: {
-          id: true,
-          name: true,
-          currentStock: true,
-        },
-      });
-
-      // Verify all products exist and have sufficient stock
-      const productMap = new Map(productsInDb.map((p) => [p.id, p]));
-      for (const item of validatedItems) {
-        const product = productMap.get(item.productId);
-        if (!product) {
-          throw new Error(`Product ${item.productId} not found`);
+        if (customerId) {
+          saleCreateData.customer = {
+            connect: { id: customerId },
+          };
         }
-        if (product.currentStock < item.quantity) {
-          throw new Error(`Insufficient stock for product ${product.name}. Available: ${product.currentStock}, Requested: ${item.quantity}`);
+
+        if (userId) {
+          saleCreateData.user = {
+            connect: { id: userId },
+          };
         }
-      }
 
-      // Second pass: atomically update stock for all items in a single batch
-      // Use raw SQL with UNNEST for efficient atomic conditional updates to prevent race conditions
-      if (validatedItems.length > 0) {
-        const itemProductIds = validatedItems.map((item: SaleItemInput) => item.productId);
-        const itemQuantities = validatedItems.map((item: SaleItemInput) => item.quantity);
+        const newSale = await tx.sale.create({
+          data: saleCreateData,
+          include: {
+            items: true,
+            customer: true,
+            user: true,
+          },
+        });
 
-        const updateResult = await tx.$executeRaw`
+        // Validate and update stock for each item BEFORE using customer data
+        // Check all items in a single batch query for better performance
+        const productIds = validatedItems.map((item) => item.productId);
+        const productsInDb = await tx.product.findMany({
+          where: {
+            id: { in: productIds },
+          },
+          select: {
+            id: true,
+            name: true,
+            currentStock: true,
+          },
+        });
+
+        // Verify all products exist and have sufficient stock
+        const productMap = new Map(productsInDb.map((p) => [p.id, p]));
+        for (const item of validatedItems) {
+          const product = productMap.get(item.productId);
+          if (!product) {
+            throw new Error(`Product ${item.productId} not found`);
+          }
+          if (product.currentStock < item.quantity) {
+            throw new Error(
+              `Insufficient stock for product ${product.name}. Available: ${product.currentStock}, Requested: ${item.quantity}`,
+            );
+          }
+        }
+
+        // Second pass: atomically update stock for all items in a single batch
+        // Use raw SQL with UNNEST for efficient atomic conditional updates to prevent race conditions
+        if (validatedItems.length > 0) {
+          const itemProductIds = validatedItems.map(
+            (item: SaleItemInput) => item.productId,
+          );
+          const itemQuantities = validatedItems.map(
+            (item: SaleItemInput) => item.quantity,
+          );
+
+          const updateResult = await tx.$executeRaw`
           UPDATE products AS p
           SET
             "current_stock" = p."current_stock" - u.quantity::float,
@@ -274,165 +314,171 @@ export async function POST(request: NextRequest) {
           WHERE p.id = u.id AND p."current_stock" >= u.quantity::float
         `;
 
-        // The number of updated rows should match the number of unique items
-        // Note: If duplicate productIds exist in validatedItems, they should ideally be merged before this step,
-        // but assuming they are distinct based on the application logic.
-        const distinctProductCount = new Set(itemProductIds).size;
-        if (updateResult !== distinctProductCount) {
-          throw new Error(`Atomic stock update failed. Another transaction may have depleted stock.`);
+          // The number of updated rows should match the number of unique items
+          // Note: If duplicate productIds exist in validatedItems, they should ideally be merged before this step,
+          // but assuming they are distinct based on the application logic.
+          const distinctProductCount = new Set(itemProductIds).size;
+          if (updateResult !== distinctProductCount) {
+            throw new Error(
+              `Atomic stock update failed. Another transaction may have depleted stock.`,
+            );
+          }
         }
-      }
 
-      // Third pass: Create all stock history entries in a single batch to minimize round-trips
-      await tx.stockHistory.createMany({
-        data: validatedItems.map((item) => ({
-          productId: item.productId,
-          changeType: 'sale',
-          quantity: -item.quantity,
-          reason: `Sale: ${newSale.invoiceNumber}`,
-          referenceId: newSale.id,
-        })),
-      });
-
-      // Handle due, prepaid, and full payments for customers
-      if (customerId) {
-        const customer = await tx.customer.findUnique({
-          where: { id: customerId },
+        // Third pass: Create all stock history entries in a single batch to minimize round-trips
+        await tx.stockHistory.createMany({
+          data: validatedItems.map((item) => ({
+            productId: item.productId,
+            changeType: "sale",
+            quantity: -item.quantity,
+            reason: `Sale: ${newSale.invoiceNumber}`,
+            referenceId: newSale.id,
+          })),
         });
 
-        if (!customer) {
-          throw new Error(`Customer ${customerId} not found`);
-        }
-        
-        const prepaidToUse = validatedData.prepaidAmountUsed || 0;
+        // Handle due, prepaid, and full payments for customers
+        if (customerId) {
+          const customer = await tx.customer.findUnique({
+            where: { id: customerId },
+          });
 
-        // 1. Handle Prepaid Balance Deduction
-        if (prepaidToUse > 0) {
-          if (customer.prepaidBalance < prepaidToUse) {
-            throw new Error(`Insufficient prepaid balance. Available: ${customer.prepaidBalance}, Tried to use: ${prepaidToUse}`);
+          if (!customer) {
+            throw new Error(`Customer ${customerId} not found`);
           }
-          
-          const newPrepaidBalance = customer.prepaidBalance - prepaidToUse;
 
-          await tx.customer.update({
-            where: { id: customerId },
-            data: { 
-              prepaidBalance: newPrepaidBalance,
-              updatedAt: new Date(),
-            },
-          });
+          const prepaidToUse = validatedData.prepaidAmountUsed || 0;
 
-          await tx.ledgerEntry.create({
-            data: {
-              customerId,
-              entryType: 'prepayment-used',
-              amount: prepaidToUse,
-              balanceAfter: customer.totalDue, // This doesn't affect the due balance directly
-              description: `Prepaid used for sale: ${newSale.invoiceNumber}`,
-              referenceId: newSale.id,
-            },
-          });
-        }
+          // 1. Handle Prepaid Balance Deduction
+          if (prepaidToUse > 0) {
+            if (customer.prepaidBalance < prepaidToUse) {
+              throw new Error(
+                `Insufficient prepaid balance. Available: ${customer.prepaidBalance}, Tried to use: ${prepaidToUse}`,
+              );
+            }
 
-        // 2. Handle Due Amount Calculation
-        const remainingAmountAfterPrepaid = totalAmount - prepaidToUse;
-        const dueAmount = remainingAmountAfterPrepaid - amountPaidValue;
+            const newPrepaidBalance = customer.prepaidBalance - prepaidToUse;
 
-        if (dueAmount > 0) {
-          const newTotalDue = customer.totalDue + dueAmount;
-          await tx.customer.update({
-            where: { id: customerId },
-            data: {
-              totalDue: { increment: dueAmount },
-              updatedAt: new Date(),
-            },
-          });
+            await tx.customer.update({
+              where: { id: customerId },
+              data: {
+                prepaidBalance: newPrepaidBalance,
+                updatedAt: new Date(),
+              },
+            });
 
-          // Create ledger entry for the credit (the sale itself)
-          await tx.ledgerEntry.create({
-            data: {
-              customerId,
-              entryType: 'credit',
-              amount: totalAmount, // The full sale amount is the credit
-              balanceAfter: newTotalDue,
-              description: `Credit purchase: ${newSale.invoiceNumber}`,
-              referenceId: newSale.id,
-            },
-          });
-          
-          // Create ledger entry for the part paid by cash/other methods
-          if (amountPaidValue > 0) {
             await tx.ledgerEntry.create({
               data: {
                 customerId,
-                entryType: 'debit',
-                amount: amountPaidValue,
-                balanceAfter: newTotalDue - amountPaidValue,
-                description: `Partial payment for: ${newSale.invoiceNumber}`,
+                entryType: "prepayment-used",
+                amount: prepaidToUse,
+                balanceAfter: customer.totalDue, // This doesn't affect the due balance directly
+                description: `Prepaid used for sale: ${newSale.invoiceNumber}`,
                 referenceId: newSale.id,
               },
             });
           }
-        } else {
+
+          // 2. Handle Due Amount Calculation
+          const remainingAmountAfterPrepaid = totalAmount - prepaidToUse;
+          const dueAmount = remainingAmountAfterPrepaid - amountPaidValue;
+
+          if (dueAmount > 0) {
+            const newTotalDue = customer.totalDue + dueAmount;
+            await tx.customer.update({
+              where: { id: customerId },
+              data: {
+                totalDue: { increment: dueAmount },
+                updatedAt: new Date(),
+              },
+            });
+
+            // Create ledger entry for the credit (the sale itself)
+            await tx.ledgerEntry.create({
+              data: {
+                customerId,
+                entryType: "credit",
+                amount: totalAmount, // The full sale amount is the credit
+                balanceAfter: newTotalDue,
+                description: `Credit purchase: ${newSale.invoiceNumber}`,
+                referenceId: newSale.id,
+              },
+            });
+
+            // Create ledger entry for the part paid by cash/other methods
+            if (amountPaidValue > 0) {
+              await tx.ledgerEntry.create({
+                data: {
+                  customerId,
+                  entryType: "debit",
+                  amount: amountPaidValue,
+                  balanceAfter: newTotalDue - amountPaidValue,
+                  description: `Partial payment for: ${newSale.invoiceNumber}`,
+                  referenceId: newSale.id,
+                },
+              });
+            }
+          } else {
             // Paid in full (or overpaid) with cash/other methods after using prepaid
             // No new due is created, so we only log the payment.
             await tx.ledgerEntry.create({
-                data: {
-                    customerId,
-                    entryType: 'debit',
-                    amount: totalAmount, // Log the entire sale value as a debit against the credit of the sale.
-                    balanceAfter: customer.totalDue, // No change in due balance
-                    description: `Full payment for sale: ${newSale.invoiceNumber}`,
-                    referenceId: newSale.id,
-                },
+              data: {
+                customerId,
+                entryType: "debit",
+                amount: totalAmount, // Log the entire sale value as a debit against the credit of the sale.
+                balanceAfter: customer.totalDue, // No change in due balance
+                description: `Full payment for sale: ${newSale.invoiceNumber}`,
+                referenceId: newSale.id,
+              },
             });
+          }
         }
-      }
 
-      return newSale;
-    }, {
-      timeout: 60000, // 60 second timeout for complex transaction
-      maxWait: 10000, // Max wait time for acquiring connection
-    });
+        return newSale;
+      },
+      {
+        timeout: 60000, // 60 second timeout for complex transaction
+        maxWait: 10000, // Max wait time for acquiring connection
+      },
+    );
 
     return NextResponse.json({
       success: true,
       data: sale,
-      message: 'Sale completed successfully',
+      message: "Sale completed successfully",
     });
   } catch (error) {
-    console.error('Error creating sale:', error);
-    
+    console.error("Error creating sale:", error);
+
     // Extract meaningful error message
-    let errorMessage = 'Failed to create sale';
+    let errorMessage = "Failed to create sale";
     let statusCode = 500;
-    
+
     if (error instanceof Error) {
       // Check for specific error patterns
-      if (error.message.includes('Insufficient stock')) {
+      if (error.message.includes("Insufficient stock")) {
         errorMessage = error.message;
         statusCode = 400;
-      } else if (error.message.includes('not found')) {
+      } else if (error.message.includes("not found")) {
         errorMessage = error.message;
         statusCode = 404;
-      } else if (error.message.includes('No items')) {
+      } else if (error.message.includes("No items")) {
         errorMessage = error.message;
         statusCode = 400;
       } else {
         // For Prisma errors and others, try to extract meaningful message
-        errorMessage = error.message || 'Failed to create sale';
+        errorMessage = error.message || "Failed to create sale";
       }
     }
-    
-    console.error('Sale creation error details:', {
+
+    console.error("Sale creation error details:", {
       message: errorMessage,
       originalError: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
-    
+
     return NextResponse.json(
       { success: false, error: errorMessage },
-      { status: statusCode }
+      { status: statusCode },
     );
   }
 }
@@ -441,7 +487,10 @@ export async function POST(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 },
+    );
   }
 
   try {
@@ -450,8 +499,8 @@ export async function PUT(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json(
-        { success: false, error: 'Sale ID is required' },
-        { status: 400 }
+        { success: false, error: "Sale ID is required" },
+        { status: 400 },
       );
     }
 
@@ -463,15 +512,18 @@ export async function PUT(request: NextRequest) {
 
     if (!existingSale) {
       return NextResponse.json(
-        { success: false, error: 'Sale not found' },
-        { status: 404 }
+        { success: false, error: "Sale not found" },
+        { status: 404 },
       );
     }
 
-    if (existingSale.status !== 'Completed') {
+    if (existingSale.status !== "Completed") {
       return NextResponse.json(
-        { success: false, error: 'Only completed sales can be cancelled or refunded' },
-        { status: 400 }
+        {
+          success: false,
+          error: "Only completed sales can be cancelled or refunded",
+        },
+        { status: 400 },
       );
     }
 
@@ -482,7 +534,9 @@ export async function PUT(request: NextRequest) {
         where: { id },
         data: {
           status,
-          notes: reason ? `${existingSale.notes || ''}\n${status}: ${reason}` : existingSale.notes,
+          notes: reason
+            ? `${existingSale.notes || ""}\n${status}: ${reason}`
+            : existingSale.notes,
           updatedAt: new Date(),
         },
         include: { items: true },
@@ -494,30 +548,40 @@ export async function PUT(request: NextRequest) {
         return acc;
       }, new Map<string, number>());
 
-      for (const [productId, quantity] of productReturnQuantities.entries()) {
-        await tx.product.update({
-          where: { id: productId },
-          data: {
-            currentStock: { increment: quantity },
-            updatedAt: new Date(),
-          },
-        });
+      const productIds = Array.from(productReturnQuantities.keys());
+      const quantities = Array.from(productReturnQuantities.values());
 
-        await tx.stockHistory.create({
-          data: {
-            productId,
-            changeType: 'return',
-            quantity,
-            reason: `${status}: ${existingSale.invoiceNumber}`,
-            referenceId: existingSale.id,
-          },
+      if (productIds.length > 0) {
+        await tx.$executeRaw`
+          UPDATE products AS p
+          SET "current_stock" = p."current_stock" + update_data.quantity,
+              "updated_at" = NOW()
+          FROM (
+            SELECT unnest(${productIds}::text[]) AS id, unnest(${quantities}::float[]) AS quantity
+          ) AS update_data
+          WHERE p.id = update_data.id
+        `;
+
+        const historyData = productIds.map((id, index) => ({
+          productId: id,
+          changeType: "return",
+          quantity: quantities[index],
+          reason: `${status}: ${existingSale.invoiceNumber}`,
+          referenceId: existingSale.id,
+        }));
+
+        await tx.stockHistory.createMany({
+          data: historyData,
         });
       }
 
       // If sale was partially or fully due, reverse customer's totalDue update
-      if (existingSale.customerId && existingSale.amountPaid < existingSale.totalAmount) {
+      if (
+        existingSale.customerId &&
+        existingSale.amountPaid < existingSale.totalAmount
+      ) {
         const dueAmount = existingSale.totalAmount - existingSale.amountPaid;
-        
+
         // Fetch customer BEFORE updating to get current balance
         const customer = await tx.customer.findUnique({
           where: { id: existingSale.customerId },
@@ -544,7 +608,7 @@ export async function PUT(request: NextRequest) {
         await tx.ledgerEntry.create({
           data: {
             customerId: existingSale.customerId,
-            entryType: 'debit',
+            entryType: "debit",
             amount: existingSale.totalAmount,
             balanceAfter: newTotalDue,
             description: `${status}: reverse credit for ${existingSale.invoiceNumber}`,
@@ -557,7 +621,7 @@ export async function PUT(request: NextRequest) {
           await tx.ledgerEntry.create({
             data: {
               customerId: existingSale.customerId,
-              entryType: 'credit',
+              entryType: "credit",
               amount: existingSale.amountPaid,
               balanceAfter: newTotalDue + existingSale.amountPaid,
               description: `${status}: reverse payment for ${existingSale.invoiceNumber}`,
@@ -576,10 +640,10 @@ export async function PUT(request: NextRequest) {
       message: `Sale ${status.toLowerCase()} successfully`,
     });
   } catch (error) {
-    console.error('Error updating sale:', error);
+    console.error("Error updating sale:", error);
     return NextResponse.json(
-      { success: false, error: 'Failed to update sale' },
-      { status: 500 }
+      { success: false, error: "Failed to update sale" },
+      { status: 500 },
     );
   }
 }
