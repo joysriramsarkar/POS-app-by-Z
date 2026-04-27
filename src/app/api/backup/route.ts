@@ -1,18 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/route";
+import { requireRole } from "@/lib/api-middleware";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const roleCheck = await requireRole(request, ['ADMIN']);
+    if (roleCheck) return roleCheck;
 
     // Fetch all table data
     const [
@@ -84,12 +81,10 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const roleCheck = await requireRole(request, ['ADMIN']);
+    if (roleCheck) return roleCheck;
 
     let backupData;
     try {
