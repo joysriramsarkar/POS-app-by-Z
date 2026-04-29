@@ -55,6 +55,9 @@ const Reports: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [customerDetail, setCustomerDetail] = useState<any | null>(null);
   const [isCustomerDetailLoading, setIsCustomerDetailLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [productDetail, setProductDetail] = useState<any | null>(null);
+  const [isProductDetailLoading, setIsProductDetailLoading] = useState(false);
 
   // Date filter state
   const [preset, setPreset] = useState<DatePreset>('30');
@@ -577,7 +580,7 @@ const Reports: React.FC = () => {
             <Card className="rounded-xl">
               <CardHeader>
                 <CardTitle>Top Selling Products</CardTitle>
-                <CardDescription>Best performing items for selected period</CardDescription>
+                <CardDescription>Best performing items — click any row for detailed report</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -589,11 +592,12 @@ const Reports: React.FC = () => {
                         <TableHead className="text-right">Qty Sold</TableHead>
                         <TableHead className="text-right">Revenue</TableHead>
                         <TableHead className="text-right">Profit</TableHead>
+                        <TableHead className="w-8"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {topProducts?.length > 0 ? topProducts.map((p: any, i: number) => (
-                        <TableRow key={p.id}>
+                        <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedProduct(p)}>
                           <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
                           <TableCell className="font-medium">
                             <p className="text-sm">{p.name}</p>
@@ -604,10 +608,11 @@ const Reports: React.FC = () => {
                           <TableCell className={`text-right font-medium ${p.profit >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                             ₹{p.profit.toFixed(2)}
                           </TableCell>
+                          <TableCell><ChevronRight className="w-4 h-4 text-muted-foreground" /></TableCell>
                         </TableRow>
                       )) : (
                         <TableRow>
-                          <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                          <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
                             {isLoading ? 'Loading products data...' : 'No product data.'}
                           </TableCell>
                         </TableRow>
@@ -741,6 +746,29 @@ const Reports: React.FC = () => {
         </Tabs>
       </div>
 
+      {/* Product Detail Modal */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => {
+        if (!open) { setSelectedProduct(null); setProductDetail(null); }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              {selectedProduct?.name}
+            </DialogTitle>
+            {selectedProduct?.nameBn && <DialogDescription>{selectedProduct.nameBn}</DialogDescription>}
+          </DialogHeader>
+          <ProductDetailContent
+            product={selectedProduct}
+            dateParams={dateParams}
+            detail={productDetail}
+            setDetail={setProductDetail}
+            isLoading={isProductDetailLoading}
+            setIsLoading={setIsProductDetailLoading}
+          />
+        </DialogContent>
+      </Dialog>
+
       {/* Customer Detail Modal */}
       <Dialog open={!!selectedCustomer} onOpenChange={(open) => {
         if (!open) { setSelectedCustomer(null); setCustomerDetail(null); }
@@ -763,6 +791,154 @@ const Reports: React.FC = () => {
     </div>
   );
 };
+
+function ProductDetailContent({ product, dateParams, detail, setDetail, isLoading, setIsLoading }: {
+  product: any;
+  dateParams: string;
+  detail: any;
+  setDetail: (d: any) => void;
+  isLoading: boolean;
+  setIsLoading: (v: boolean) => void;
+}) {
+  useEffect(() => {
+    if (!product) return;
+    setIsLoading(true);
+    fetch(`/api/reports/products/${product.id}?${dateParams}`)
+      .then(r => r.json())
+      .then(setDetail)
+      .finally(() => setIsLoading(false));
+  }, [product?.id, dateParams, setIsLoading, setDetail]);
+
+  if (isLoading) return <div className="py-16 text-center text-muted-foreground">Loading product report...</div>;
+  if (!detail || !detail.summary || !detail.product) return null;
+
+  const { summary, product: p, dailyTrend = [], hourlyPattern = [], weeklyPattern = [], topCustomers = [] } = detail;
+
+  return (
+    <div className="space-y-5">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Sold', value: `${summary.totalQty} ${p.unit}`, color: 'text-blue-600' },
+          { label: 'Revenue', value: `₹${summary.totalRevenue.toFixed(0)}`, color: 'text-primary' },
+          { label: 'Profit', value: `₹${summary.totalProfit.toFixed(0)}`, color: summary.totalProfit >= 0 ? 'text-emerald-600' : 'text-red-500' },
+          { label: 'Margin', value: `${summary.profitMargin}%`, color: 'text-amber-600' },
+        ].map(s => (
+          <div key={s.label} className="bg-muted/50 rounded-xl p-3 text-center">
+            <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Peak info + stock */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Peak Hour', value: summary.peakHour },
+          { label: 'Peak Day', value: summary.peakDay },
+          { label: 'Avg Qty/Order', value: summary.avgOrderQty.toFixed(1) },
+          { label: 'Current Stock', value: `${p.currentStock} ${p.unit}`, color: p.currentStock <= p.minStockLevel ? 'text-red-500' : 'text-emerald-600' },
+        ].map(s => (
+          <div key={s.label} className="border rounded-xl p-3 text-center">
+            <p className={`text-base font-semibold ${(s as any).color ?? ''}`}>{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Daily Trend */}
+      {dailyTrend?.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold mb-2">Daily Sales Trend</p>
+          <div className="h-44">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dailyTrend} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                <XAxis dataKey="date" tickFormatter={v => { const d = new Date(v); return `${d.getDate()}/${d.getMonth()+1}`; }} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={v => v >= 1000 ? `₹${(v/1000).toFixed(1)}k` : `₹${v}`} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={42} />
+                <RechartsTooltip formatter={(v: number, n: string) => [n === 'revenue' ? `₹${v.toFixed(2)}` : v, n === 'revenue' ? 'Revenue' : 'Qty']} labelFormatter={l => new Date(l).toLocaleDateString()} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
+                <Legend wrapperStyle={{ fontSize: '11px' }} />
+                <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[3,3,0,0]} maxBarSize={20} />
+                <Bar dataKey="qty" name="Qty" fill="#10b981" radius={[3,3,0,0]} maxBarSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly + Hourly patterns side by side */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <p className="text-sm font-semibold mb-2">Weekly Pattern</p>
+          <div className="h-36">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={weeklyPattern} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                <XAxis dataKey="day" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
+                <RechartsTooltip formatter={(v: number) => [v, 'Qty']} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
+                <Bar dataKey="qty" fill="#8b5cf6" radius={[3,3,0,0]} maxBarSize={24}>
+                  {weeklyPattern.map((entry: any, i: number) => (
+                    <Cell key={i} fill={entry.qty === Math.max(...weeklyPattern.map((w: any) => w.qty)) ? '#7c3aed' : '#8b5cf6'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-semibold mb-2">Hourly Pattern</p>
+          <div className="h-36">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={hourlyPattern} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                <XAxis dataKey="hour" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} interval={3} />
+                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
+                <RechartsTooltip formatter={(v: number) => [v, 'Qty']} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
+                <Bar dataKey="qty" fill="#f59e0b" radius={[3,3,0,0]} maxBarSize={16}>
+                  {hourlyPattern.map((entry: any, i: number) => (
+                    <Cell key={i} fill={entry.qty === Math.max(...hourlyPattern.map((h: any) => h.qty)) ? '#d97706' : '#f59e0b'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Customers */}
+      {topCustomers?.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold mb-2">Top Customers for This Product</p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>#</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead className="text-right">Qty Bought</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {topCustomers.map((c: any, i: number) => (
+                <TableRow key={c.id}>
+                  <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
+                  <TableCell>
+                    <p className="text-sm font-medium">{c.name}</p>
+                    {c.phone && <p className="text-xs text-muted-foreground">{c.phone}</p>}
+                  </TableCell>
+                  <TableCell className="text-right">{c.qty} <span className="text-xs text-muted-foreground">{p.unit}</span></TableCell>
+                  <TableCell className="text-right font-medium">₹{c.revenue.toFixed(2)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      {topCustomers?.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-4">No customer data — all sales were walk-in.</p>
+      )}
+    </div>
+  );
+}
 
 function CustomerDetailContent({ customer, dateParams, detail, setDetail, isLoading, setIsLoading }: {
   customer: any;

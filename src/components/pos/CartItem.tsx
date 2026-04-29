@@ -77,15 +77,13 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
   }, [item.id, removeItem]);
 
   const [inputValue, setInputValue] = useState<string>(String(item.quantity));
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (document.activeElement !== document.getElementById(`qty-${item.productId}`)) {
-      // Sync local input value with actual quantity only when it changes externally
-      if (inputValue !== String(item.quantity)) {
-        setTimeout(() => setInputValue(String(item.quantity)), 0);
-      }
+    if (document.activeElement !== inputRef.current) {
+      setInputValue(String(item.quantity));
     }
-  }, [item.quantity, item.productId, inputValue]);
+  }, [item.quantity]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -100,24 +98,16 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
     }
   };
 
-  // Keyboard shortcuts
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
-        e.preventDefault();
-        handleIncrement();
-      } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
-        e.preventDefault();
-        handleDecrement();
-      }
-    },
-    [handleIncrement, handleDecrement]
-  );
-  
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       commitInputValue();
       (e.target as HTMLInputElement).blur();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      handleIncrement();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      handleDecrement();
     }
   };
 
@@ -169,7 +159,6 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
             className="flex items-center gap-1"
             role="group"
             aria-label="Quantity controls"
-            onKeyDown={handleKeyDown}
             tabIndex={0}
           >
             {/* Decrement Button */}
@@ -186,6 +175,7 @@ export function CartItem({ item, isHighlighted = false }: CartItemProps) {
 
             {/* Quantity Input */}
             <Input
+              ref={inputRef}
               id={`quantity-${item.id}`}
               name={`quantity-${item.id}`}
               type="number"
