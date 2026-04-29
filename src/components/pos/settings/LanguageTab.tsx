@@ -17,12 +17,12 @@ export default function LanguageTab({ localSettings, handleChange, handleSave, i
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ভাষা সেটিংস (Language Settings)</CardTitle>
-        <CardDescription>Set app and receipt languages.</CardDescription>
+        <CardTitle>ভাষা সেটিংস</CardTitle>
+        <CardDescription>অ্যাপ ও রিসিপ্টের ভাষা নির্ধারণ করুন।</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
-          <Label>অ্যাপের ভাষা (App Language)</Label>
+          <Label>অ্যাপের ভাষা</Label>
           <Select value={localSettings.app_language} onValueChange={(val) => handleChange("app_language", val as "en" | "bn")}>
             <SelectTrigger className="w-full md:w-[300px]">
               <SelectValue />
@@ -35,7 +35,7 @@ export default function LanguageTab({ localSettings, handleChange, handleSave, i
         </div>
 
         <div className="space-y-2">
-          <Label>রিসিপ্টের ভাষা (Receipt Language)</Label>
+          <Label>রিসিপ্টের ভাষা</Label>
           <Select value={localSettings.receipt_language} onValueChange={(val) => handleChange("receipt_language", val as "en" | "bn")}>
             <SelectTrigger className="w-full md:w-[300px]">
               <SelectValue />
@@ -48,10 +48,10 @@ export default function LanguageTab({ localSettings, handleChange, handleSave, i
           </Select>
         </div>
 
-        <div className="pt-4 flex justify-end">
-          <Button onClick={() => handleSave(["app_language", "receipt_language"])} disabled={isSaving || !hasChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+        <div className="pt-2 flex justify-end">
+          <Button onClick={() => handleSave(["app_language", "receipt_language"])} disabled={isSaving || !hasChanges()} className="bg-primary text-primary-foreground hover:bg-primary/90">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            সংরক্ষণ করুন (Save)
+            সংরক্ষণ করুন
           </Button>
         </div>
       </CardContent>

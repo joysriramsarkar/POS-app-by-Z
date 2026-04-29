@@ -5,16 +5,12 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requirePermission } from '@/lib/api-middleware';
 
 // GET /api/suppliers - Fetch suppliers
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'suppliers.view');
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -85,10 +81,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/suppliers - Create new supplier
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'suppliers.create');
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -129,10 +123,8 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/suppliers - Update supplier
 export async function PUT(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'suppliers.edit');
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -169,10 +161,8 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/suppliers - Soft delete supplier
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'suppliers.delete');
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);

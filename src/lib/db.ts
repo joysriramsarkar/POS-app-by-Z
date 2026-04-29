@@ -23,7 +23,13 @@ function createPrismaClient(): PrismaClient {
   }
 
   // Use dummy connection string if building to prevent throw
-  const pool = new Pool({ connectionString: connectionString || "postgresql://dummy:dummy@localhost:5432/dummy" })
+  const pool = new Pool({
+    connectionString: connectionString || "postgresql://dummy:dummy@localhost:5432/dummy",
+    // Required for PgBouncer transaction pooling mode
+    max: 1,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  })
   // Compatibility workaround between different pg @types versions used by Prisma adapter
   const adapter = new PrismaPg(pool as unknown as any)
 

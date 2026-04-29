@@ -111,10 +111,8 @@ export default function BackupTab() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ডাটা ব্যাকআপ ও রিস্টোর (Backup & Restore)</CardTitle>
-        <CardDescription>
-          Securely backup or restore all your database records.
-        </CardDescription>
+        <CardTitle>ডাটা ব্যাকআপ ও রিস্টোর</CardTitle>
+        <CardDescription>সমস্ত ডাটাবেস রেকর্ড সুরক্ষিতভাবে ব্যাকআপ বা রিস্টোর করুন।</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

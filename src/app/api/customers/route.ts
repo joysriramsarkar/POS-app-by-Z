@@ -6,16 +6,12 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { CustomerInputSchema } from '@/schemas';
-
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requirePermission } from '@/lib/api-middleware';
 
 // GET /api/customers - Fetch customers
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'customers.view');
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -96,10 +92,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/customers - Create new customer
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'customers.create');
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -159,10 +153,8 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/customers - Update customer
 export async function PUT(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'customers.edit');
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -224,10 +216,8 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/customers - Soft delete customer
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'customers.delete');
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);

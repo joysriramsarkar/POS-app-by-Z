@@ -1,15 +1,20 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db as prisma } from "@/lib/db";
-import {
-  startOfDay,
-  endOfDay,
-  format,
-  eachDayOfInterval,
-  parseISO,
-  subDays,
-} from "date-fns";
+import { format, eachDayOfInterval, parseISO, subDays } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { requirePermission } from "@/lib/api-middleware";
+
+const TZ = "Asia/Kolkata";
+
+function toISTBounds(date: Date): { start: Date; end: Date } {
+  const zoned = toZonedTime(date, TZ);
+  const start = new Date(Date.UTC(
+    zoned.getFullYear(), zoned.getMonth(), zoned.getDate(), 0, 0, 0, 0
+  ) - 5.5 * 60 * 60 * 1000);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000 - 1);
+  return { start, end };
+}
 
 export async function GET(request: NextRequest) {
   const authResponse = await requirePermission(request, "reports.view");
@@ -23,115 +28,134 @@ export async function GET(request: NextRequest) {
     let endDate: Date;
 
     if (sp.get("from") && sp.get("to")) {
-      startDate = startOfDay(parseISO(sp.get("from")!));
-      endDate = endOfDay(parseISO(sp.get("to")!));
+      startDate = toISTBounds(parseISO(sp.get("from")!)).start;
+      endDate = toISTBounds(parseISO(sp.get("to")!)).end;
     } else {
       const days = parseInt(sp.get("days") || "30");
-      startDate = startOfDay(subDays(new Date(), days - 1));
-      endDate = endOfDay(new Date());
+      const now = toZonedTime(new Date(), TZ);
+      startDate = toISTBounds(subDays(now, days - 1)).start;
+      endDate = toISTBounds(now).end;
     }
 
-    const sales = await prisma.sale.findMany({
+    // Aggregate totals directly in DB — no in-memory loops over all sales
+    const [salesAgg, paymentAgg, salesCount] = await Promise.all([
+      prisma.saleItem.aggregate({
+        where: {
+          sale: { createdAt: { gte: startDate, lte: endDate }, status: "Completed" },
+        },
+        _sum: { totalPrice: true, quantity: true },
+      }),
+      prisma.sale.groupBy({
+        by: ["paymentMethod"],
+        where: { createdAt: { gte: startDate, lte: endDate }, status: "Completed" },
+        _sum: { totalAmount: true },
+      }),
+      prisma.sale.count({
+        where: { createdAt: { gte: startDate, lte: endDate }, status: "Completed" },
+      }),
+    ]);
+
+    // Profit requires cost — fetch per-product aggregated cost from DB
+    const costAgg = await prisma.saleItem.findMany({
       where: {
-        createdAt: { gte: startDate, lte: endDate },
-        status: "Completed",
+        sale: { createdAt: { gte: startDate, lte: endDate }, status: "Completed" },
       },
-      include: { items: true },
-      orderBy: { createdAt: "asc" },
+      select: { productId: true, quantity: true },
     });
 
-    // Previous period for growth comparison
-    const periodMs = endDate.getTime() - startDate.getTime();
-    const prevEnd = new Date(startDate.getTime() - 1);
-    const prevStart = new Date(prevEnd.getTime() - periodMs);
-    const previousSales = await prisma.sale.aggregate({
-      where: {
-        createdAt: { gte: prevStart, lte: prevEnd },
-        status: "Completed",
-      },
-      _sum: { totalAmount: true },
-    });
-    const previousPeriodRevenue = previousSales._sum.totalAmount || 0;
-
-    // Product cost map
-    const productIds = Array.from(
-      new Set(sales.flatMap((s) => s.items.map((i) => i.productId))),
-    );
+    const productIds = [...new Set(costAgg.map((i) => i.productId))];
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
       select: { id: true, buyingPrice: true },
     });
     const costMap = new Map(products.map((p) => [p.id, p.buyingPrice]));
+    const totalCost = costAgg.reduce(
+      (sum, i) => sum + (costMap.get(i.productId) || 0) * i.quantity,
+      0
+    );
 
-    let totalRevenue = 0;
-    let totalProfit = 0;
+    const totalRevenue = salesAgg._sum.totalPrice || 0;
+    const totalProfit = totalRevenue - totalCost;
+
+    // Previous period for growth
+    const periodMs = endDate.getTime() - startDate.getTime();
+    const prevEnd = new Date(startDate.getTime() - 1);
+    const prevStart = new Date(prevEnd.getTime() - periodMs);
+    const prevAgg = await prisma.saleItem.aggregate({
+      where: {
+        sale: { createdAt: { gte: prevStart, lte: prevEnd }, status: "Completed" },
+      },
+      _sum: { totalPrice: true },
+    });
+    const previousPeriodRevenue = prevAgg._sum.totalPrice || 0;
+
     const paymentBreakdown: Record<string, number> = {};
-
-    // Aggregate totals (same for both modes)
-    sales.forEach((sale) => {
-      let cost = 0;
-      sale.items.forEach((item) => {
-        cost += (costMap.get(item.productId) || 0) * item.quantity;
-      });
-      totalRevenue += sale.totalAmount;
-      totalProfit += sale.totalAmount - cost;
-      paymentBreakdown[sale.paymentMethod] =
-        (paymentBreakdown[sale.paymentMethod] || 0) + sale.totalAmount;
+    paymentAgg.forEach((p) => {
+      paymentBreakdown[p.paymentMethod] = p._sum.totalAmount || 0;
     });
 
-    // Build chart data
-    let chartData: {
-      date: string;
-      revenue: number;
-      profit: number;
-      count: number;
-    }[];
+    // Chart data — use DB groupBy for daily, minimal fetch for hourly
+    let chartData: { date: string; revenue: number; profit: number; count: number }[];
 
     if (isHourly) {
-      // 24 slots: 00:00 → 23:00
+      const hourlySales = await prisma.sale.findMany({
+        where: { createdAt: { gte: startDate, lte: endDate }, status: "Completed" },
+        select: { createdAt: true, totalAmount: true, items: { select: { productId: true, quantity: true } } },
+      });
+
       chartData = Array.from({ length: 24 }, (_, h) => ({
         date: String(h).padStart(2, "0") + ":00",
         revenue: 0,
         profit: 0,
         count: 0,
       }));
-      sales.forEach((sale) => {
-        const hour = new Date(sale.createdAt).getHours();
-        let cost = 0;
-        sale.items.forEach((item) => {
-          cost += (costMap.get(item.productId) || 0) * item.quantity;
-        });
+
+      hourlySales.forEach((sale) => {
+        const hour = toZonedTime(sale.createdAt, TZ).getHours();
+        const cost = sale.items.reduce(
+          (s, i) => s + (costMap.get(i.productId) || 0) * i.quantity,
+          0
+        );
         chartData[hour].revenue += sale.totalAmount;
         chartData[hour].profit += sale.totalAmount - cost;
         chartData[hour].count += 1;
       });
     } else {
-      const dayList = eachDayOfInterval({ start: startDate, end: endDate });
-      const salesByDay = new Map<
-        string,
-        { date: string; revenue: number; profit: number; count: number }
-      >();
-      dayList.forEach((d) => {
-        salesByDay.set(format(d, "yyyy-MM-dd"), {
-          date: format(d, "yyyy-MM-dd"),
-          revenue: 0,
-          profit: 0,
-          count: 0,
-        });
+      const dailyAgg = await prisma.sale.groupBy({
+        by: ["createdAt"],
+        where: { createdAt: { gte: startDate, lte: endDate }, status: "Completed" },
+        _sum: { totalAmount: true },
+        _count: { id: true },
       });
-      sales.forEach((sale) => {
-        const key = format(sale.createdAt, "yyyy-MM-dd");
+
+      // Build day map from interval
+      const dayList = eachDayOfInterval({ start: startDate, end: endDate });
+      const salesByDay = new Map<string, { date: string; revenue: number; profit: number; count: number }>();
+      dayList.forEach((d) => {
+        const key = format(toZonedTime(d, TZ), "yyyy-MM-dd");
+        salesByDay.set(key, { date: key, revenue: 0, profit: 0, count: 0 });
+      });
+
+      // For daily profit we need per-day cost — fetch minimal data
+      const dailySales = await prisma.sale.findMany({
+        where: { createdAt: { gte: startDate, lte: endDate }, status: "Completed" },
+        select: { createdAt: true, totalAmount: true, items: { select: { productId: true, quantity: true } } },
+      });
+
+      dailySales.forEach((sale) => {
+        const key = format(toZonedTime(sale.createdAt, TZ), "yyyy-MM-dd");
         const day = salesByDay.get(key);
         if (day) {
-          let cost = 0;
-          sale.items.forEach((item) => {
-            cost += (costMap.get(item.productId) || 0) * item.quantity;
-          });
+          const cost = sale.items.reduce(
+            (s, i) => s + (costMap.get(i.productId) || 0) * i.quantity,
+            0
+          );
           day.revenue += sale.totalAmount;
           day.profit += sale.totalAmount - cost;
           day.count += 1;
         }
       });
+
       chartData = Array.from(salesByDay.values());
     }
 
@@ -146,12 +170,10 @@ export async function GET(request: NextRequest) {
       summary: {
         totalRevenue,
         totalProfit,
-        totalSalesCount: sales.length,
-        revenueGrowth: revenueGrowth.toFixed(2),
+        totalSalesCount: salesCount,
+        revenueGrowth: parseFloat(revenueGrowth.toFixed(2)),
         profitMargin:
-          totalRevenue > 0
-            ? ((totalProfit / totalRevenue) * 100).toFixed(2)
-            : "0",
+          totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(2) : "0",
         paymentBreakdown,
       },
       chartData,
@@ -159,8 +181,8 @@ export async function GET(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Failed to fetch sales report:", error);
     return NextResponse.json(
-      { error: "Failed to fetch sales report", details: (error instanceof Error ? error.message : "Unknown error") },
-      { status: 500 },
+      { error: "Failed to fetch sales report", details: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
     );
   }
 }

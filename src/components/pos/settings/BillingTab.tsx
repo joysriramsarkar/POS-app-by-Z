@@ -14,17 +14,25 @@ interface BillingTabProps {
   hasChanges: () => boolean;
 }
 
+const CURRENCY_PRESETS = [
+  { symbol: "৳", label: "BDT" },
+  { symbol: "₹", label: "INR" },
+  { symbol: "$", label: "USD" },
+  { symbol: "€", label: "EUR" },
+  { symbol: "£", label: "GBP" },
+];
+
 export default function BillingTab({ localSettings, handleChange, handleSave, isSaving, hasChanges }: BillingTabProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>বিলিং সেটিংস (Billing Settings)</CardTitle>
-        <CardDescription>Configure billing calculation preferences.</CardDescription>
+        <CardTitle>বিলিং সেটিংস</CardTitle>
+        <CardDescription>বিলিং ক্যালকুলেশনের পছন্দ কনফিগার করুন।</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>ডিফল্ট ডিসকাউন্ট % (Default Discount)</Label>
+            <Label>ডিফল্ট ডিসকাউন্ট %</Label>
             <Input
               type="number"
               min="0"
@@ -34,7 +42,7 @@ export default function BillingTab({ localSettings, handleChange, handleSave, is
             />
           </div>
           <div className="space-y-2">
-            <Label>ট্যাক্স রেট % (Tax Rate)</Label>
+            <Label>ট্যাক্স রেট %</Label>
             <Input
               type="number"
               min="0"
@@ -44,29 +52,43 @@ export default function BillingTab({ localSettings, handleChange, handleSave, is
           </div>
         </div>
 
-        <div className="space-y-2 max-w-xs">
-          <Label>কারেন্সি সিম্বল (Currency Symbol)</Label>
+        <div className="space-y-2">
+          <Label>কারেন্সি সিম্বল</Label>
+          <div className="flex flex-wrap gap-2 mb-2">
+            {CURRENCY_PRESETS.map(({ symbol, label }) => (
+              <button
+                key={symbol}
+                onClick={() => handleChange("currency_symbol", symbol)}
+                className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-all ${
+                  localSettings.currency_symbol === symbol
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border hover:border-primary/50"
+                }`}
+              >
+                {symbol} {label}
+              </button>
+            ))}
+          </div>
           <Input
             value={localSettings.currency_symbol}
             onChange={(e) => handleChange("currency_symbol", e.target.value)}
+            className="max-w-[120px]"
+            placeholder="কাস্টম"
           />
         </div>
 
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div className="space-y-0.5">
-            <Label className="text-base">রাউন্ড অফ বিল (Round Off Bill)</Label>
-            <p className="text-sm text-muted-foreground">বিলের টাকা রাউন্ড অফ করুন</p>
+            <Label className="text-sm font-medium">রাউন্ড অফ বিল</Label>
+            <p className="text-xs text-muted-foreground">বিলের টাকা নিকটতম পূর্ণ সংখ্যায় রাউন্ড করুন</p>
           </div>
-          <Switch
-            checked={localSettings.round_off}
-            onCheckedChange={(val) => handleChange("round_off", val)}
-          />
+          <Switch checked={localSettings.round_off} onCheckedChange={(val) => handleChange("round_off", val)} />
         </div>
 
-        <div className="pt-4 flex justify-end">
-          <Button onClick={() => handleSave(["default_discount", "tax_rate", "currency_symbol", "round_off"])} disabled={isSaving || !hasChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+        <div className="pt-2 flex justify-end">
+          <Button onClick={() => handleSave(["default_discount", "tax_rate", "currency_symbol", "round_off"])} disabled={isSaving || !hasChanges()} className="bg-primary text-primary-foreground hover:bg-primary/90">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            সংরক্ষণ করুন (Save)
+            সংরক্ষণ করুন
           </Button>
         </div>
       </CardContent>

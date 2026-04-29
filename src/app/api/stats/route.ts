@@ -3,18 +3,14 @@ export const dynamic = 'force-dynamic';
 // Stats API Route - Lakhan Bhandar POS
 // ============================================================================
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requirePermission } from '@/lib/api-middleware';
 
 // GET /api/stats - Fetch dashboard stats
-export async function GET() {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+export async function GET(request: NextRequest) {
+  const authError = await requirePermission(request, 'sales.view');
+  if (authError) return authError;
 
   try {
     // Get the start and end of today in the local timezone

@@ -101,7 +101,7 @@ export function CameraScannerDialog({
     startScanner().catch((err) => setError('Scanner error: ' + err?.message));
 
     return () => { stopScanner(); };
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open || !isAndroidApp) return null;
 

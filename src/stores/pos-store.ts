@@ -8,6 +8,7 @@ import type { CartItem, PaymentMethod, Product, Customer, Sale } from '@/types/p
 import { v4 as uuidv4 } from 'uuid';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 import Decimal from 'decimal.js';
+import { toMoneyNumber } from '@/lib/money';
 
 // ============================================================================
 // CART STORE
@@ -144,7 +145,7 @@ export const useCartStore = create<CartState & CartActions>()(
           updatedItems[existingItemIndex] = {
             ...existingItem,
             quantity: newQuantity,
-            totalPrice: new Decimal(newQuantity).times(new Decimal(existingItem.unitPrice)).toNumber(),
+            totalPrice: toMoneyNumber(new Decimal(newQuantity).times(new Decimal(existingItem.unitPrice))),
           };
           get()._updateActiveTab({ items: updatedItems });
         } else {
@@ -155,7 +156,7 @@ export const useCartStore = create<CartState & CartActions>()(
             barcode: product.barcode || undefined,
             quantity: quantity,
             unitPrice: product.sellingPrice,
-            totalPrice: new Decimal(quantity).times(new Decimal(product.sellingPrice)).toNumber(),
+            totalPrice: toMoneyNumber(new Decimal(quantity).times(new Decimal(product.sellingPrice))),
             unit: product.unit,
             availableStock: product.currentStock,
           };
@@ -177,7 +178,7 @@ export const useCartStore = create<CartState & CartActions>()(
         get()._updateActiveTab({
           items: get().getActiveTab().items.map((item) =>
             item.id === itemId
-              ? { ...item, quantity, totalPrice: new Decimal(quantity).times(new Decimal(item.unitPrice)).toNumber() }
+              ? { ...item, quantity, totalPrice: toMoneyNumber(new Decimal(quantity).times(new Decimal(item.unitPrice))) }
               : item
           ),
         });
@@ -215,13 +216,13 @@ export const useCartStore = create<CartState & CartActions>()(
 
       // Calculations based on active tab
       getSubtotal: () => {
-        return get().getActiveTab().items.reduce((sum, item) => new Decimal(sum).plus(new Decimal(item.totalPrice)).toNumber(), 0);
+        return toMoneyNumber(get().getActiveTab().items.reduce((sum, item) => new Decimal(sum).plus(new Decimal(item.totalPrice)), new Decimal(0)));
       },
 
       getTotal: () => {
         const subtotal = get().getSubtotal();
         const { discount, tax } = get().getActiveTab();
-        return new Decimal(subtotal).minus(new Decimal(discount)).plus(new Decimal(tax)).toNumber();
+        return toMoneyNumber(new Decimal(subtotal).minus(new Decimal(discount)).plus(new Decimal(tax)));
       },
 
       getItemCount: () => {

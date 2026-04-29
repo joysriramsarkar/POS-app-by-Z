@@ -20,12 +20,12 @@ export default function PrinterTab({ localSettings, handleChange, handleSave, is
   return (
     <Card>
       <CardHeader>
-        <CardTitle>প্রিন্টার সেটিংস (Printer Settings)</CardTitle>
-        <CardDescription>Configure receipt printing preferences.</CardDescription>
+        <CardTitle>প্রিন্টার সেটিংস</CardTitle>
+        <CardDescription>রিসিপ্ট প্রিন্টিং পছন্দ কনফিগার করুন।</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-5">
         <div className="space-y-3">
-          <Label className="text-base">ডিফল্ট পেপার সাইজ (Default Paper Size)</Label>
+          <Label className="text-sm font-medium">ডিফল্ট পেপার সাইজ</Label>
           <RadioGroup
             value={localSettings.print_paper_size}
             onValueChange={(val) => handleChange("print_paper_size", val as "58mm" | "80mm" | "A4" | "A5")}
@@ -51,7 +51,7 @@ export default function PrinterTab({ localSettings, handleChange, handleSave, is
         </div>
 
         <div className="space-y-2">
-          <Label>ফন্ট সাইজ (Font Size)</Label>
+          <Label>ফন্ট সাইজ</Label>
           <Select value={localSettings.print_font_size} onValueChange={(val) => handleChange("print_font_size", val as "small" | "medium" | "large")}>
             <SelectTrigger className="w-[200px]">
               <SelectValue />
@@ -65,7 +65,7 @@ export default function PrinterTab({ localSettings, handleChange, handleSave, is
         </div>
 
         <div className="space-y-2">
-          <Label>রিসিপ্ট হেডার (Receipt Header) - Max 100 chars</Label>
+          <Label>রিসিপ্ট হেডার <span className="text-muted-foreground font-normal">(সর্বোচ্চ ১০০ অক্ষর)</span></Label>
           <Textarea
             maxLength={100}
             placeholder="Custom header text for receipts"
@@ -75,7 +75,7 @@ export default function PrinterTab({ localSettings, handleChange, handleSave, is
         </div>
 
         <div className="space-y-2">
-          <Label>রিসিপ্ট ফুটার (Receipt Footer) - Max 100 chars</Label>
+          <Label>রিসিপ্ট ফুটার <span className="text-muted-foreground font-normal">(সর্বোচ্চ ১০০ অক্ষর)</span></Label>
           <Textarea
             maxLength={100}
             placeholder="Thank you message, terms, etc."
@@ -86,8 +86,8 @@ export default function PrinterTab({ localSettings, handleChange, handleSave, is
 
         <div className="flex items-center justify-between rounded-lg border p-4">
           <div className="space-y-0.5">
-            <Label className="text-base">অটো-প্রিন্ট (Auto-Print)</Label>
-            <p className="text-sm text-muted-foreground">বিক্রয়ের পর অটোমেটিক প্রিন্ট করুন</p>
+            <Label className="text-sm font-medium">অটো-প্রিন্ট</Label>
+            <p className="text-xs text-muted-foreground">বিক্রয়ের পর অটোমেটিক প্রিন্ট করুন</p>
           </div>
           <Switch
             checked={localSettings.auto_print}
@@ -95,10 +95,10 @@ export default function PrinterTab({ localSettings, handleChange, handleSave, is
           />
         </div>
 
-        <div className="pt-4 flex justify-end">
-          <Button onClick={() => handleSave(["print_paper_size", "print_font_size", "print_header", "print_footer", "auto_print"])} disabled={isSaving || !hasChanges()} className="bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
+        <div className="pt-2 flex justify-end">
+          <Button onClick={() => handleSave(["print_paper_size", "print_font_size", "print_header", "print_footer", "auto_print"])} disabled={isSaving || !hasChanges()} className="bg-primary text-primary-foreground hover:bg-primary/90">
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            সংরক্ষণ করুন (Save)
+            সংরক্ষণ করুন
           </Button>
         </div>
       </CardContent>

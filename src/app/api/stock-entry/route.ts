@@ -6,12 +6,13 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { StockEntryInputSchema } from '@/schemas';
-import { requireRole } from '@/lib/api-middleware';
+import { requirePermission } from '@/lib/api-middleware';
+import { multiplyMoney, toMoneyNumber } from '@/lib/money';
 
 // POST /api/stock-entry - Create stock entry (purchase)
 export async function POST(request: NextRequest) {
-  const roleCheck = await requireRole(request, ['ADMIN', 'MANAGER']);
-  if (roleCheck) return roleCheck;
+  const authError = await requirePermission(request, 'stock.edit');
+  if (authError) return authError;
 
   try {
     let body;
@@ -64,9 +65,9 @@ export async function POST(request: NextRequest) {
         // Handle division by zero edge case (though newStock should be > 0 since quantity > 0)
         if (newStock > 0) {
           const wac = ((oldStock * product.buyingPrice) + (quantity * purchasePrice)) / newStock;
-          updateData.buyingPrice = wac;
+          updateData.buyingPrice = toMoneyNumber(wac);
         } else {
-          updateData.buyingPrice = purchasePrice;
+          updateData.buyingPrice = toMoneyNumber(purchasePrice);
         }
       }
 
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest) {
             data: {
               supplierId,
               invoiceNumber: `PUR-${Date.now()}`,
-              totalAmount: quantity * purchasePrice,
+              totalAmount: multiplyMoney(quantity, purchasePrice),
               paymentStatus: 'Paid',
               notes,
               items: {
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
                   productName: product.name,
                   quantity,
                   buyingPrice: purchasePrice,
-                  totalPrice: quantity * purchasePrice,
+                  totalPrice: multiplyMoney(quantity, purchasePrice),
                 },
               },
             },

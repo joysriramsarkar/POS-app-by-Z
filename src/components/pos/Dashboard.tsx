@@ -81,52 +81,54 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           fetch('/api/stats'),
         ]);
 
+        // Safe sales handling
         if (salesResult.status === 'fulfilled' && salesResult.value.ok) {
           try {
-            const { data: sales } = await salesResult.value.json();
-            if (sales) {
-              const recentTransactions = sales.map((sale: Sale) => ({
-                id: sale.id,
-                invoiceNumber: sale.invoiceNumber,
-                customerName: sale.customer?.name,
-                totalAmount: sale.totalAmount,
-                paymentMethod: sale.paymentMethod,
-                createdAt: new Date(sale.createdAt),
-              }));
-              setTransactions(recentTransactions);
-              setFullTransactions(sales.map((sale: any) => ({ ...sale, createdAt: new Date(sale.createdAt) })));
-            }
+            const response = await salesResult.value.json();
+            const sales = response.data ?? [];
+            const recentTransactions = (sales as Sale[]).map((sale) => ({
+              id: sale.id ?? '',
+              invoiceNumber: sale.invoiceNumber ?? 'N/A',
+              customerName: sale.customer?.name,
+              totalAmount: Number(sale.totalAmount) || 0,
+              paymentMethod: sale.paymentMethod ?? 'Unknown',
+              createdAt: new Date(sale.createdAt ?? Date.now()),
+            }));
+            setTransactions(recentTransactions);
+            setFullTransactions(sales.map((sale: any) => ({ 
+              ...sale, 
+              createdAt: new Date(sale.createdAt ?? Date.now()) 
+            } as Transaction)));
           } catch (parseErr) {
             console.error('Failed to parse sales response:', parseErr);
+            setTransactions([]);
+            setFullTransactions([]);
           }
-        } else if (salesResult.status === 'fulfilled') {
-          console.warn('Sales API returned non-OK status:', salesResult.value.status);
-        } else {
-          console.error('Sales API fetch failed:', salesResult.reason);
         }
 
+        // Safe stats handling
         if (statsResult.status === 'fulfilled' && statsResult.value.ok) {
           try {
-            const { data: apiStats } = await statsResult.value.json();
+            const response = await statsResult.value.json();
+            const apiStats = response.data ?? {};
             setStats(prevStats => ({
               ...prevStats,
-              ...apiStats,
+              todaySales: Number(apiStats.todaySales) || 0,
+              todayOrders: Number(apiStats.todayOrders) || 0,
+              duePayments: Number(apiStats.duePayments) || 0,
+              salesComparison: apiStats.salesComparison || 'N/A',
+              ordersComparison: apiStats.ordersComparison || 'N/A',
             }));
-            // stats API doesn't return per-method payment totals, we'll compute below
           } catch (parseErr) {
             console.error('Failed to parse stats response:', parseErr);
           }
-        } else if (statsResult.status === 'fulfilled') {
-          console.warn('Stats API returned non-OK status:', statsResult.value.status);
-        } else {
-          console.error('Stats API fetch failed:', statsResult.reason);
         }
 
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       }
 
-      // Compute payment breakdown by fetching today's sales (server-side has proper filtering)
+      // Safe payment breakdown computation
       try {
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
@@ -138,34 +140,36 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         );
 
         if (salesRes.ok) {
-          const { data: todaySales } = await salesRes.json();
+          const response = await salesRes.json();
+          const todaySales = response.data ?? [];
           let upiTotal = 0;
           let cashTotal = 0;
           let dueTotal = 0;
 
           todaySales.forEach((s: any) => {
-            const amtPaid = Number(s.amountPaid || 0) || 0;
-            const totalAmt = Number(s.totalAmount || 0) || 0;
-            if (s.paymentMethod === 'UPI') {
+            const amtPaid = Number(s?.amountPaid || 0) || 0;
+            const totalAmt = Number(s?.totalAmount || 0) || 0;
+            const method = s?.paymentMethod;
+            
+            if (method === 'UPI') {
               upiTotal += amtPaid;
-            } else if (s.paymentMethod === 'Cash') {
+            } else if (method === 'Cash') {
               cashTotal += amtPaid;
-            } else if (s.paymentMethod === 'Mixed') {
-              cashTotal += Number(s.cashAmount || 0);
-              upiTotal += Number(s.upiAmount || 0);
+            } else if (method === 'Mixed') {
+              cashTotal += Number(s?.cashAmount || 0);
+              upiTotal += Number(s?.upiAmount || 0);
             }
 
-            // accumulate any unpaid portion as today's due (fallback)
             if (amtPaid < totalAmt) {
               dueTotal += totalAmt - amtPaid;
             }
           });
 
-          // Use only today's due amount from sales calculation
           setBreakdown({ upi: upiTotal, cash: cashTotal, due: dueTotal });
         }
       } catch (err) {
         console.error('Failed to compute payment breakdown:', err);
+        setBreakdown({ upi: 0, cash: 0, due: 0 });
       }
     };
     fetchDashboardData();

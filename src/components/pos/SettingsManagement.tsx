@@ -72,7 +72,8 @@ export default function SettingsManagement() {
            localSettings.store_name_bn !== settings.store_name_bn ||
            localSettings.store_address !== settings.store_address ||
            localSettings.store_phone !== settings.store_phone ||
-           localSettings.store_gst !== settings.store_gst;
+           localSettings.store_gst !== settings.store_gst ||
+           localSettings.store_logo !== settings.store_logo;
   };
 
   const hasPrinterChanges = (): boolean => {
@@ -100,43 +101,45 @@ export default function SettingsManagement() {
            localSettings.round_off !== settings.round_off;
   };
 
+  const tabs = [
+    { value: "profile", label: "স্টোর প্রোফাইল", icon: Store, hasChanges: hasProfileChanges },
+    { value: "printer", label: "প্রিন্টার", icon: Printer, hasChanges: hasPrinterChanges },
+    { value: "billing", label: "বিলিং", icon: Receipt, hasChanges: hasBillingChanges },
+    { value: "theme", label: "থিম", icon: Palette, hasChanges: hasThemeChanges },
+    { value: "language", label: "ভাষা", icon: Globe, hasChanges: hasLanguageChanges },
+    { value: "users", label: "ইউজার", icon: Users, hasChanges: () => false },
+    { value: "backup", label: "ব্যাকআপ", icon: Database, hasChanges: () => false },
+  ];
+
   return (
     <div className="flex flex-col h-full bg-muted/20">
-      <div className="shrink-0 border-b bg-background p-4 flex items-center gap-2">
+      <div className="shrink-0 border-b bg-background px-4 py-3 flex items-center gap-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
           <Store className="w-5 h-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-xl font-bold">Settings / সেটিংস</h1>
-          <p className="text-sm text-muted-foreground">Configure your store preferences</p>
+          <h1 className="text-lg font-bold leading-tight">সেটিংস</h1>
+          <p className="text-xs text-muted-foreground">স্টোরের পছন্দ কনফিগার করুন</p>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
-        <div className="max-w-6xl mx-auto">
-          <Tabs defaultValue="profile" className="flex flex-col md:flex-row gap-6">
-            <TabsList className="flex flex-row md:flex-col h-auto w-full md:w-64 bg-transparent p-0 justify-start md:items-start overflow-x-auto no-scrollbar border-b md:border-b-0 md:border-r border-border pb-2 md:pb-0 md:pr-4 shrink-0 md:sticky md:top-0 md:h-fit md:max-h-screen md:overflow-y-auto">
-              <TabsTrigger value="profile" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
-                <Store className="w-4 h-4" /> স্টোর প্রোফাইল (Profile)
-              </TabsTrigger>
-              <TabsTrigger value="printer" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
-                <Printer className="w-4 h-4" /> প্রিন্টার সেটিংস (Printer)
-              </TabsTrigger>
-              <TabsTrigger value="backup" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
-                <Database className="w-4 h-4" /> ডাটা ব্যাকআপ (Backup)
-              </TabsTrigger>
-              <TabsTrigger value="theme" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
-                <Palette className="w-4 h-4" /> থিম সেটিংস (Theme)
-              </TabsTrigger>
-              <TabsTrigger value="users" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
-                <Users className="w-4 h-4" /> ইউজার (Users)
-              </TabsTrigger>
-              <TabsTrigger value="language" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
-                <Globe className="w-4 h-4" /> ভাষা (Language)
-              </TabsTrigger>
-              <TabsTrigger value="billing" className="md:w-full justify-start text-left gap-2 px-3 py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white hover:bg-blue-100 dark:hover:bg-gray-700 dark:data-[state=active]:bg-blue-500 whitespace-nowrap">
-                <Receipt className="w-4 h-4" /> বিলিং (Billing)
-              </TabsTrigger>
+      <div className="flex-1 min-h-0 overflow-y-scroll p-3 md:p-6">
+        <div className="max-w-5xl mx-auto">
+          <Tabs defaultValue="profile" className="flex flex-col md:flex-row gap-4 md:gap-6 items-start">
+            <TabsList className="flex flex-row md:flex-col h-auto w-full md:w-52 bg-transparent p-0 justify-start md:items-start overflow-x-auto no-scrollbar border-b md:border-b-0 md:border-r border-border pb-2 md:pb-0 md:pr-3 shrink-0 md:sticky md:top-0 md:h-fit">
+              {tabs.map(({ value, label, icon: Icon, hasChanges: tabHasChanges }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="md:w-full h-auto justify-start text-left gap-2 px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:bg-muted rounded-md whitespace-nowrap relative"
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="text-sm">{label}</span>
+                  {tabHasChanges() && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-orange-400 ml-auto shrink-0" />
+                  )}
+                </TabsTrigger>
+              ))}
             </TabsList>
 
             <div className="flex-1 min-w-0">
@@ -146,20 +149,20 @@ export default function SettingsManagement() {
               <TabsContent value="printer" className="m-0 focus-visible:outline-none focus-visible:ring-0">
                 <PrinterTab localSettings={localSettings} handleChange={handleChange} handleSave={handleSave} isSaving={isSaving} hasChanges={hasPrinterChanges} />
               </TabsContent>
-              <TabsContent value="backup" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <BackupTab />
+              <TabsContent value="billing" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                <BillingTab localSettings={localSettings} handleChange={handleChange} handleSave={handleSave} isSaving={isSaving} hasChanges={hasBillingChanges} />
               </TabsContent>
               <TabsContent value="theme" className="m-0 focus-visible:outline-none focus-visible:ring-0">
                 <ThemeTab localSettings={localSettings} handleChange={handleChange} handleSave={handleSave} isSaving={isSaving} hasChanges={hasThemeChanges} />
               </TabsContent>
-              <TabsContent value="users" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <UsersTab session={session} />
-              </TabsContent>
               <TabsContent value="language" className="m-0 focus-visible:outline-none focus-visible:ring-0">
                 <LanguageTab localSettings={localSettings} handleChange={handleChange} handleSave={handleSave} isSaving={isSaving} hasChanges={hasLanguageChanges} />
               </TabsContent>
-              <TabsContent value="billing" className="m-0 focus-visible:outline-none focus-visible:ring-0">
-                <BillingTab localSettings={localSettings} handleChange={handleChange} handleSave={handleSave} isSaving={isSaving} hasChanges={hasBillingChanges} />
+              <TabsContent value="users" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                <UsersTab session={session} />
+              </TabsContent>
+              <TabsContent value="backup" className="m-0 focus-visible:outline-none focus-visible:ring-0">
+                <BackupTab />
               </TabsContent>
             </div>
           </Tabs>

@@ -21,10 +21,12 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
   const [syncStats, setSyncStats] = useState<{ synced: number; failed: number; total: number } | null>(null);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [failedSyncCount, setFailedSyncCount] = useState(0);
+  const [failedSyncPreview, setFailedSyncPreview] = useState<string | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   useEffect(() => {
     let monitor: NetworkStatusMonitor | null = null;
+    let cleanup = () => {};
 
     async function initialize() {
       try {
@@ -44,34 +46,51 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
             ]);
             setPendingSyncCount(unsynced.length);
             setFailedSyncCount(failed.length);
+            const firstFailed = failed[0];
+            setFailedSyncPreview(
+              firstFailed
+                ? `${firstFailed.entityType}.${firstFailed.action}: ${firstFailed.error || 'Unknown sync error'}`
+                : null
+            );
           } catch (readError) {
             console.warn('Unable to read sync counts', readError);
           }
         };
 
-        monitor.subscribe((status) => {
+        const handleNetworkStatus = (status: NetworkStatus) => {
           setNetworkStatus(status);
           refreshCounts().catch(console.error);
           if (status === 'online') setLastSyncTime(new Date());
-        });
+        };
 
-        refreshCounts().catch(console.error);
-
-        window.addEventListener('offlineSyncComplete', async (event: Event) => {
+        const handleSyncComplete = async (event: Event) => {
           const stats = (event as CustomEvent).detail;
           setSyncStats(stats);
           setIsSyncing(false);
           setLastSyncTime(new Date());
           refreshCounts().catch(console.error);
-        });
+        };
 
-        window.addEventListener('offlineSyncStart', () => setIsSyncing(true));
+        const handleSyncStart = () => setIsSyncing(true);
 
-        // Session expired during sync — force logout
-        window.addEventListener('syncSessionExpired', () => {
+        const handleSessionExpired = () => {
           setIsSyncing(false);
           signOut({ callbackUrl: '/login' });
-        });
+        };
+
+        monitor.subscribe(handleNetworkStatus);
+
+        refreshCounts().catch(console.error);
+
+        window.addEventListener('offlineSyncComplete', handleSyncComplete);
+        window.addEventListener('offlineSyncStart', handleSyncStart);
+        window.addEventListener('syncSessionExpired', handleSessionExpired);
+
+        cleanup = () => {
+          window.removeEventListener('offlineSyncComplete', handleSyncComplete);
+          window.removeEventListener('offlineSyncStart', handleSyncStart);
+          window.removeEventListener('syncSessionExpired', handleSessionExpired);
+        };
 
         setNetworkStatus(monitor.getStatus());
       } catch (error) {
@@ -83,9 +102,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     initialize();
 
     return () => {
-      window.removeEventListener('offlineSyncComplete', () => {});
-      window.removeEventListener('offlineSyncStart', () => {});
-      window.removeEventListener('syncSessionExpired', () => {});
+      cleanup();
     };
   }, []);
 
@@ -107,7 +124,12 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       {failedSyncCount > 0 && !isSyncing && networkStatus === 'online' && (
         <div className="fixed bottom-4 right-4 bg-orange-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
           ⚠️ {failedSyncCount} item{failedSyncCount > 1 ? 's' : ''} failed to sync
-          <div className="text-xs mt-1 text-white/90">Go to Settings → Sync to resolve</div>
+          {failedSyncPreview && (
+            <div className="text-xs mt-1 text-white/90 max-w-xs truncate" title={failedSyncPreview}>
+              {failedSyncPreview}
+            </div>
+          )}
+          <div className="text-xs mt-1 text-white/90">Retry after fixing the conflict, stock, or login issue.</div>
         </div>
       )}
     </OfflineContext.Provider>

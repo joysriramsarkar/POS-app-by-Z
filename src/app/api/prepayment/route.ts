@@ -3,11 +3,12 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
-import { getAuthenticatedUser } from '@/lib/api-middleware';
+import { requirePermission } from '@/lib/api-middleware';
+import { addMoney, toMoneyNumber } from '@/lib/money';
 
 const prepaymentSchema = z.object({
   customerId: z.string().cuid(),
-  amount: z.number().positive(),
+  amount: z.coerce.number().positive().transform((value) => toMoneyNumber(value)),
 });
 
 /**
@@ -50,10 +51,8 @@ const prepaymentSchema = z.object({
  */
 export async function POST(req: NextRequest) {
     try {
-        const currentUser = await getAuthenticatedUser(req);
-        if (!currentUser) {
-            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-        }
+        const authError = await requirePermission(req, 'customers.edit');
+        if (authError) return authError;
 
         const body = await req.json();
         const validation = prepaymentSchema.safeParse(body);
@@ -73,7 +72,7 @@ export async function POST(req: NextRequest) {
                 throw new Error('Customer not found');
             }
 
-            const newPrepaidBalance = customer.prepaidBalance + amount;
+            const newPrepaidBalance = addMoney(customer.prepaidBalance, amount);
 
             const updated = await tx.customer.update({
                 where: { id: customerId },

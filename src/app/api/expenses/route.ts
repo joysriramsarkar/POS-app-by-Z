@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db as prisma } from "@/lib/db";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requirePermission } from "@/lib/api-middleware";
+import { toMoneyNumber } from "@/lib/money";
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  const authError = await requirePermission(request, "expenses.view");
+  if (authError) return authError;
 
   try {
     const expenses = await prisma.expense.findMany({
@@ -27,13 +22,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  const authError = await requirePermission(request, "expenses.create");
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -89,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     const expense = await prisma.expense.create({
       data: {
-        amount: parseFloat(amount),
+        amount: toMoneyNumber(amount),
         category,
         notes,
         date: parsedDate,
@@ -106,13 +96,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  const authError = await requirePermission(request, "expenses.delete");
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);

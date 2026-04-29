@@ -8,19 +8,16 @@ import { db } from "@/lib/db";
 import { generateServerInvoiceNumber } from "@/lib/invoice";
 import { v4 as uuidv4 } from "uuid";
 import { SaleInputSchema, SaleItemInput } from "@/schemas";
+import { addMoney, subtractMoney, toMoneyNumber } from "@/lib/money";
 
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requirePermission } from "@/lib/api-middleware";
 
 // GET /api/sales - Fetch sales
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  const authError = await requirePermission(request, "sales.view");
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -137,13 +134,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/sales - Create new sale
 export async function POST(request: NextRequest) {
+  const authError = await requirePermission(request, "sales.create");
+  if (authError) return authError;
   const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
 
   try {
     let body;
@@ -177,14 +170,11 @@ export async function POST(request: NextRequest) {
     } = validatedData;
 
     // Calculate totals with validated numeric values
-    const subtotal = validatedItems.reduce(
-      (sum: number, item: { totalPrice: number }) => sum + item.totalPrice,
-      0,
-    );
-    const discountAmount = Math.max(0, validatedData.discount);
-    const taxAmount = Math.max(0, validatedData.tax);
-    const totalAmount = subtotal - discountAmount + taxAmount;
-    const amountPaidValue = Math.max(0, validatedData.amountPaid);
+    const subtotal = addMoney(...validatedItems.map((item) => item.totalPrice));
+    const discountAmount = Math.max(0, toMoneyNumber(validatedData.discount));
+    const taxAmount = Math.max(0, toMoneyNumber(validatedData.tax));
+    const totalAmount = addMoney(subtractMoney(subtotal, discountAmount), taxAmount);
+    const amountPaidValue = Math.max(0, toMoneyNumber(validatedData.amountPaid));
 
     // Validate payment status based on customer type
     let paymentStatus = "Paid";
@@ -346,7 +336,7 @@ export async function POST(request: NextRequest) {
             throw new Error(`Customer ${customerId} not found`);
           }
 
-          const prepaidToUse = validatedData.prepaidAmountUsed || 0;
+          const prepaidToUse = toMoneyNumber(validatedData.prepaidAmountUsed || 0);
 
           // 1. Handle Prepaid Balance Deduction
           if (prepaidToUse > 0) {
@@ -356,7 +346,7 @@ export async function POST(request: NextRequest) {
               );
             }
 
-            const newPrepaidBalance = customer.prepaidBalance - prepaidToUse;
+            const newPrepaidBalance = subtractMoney(customer.prepaidBalance, prepaidToUse);
 
             await tx.customer.update({
               where: { id: customerId },
@@ -379,11 +369,11 @@ export async function POST(request: NextRequest) {
           }
 
           // 2. Handle Due Amount Calculation
-          const remainingAmountAfterPrepaid = totalAmount - prepaidToUse;
-          const dueAmount = remainingAmountAfterPrepaid - amountPaidValue;
+          const remainingAmountAfterPrepaid = subtractMoney(totalAmount, prepaidToUse);
+          const dueAmount = subtractMoney(remainingAmountAfterPrepaid, amountPaidValue);
 
           if (dueAmount > 0) {
-            const newTotalDue = customer.totalDue + dueAmount;
+            const newTotalDue = addMoney(customer.totalDue, dueAmount);
             await tx.customer.update({
               where: { id: customerId },
               data: {
@@ -411,7 +401,7 @@ export async function POST(request: NextRequest) {
                   customerId,
                   entryType: "debit",
                   amount: amountPaidValue,
-                  balanceAfter: newTotalDue - amountPaidValue,
+                  balanceAfter: subtractMoney(newTotalDue, amountPaidValue),
                   description: `Partial payment for: ${newSale.invoiceNumber}`,
                   referenceId: newSale.id,
                 },
@@ -485,13 +475,8 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/sales - Update sale (cancel/refund)
 export async function PUT(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 },
-    );
-  }
+  const authError = await requirePermission(request, "sales.edit");
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -580,7 +565,7 @@ export async function PUT(request: NextRequest) {
         existingSale.customerId &&
         existingSale.amountPaid < existingSale.totalAmount
       ) {
-        const dueAmount = existingSale.totalAmount - existingSale.amountPaid;
+        const dueAmount = subtractMoney(existingSale.totalAmount, existingSale.amountPaid);
 
         // Fetch customer BEFORE updating to get current balance
         const customer = await tx.customer.findUnique({
@@ -592,7 +577,7 @@ export async function PUT(request: NextRequest) {
         }
 
         // Calculate expected balance AFTER the decrement
-        const newTotalDue = customer.totalDue - dueAmount;
+        const newTotalDue = subtractMoney(customer.totalDue, dueAmount);
 
         // Now update totalDue
         await tx.customer.update({
@@ -623,7 +608,7 @@ export async function PUT(request: NextRequest) {
               customerId: existingSale.customerId,
               entryType: "credit",
               amount: existingSale.amountPaid,
-              balanceAfter: newTotalDue + existingSale.amountPaid,
+              balanceAfter: addMoney(newTotalDue, existingSale.amountPaid),
               description: `${status}: reverse payment for ${existingSale.invoiceNumber}`,
               referenceId: existingSale.id,
             },

@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
   if (roleCheck) return roleCheck;
 
   try {
-    const { summary } = await request.json();
+    const body = await request.json();
+    const { summary } = body;
 
     if (!summary) {
       return NextResponse.json(
@@ -26,42 +27,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Since we don't have a Google Gemini or OpenAI API key integrated natively here,
-    // we provide a "mocked" intelligent response for now. If an API key was provided in .env,
-    // we could fetch from api.openai.com/v1/chat/completions or generativelanguage.googleapis.com here.
+    const margin = parseFloat(summary.profitMargin ?? "0");
+    const growth = summary.revenueGrowth ?? 0;
+    const salesCount = summary.totalSalesCount ?? 0;
+    const revenue = summary.totalRevenue ?? 0;
+    const profit = summary.totalProfit ?? 0;
+    const topPayment = Object.entries(summary.paymentBreakdown ?? {}).sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0] ?? "N/A";
 
-    // Simulate AI delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    // Structured prompt context — gives the rule-based engine enough signal for specific advice
+    const insights: string[] = [];
 
-    const promptText = `
-      Based on the following data:
-      Total Revenue: ₹${summary.totalRevenue}
-      Total Profit: ₹${summary.totalProfit}
-      Profit Margin: ${summary.profitMargin}%
-      Total Sales Count: ${summary.totalSalesCount}
-    `;
-
-    let advice = "Hello from your AI Business Advisor! 🤖\n\n";
-
-    if (summary.profitMargin > 20) {
-      advice +=
-        "Your profit margins are looking great (above 20%). Consider reinvesting some of this profit into marketing or expanding your inventory with new product lines.\n";
+    // Margin analysis
+    if (margin >= 30) {
+      insights.push(`✅ Excellent profit margin of ${margin}%. You have pricing power — consider bundling slow-moving items with top sellers to clear stock.`);
+    } else if (margin >= 15) {
+      insights.push(`⚠️ Moderate profit margin of ${margin}%. Review your top 5 products' buying prices — even a 5% reduction in cost can significantly improve margins.`);
     } else {
-      advice +=
-        "Your profit margins are relatively low. Consider analyzing your top-selling products to see if you can slightly increase prices, or negotiate better buying prices from your suppliers.\n";
+      insights.push(`🔴 Low profit margin of ${margin}%. Urgently review pricing strategy. Identify products sold below cost or with near-zero margin and either reprice or discontinue them.`);
     }
 
-    if (summary.totalSalesCount < 10) {
-      advice +=
-        "Sales volume is a bit low today. You might want to run a local promotion or engage with recurring customers.\n";
+    // Revenue growth
+    if (growth > 10) {
+      insights.push(`📈 Revenue grew ${growth}% vs the previous period. Capitalize on this momentum — ensure your best-selling items are fully stocked.`);
+    } else if (growth >= 0) {
+      insights.push(`➡️ Revenue is stable (${growth}% growth). To accelerate, consider loyalty discounts for repeat customers or upselling higher-margin products at checkout.`);
     } else {
-      advice +=
-        "Great sales volume! Keep up the good work and ensure your best-selling items remain well-stocked.\n";
+      insights.push(`📉 Revenue declined ${Math.abs(growth)}% vs the previous period. Investigate which product categories dropped and whether it's seasonal or a pricing issue.`);
     }
 
-    advice +=
-      "\nTip: Always monitor the Auto-Restock list daily to never miss out on sales due to zero inventory.";
+    // Sales volume
+    if (salesCount < 5) {
+      insights.push(`📢 Very low transaction count (${salesCount}). Consider running a short-term promotion or reaching out to regular customers via WhatsApp.`);
+    } else if (salesCount >= 50) {
+      insights.push(`🔥 High transaction volume (${salesCount} sales). Ensure your checkout process is fast — long queues during peak hours can lose customers.`);
+    }
 
+    // Payment method insight
+    if (topPayment !== "N/A") {
+      insights.push(`💳 Most revenue came via ${topPayment}. If it's cash-heavy, consider offering a small UPI discount to reduce cash handling overhead.`);
+    }
+
+    // Profit vs revenue sanity
+    if (revenue > 0 && profit < 0) {
+      insights.push(`⚠️ You are selling at a net loss (Revenue: ₹${revenue.toFixed(0)}, Profit: ₹${profit.toFixed(0)}). Check if any products have buying prices higher than their selling prices in your inventory.`);
+    }
+
+    const advice = insights.join("\n\n");
     return NextResponse.json({ success: true, advice });
   } catch (error: unknown) {
     return NextResponse.json(

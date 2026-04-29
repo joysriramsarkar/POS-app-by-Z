@@ -123,15 +123,23 @@ export function CheckoutDialog({
   const [upiReceived, setUpiReceived] = useState<string>('');
   const [addAsPrePayment, setAddAsPrePayment] = useState(false);
 
-  // usePrepaid toggle করলে amount আপডেট করো
-  useEffect(() => {
-    if (!isOpen) return;
+  // Auto-update amount when remainingTotal changes (usePrepaid toggle)
+  const updateAmountFields = useCallback(() => {
     if (paymentMethod === 'Mixed') {
       setCashReceived(remainingTotal.toString());
+      setUpiReceived('');
+      setAmountReceived('');
     } else {
       setAmountReceived(remainingTotal.toString());
+      setCashReceived('');
+      setUpiReceived('');
     }
-  }, [remainingTotal]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [remainingTotal, paymentMethod]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updateAmountFields();
+  }, [isOpen, updateAmountFields]);
 
   const parsedAmount = useMemo(() => {
     if (paymentMethod === 'Mixed') {
@@ -165,24 +173,16 @@ export function CheckoutDialog({
     }).format(price);
   };
 
-  // Dialog açıldığında amount'u sıfırla
+  // Reset form when dialog opens (using ref to avoid stale closures)
   useEffect(() => {
     if (isOpen && !prevOpenRef.current) {
       setInputError(null);
       setUsePrepaid(false);
       setAddAsPrePayment(false);
-      if (paymentMethod === 'Mixed') {
-        setCashReceived(remainingTotal.toString());
-        setUpiReceived('');
-        setAmountReceived('');
-      } else {
-        setAmountReceived(remainingTotal.toString());
-        setCashReceived('');
-        setUpiReceived('');
-      }
+      updateAmountFields();
     }
     prevOpenRef.current = isOpen;
-  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOpen, updateAmountFields]);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {

@@ -70,6 +70,18 @@ async function main() {
       { code: "customers.view", description: "View customers", category: "customers" },
       { code: "customers.create", description: "Create customer", category: "customers" },
       { code: "customers.edit", description: "Edit customer", category: "customers" },
+      { code: "customers.delete", description: "Delete/deactivate customer", category: "customers" },
+
+      // Suppliers
+      { code: "suppliers.view", description: "View suppliers", category: "suppliers" },
+      { code: "suppliers.create", description: "Create supplier", category: "suppliers" },
+      { code: "suppliers.edit", description: "Edit supplier", category: "suppliers" },
+      { code: "suppliers.delete", description: "Delete/deactivate supplier", category: "suppliers" },
+
+      // Expenses
+      { code: "expenses.view", description: "View expenses", category: "expenses" },
+      { code: "expenses.create", description: "Create expense", category: "expenses" },
+      { code: "expenses.delete", description: "Delete expense", category: "expenses" },
     ];
 
     // Upsert permissions
@@ -93,7 +105,9 @@ async function main() {
         "stock.view", "stock.edit", "stock.import",
         "reports.view", "reports.export",
         "settings.view", "settings.edit",
-        "customers.view", "customers.create", "customers.edit",
+        "customers.view", "customers.create", "customers.edit", "customers.delete",
+        "suppliers.view", "suppliers.create", "suppliers.edit", "suppliers.delete",
+        "expenses.view", "expenses.create", "expenses.delete",
       ],
       MANAGER: [
         // Manager can do most things except user management and settings
@@ -101,13 +115,16 @@ async function main() {
         "sales.view", "sales.create", "sales.edit",
         "stock.view", "stock.edit", "stock.import",
         "reports.view", "reports.export",
-        "customers.view", "customers.create", "customers.edit",
+        "customers.view", "customers.create", "customers.edit", "customers.delete",
+        "suppliers.view", "suppliers.create", "suppliers.edit", "suppliers.delete",
+        "expenses.view", "expenses.create", "expenses.delete",
       ],
       CASHIER: [
         // Cashier can only do sales, view products and customers
         "products.view",
         "sales.view", "sales.create",
         "customers.view", "customers.create",
+        "suppliers.view",
       ],
       VIEWER: [
         // Viewer can only view reports

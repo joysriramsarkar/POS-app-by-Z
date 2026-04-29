@@ -1,6 +1,31 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+interface SaleChartPoint { date: string; revenue: number; profit: number; count: number; }
+interface SummaryData {
+  totalRevenue: number; totalProfit: number; totalSalesCount: number;
+  revenueGrowth: number; profitMargin: string;
+  paymentBreakdown: Record<string, number>;
+}
+interface StockItem { id: string; name: string; nameBn?: string; category?: string; currentStock: number; minStockLevel: number; unit: string; barcode?: string; }
+interface DueCustomer { id: string; name: string; phone?: string; totalDue: number; updatedAt: string; _count?: { sales: number }; }
+interface TopProduct { id: string; name: string; nameBn?: string; unit: string; quantity: number; revenue: number; profit: number; }
+interface CategoryData { name: string; revenue: number; margin: string; percentage: string; }
+interface TopCustomer { id: string; name: string; phone?: string; totalSpent: number; orderCount: number; aov: number; }
+interface ProductDetail {
+  summary: { totalQty: number; totalRevenue: number; totalProfit: number; profitMargin: string; peakHour: string; peakDay: string; avgOrderQty: number; };
+  product: { id: string; name: string; nameBn?: string; unit: string; currentStock: number; minStockLevel: number; };
+  dailyTrend: { date: string; revenue: number; qty: number; }[];
+  hourlyPattern: { hour: string; qty: number; }[];
+  weeklyPattern: { day: string; qty: number; }[];
+  topCustomers: { id: string; name: string; phone?: string; qty: number; revenue: number; }[];
+}
+interface CustomerDetail {
+  totalSpent: number; orderCount: number; aov: number;
+  monthlyTrend: { month: string; spent: number; }[];
+  topProducts: { id: string; name: string; qty: number; revenue: number; }[];
+}
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,25 +64,29 @@ function mergeSmallSlices(data: { name: string; value: number }[], threshold = 0
 }
 
 const Reports: React.FC = () => {
-  const [salesData, setSalesData] = useState<any[]>([]);
-  const [summaryData, setSummaryData] = useState<any>(null);
-  const [stockData, setStockData] = useState<any[]>([]);
-  const [dueData, setDueData] = useState<any[]>([]);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [salesData, setSalesData] = useState<SaleChartPoint[]>([]);
+  const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
+  const [stockData, setStockData] = useState<StockItem[]>([]);
+  const [dueData, setDueData] = useState<DueCustomer[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
+  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
+
+  // Per-tab loading & error state
+  const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({});
+  const [tabError, setTabError] = useState<Record<string, string | null>>({});
+
   const [chartType, setChartType] = useState<ChartType>('bar');
   const [aiAdvice, setAiAdvice] = useState<string | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
-  const [categoryData, setCategoryData] = useState<any[]>([]);
-  const [topCustomers, setTopCustomers] = useState<any[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
-  const [customerDetail, setCustomerDetail] = useState<any | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<TopCustomer | null>(null);
+  const [customerDetail, setCustomerDetail] = useState<CustomerDetail | null>(null);
   const [isCustomerDetailLoading, setIsCustomerDetailLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
-  const [productDetail, setProductDetail] = useState<any | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<TopProduct | null>(null);
+  const [productDetail, setProductDetail] = useState<ProductDetail | null>(null);
   const [isProductDetailLoading, setIsProductDetailLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('sales');
 
   // Date filter state
   const [preset, setPreset] = useState<DatePreset>('30');
@@ -76,60 +105,73 @@ const Reports: React.FC = () => {
     return `from=${customFrom}&to=${customTo}`;
   }, [preset, customFrom, customTo]);
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage(null);
+  const fetchTab = useCallback(async (tab: string, params: string) => {
+    setTabLoading(prev => ({ ...prev, [tab]: true }));
+    setTabError(prev => ({ ...prev, [tab]: null }));
     try {
-      const [salesResult, stockResult, duesResult, productsResult] = await Promise.allSettled([
-        fetch(`/api/reports/sales?${dateParams}`),
-        fetch('/api/reports/stock'),
-        fetch('/api/reports/dues'),
-        fetch(`/api/reports/products?${dateParams}`)
-      ]);
-
-      if (salesResult.status === 'fulfilled' && salesResult.value.ok) {
-        const j = await salesResult.value.json();
+      if (tab === 'sales') {
+        const res = await fetch(`/api/reports/sales?${params}`);
+        if (!res.ok) throw new Error('Failed to load Sales data');
+        const j = await res.json();
         setSummaryData(j.summary);
         setSalesData(j.chartData);
-      }
-      if (stockResult.status === 'fulfilled' && stockResult.value.ok) {
-        const j = await stockResult.value.json();
+      } else if (tab === 'payment') {
+        // payment data comes from sales summary — reuse if already loaded
+        if (!summaryData) {
+          const res = await fetch(`/api/reports/sales?${params}`);
+          if (!res.ok) throw new Error('Failed to load Payment data');
+          const j = await res.json();
+          setSummaryData(j.summary);
+          setSalesData(j.chartData);
+        }
+      } else if (tab === 'stock') {
+        const res = await fetch('/api/reports/stock');
+        if (!res.ok) throw new Error('Failed to load Stock data');
+        const j = await res.json();
         setStockData(j.lowStockItems);
-      }
-      if (duesResult.status === 'fulfilled' && duesResult.value.ok) {
-        const j = await duesResult.value.json();
+      } else if (tab === 'dues') {
+        const res = await fetch('/api/reports/dues');
+        if (!res.ok) throw new Error('Failed to load Dues data');
+        const j = await res.json();
         setDueData(j.customersWithDues);
-      }
-      if (productsResult.status === 'fulfilled' && productsResult.value.ok) {
-        const j = await productsResult.value.json();
+      } else if (tab === 'products') {
+        const res = await fetch(`/api/reports/products?${params}`);
+        if (!res.ok) throw new Error('Failed to load Products data');
+        const j = await res.json();
         setTopProducts(j.topProducts);
-      }
-
-      const [catResult, custResult] = await Promise.allSettled([
-        fetch(`/api/reports/categories?${dateParams}`),
-        fetch(`/api/reports/customers?${dateParams}`),
-      ]);
-      if (catResult.status === 'fulfilled' && catResult.value.ok) {
-        const j = await catResult.value.json();
+      } else if (tab === 'categories') {
+        const res = await fetch(`/api/reports/categories?${params}`);
+        if (!res.ok) throw new Error('Failed to load Categories data');
+        const j = await res.json();
         setCategoryData(j.categories);
-      }
-      if (custResult.status === 'fulfilled' && custResult.value.ok) {
-        const j = await custResult.value.json();
+      } else if (tab === 'customers') {
+        const res = await fetch(`/api/reports/customers?${params}`);
+        if (!res.ok) throw new Error('Failed to load Customers data');
+        const j = await res.json();
         setTopCustomers(j.topCustomers);
       }
-
-      const allFailed = [salesResult, stockResult, duesResult, productsResult, catResult!, custResult!].every(
-        r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok)
-      );
-      if (allFailed) setErrorMessage('Failed to load report data. Please refresh and try again.');
-    } catch (error) {
-      setErrorMessage('An unexpected error occurred while loading reports.');
+    } catch (err) {
+      setTabError(prev => ({ ...prev, [tab]: err instanceof Error ? err.message : `Failed to load ${tab} data` }));
     } finally {
-      setIsLoading(false);
+      setTabLoading(prev => ({ ...prev, [tab]: false }));
     }
-  }, [dateParams]);
+  }, [summaryData]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  // Load sales tab on mount and when dateParams changes
+  useEffect(() => { fetchTab('sales', dateParams); }, [dateParams]);
+
+  // Load active tab data when tab changes (if not already loaded or date changed)
+  const fetchedTabs = React.useRef<Set<string>>(new Set());
+  useEffect(() => { fetchedTabs.current.clear(); }, [dateParams]);
+  useEffect(() => {
+    if (activeTab === 'sales') return; // already fetched above
+    if (fetchedTabs.current.has(activeTab)) return;
+    fetchedTabs.current.add(activeTab);
+    fetchTab(activeTab, dateParams);
+  }, [activeTab, dateParams, fetchTab]);
+
+  const isLoading = tabLoading['sales'] ?? false;
+  const errorMessage = tabError[activeTab] ?? null;
 
   const outstandingDues = useMemo(
     () => dueData?.reduce((acc, c) => acc + c.totalDue, 0).toFixed(2) || '0.00',
@@ -264,7 +306,7 @@ const Reports: React.FC = () => {
         <div className="shrink-0 bg-destructive/10 border-b border-destructive/30 p-4 flex items-center gap-3">
           <AlertTriangle className="w-5 h-5 text-destructive shrink-0" />
           <p className="text-sm font-medium text-destructive flex-1">{errorMessage}</p>
-          <Button variant="ghost" size="sm" onClick={fetchData} className="text-destructive hover:text-destructive min-h-9">Retry</Button>
+          <Button variant="ghost" size="sm" onClick={() => fetchTab(activeTab, dateParams)} className="text-destructive hover:text-destructive min-h-9">Retry</Button>
         </div>
       )}
 
@@ -323,7 +365,7 @@ const Reports: React.FC = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="sales" className="w-full">
+        <Tabs defaultValue="sales" className="w-full" onValueChange={setActiveTab}>
           <div className="w-full overflow-x-auto pb-2">
             <TabsList className="h-auto flex flex-wrap gap-1 bg-muted p-1 rounded-lg w-full sm:w-auto">
               <TabsTrigger className="flex-1 sm:flex-none" value="sales">Sales</TabsTrigger>
@@ -420,7 +462,7 @@ const Reports: React.FC = () => {
                       </ResponsiveContainer>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
-                        <p className="text-muted-foreground">{isLoading ? 'Loading...' : 'No data.'}</p>
+                        <p className="text-muted-foreground">{tabLoading['payment'] || tabLoading['sales'] ? 'Loading...' : 'No data.'}</p>
                       </div>
                     )}
                   </div>
@@ -456,7 +498,7 @@ const Reports: React.FC = () => {
                       }) : (
                         <TableRow>
                           <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? 'Loading...' : 'No payment data.'}
+                            {tabLoading['payment'] || tabLoading['sales'] ? 'Loading...' : 'No payment data.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -476,7 +518,7 @@ const Reports: React.FC = () => {
                   <CardDescription>Items at or below minimum stock level</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => {
-                  const itemsText = stockData.map((i: any) => `${i.name} - Stock: ${i.currentStock}`).join('\n');
+                  const itemsText = stockData.map(i => `${i.name} - Stock: ${i.currentStock}`).join('\n');
                   const blob = new Blob([itemsText], { type: 'text/plain' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
@@ -501,7 +543,11 @@ const Reports: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {stockData?.length > 0 ? stockData.map((item: any) => (
+                      {tabLoading['stock'] ? (
+                        <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Loading stock data...</TableCell></TableRow>
+                      ) : tabError['stock'] ? (
+                        <TableRow><TableCell colSpan={4} className="text-center py-6 text-destructive">{tabError['stock']}</TableCell></TableRow>
+                      ) : stockData?.length > 0 ? stockData.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">
                             <p className="text-sm">{item.name}</p>
@@ -519,7 +565,7 @@ const Reports: React.FC = () => {
                       )) : (
                         <TableRow>
                           <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? 'Loading stock data...' : '✅ All items are well stocked.'}
+                            {'✅ All items are well stocked.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -549,7 +595,11 @@ const Reports: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {dueData?.length > 0 ? dueData.map((c: any) => (
+                      {tabLoading['dues'] ? (
+                        <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Loading customer dues...</TableCell></TableRow>
+                      ) : tabError['dues'] ? (
+                        <TableRow><TableCell colSpan={4} className="text-center py-6 text-destructive">{tabError['dues']}</TableCell></TableRow>
+                      ) : dueData?.length > 0 ? dueData.map((c) => (
                         <TableRow key={c.id}>
                           <TableCell className="font-medium">
                             <p className="text-sm">{c.name}</p>
@@ -564,7 +614,7 @@ const Reports: React.FC = () => {
                       )) : (
                         <TableRow>
                           <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? 'Loading customer dues...' : '✅ No pending dues.'}
+                            {'✅ No pending dues.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -596,7 +646,11 @@ const Reports: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {topProducts?.length > 0 ? topProducts.map((p: any, i: number) => (
+                      {tabLoading['products'] ? (
+                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">Loading products data...</TableCell></TableRow>
+                      ) : tabError['products'] ? (
+                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-destructive">{tabError['products']}</TableCell></TableRow>
+                      ) : topProducts?.length > 0 ? topProducts.map((p, i) => (
                         <TableRow key={p.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedProduct(p)}>
                           <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
                           <TableCell className="font-medium">
@@ -613,7 +667,7 @@ const Reports: React.FC = () => {
                       )) : (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? 'Loading products data...' : 'No product data.'}
+                            {'No product data.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -633,7 +687,9 @@ const Reports: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="w-full h-64">
-                    {categoryData.length > 0 ? (
+                    {tabLoading['categories'] ? (
+                      <div className="w-full h-full flex items-center justify-center"><p className="text-muted-foreground">Loading...</p></div>
+                    ) : categoryData.length > 0 ? (
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           {(() => { const d = mergeSmallSlices(categoryData.map(c => ({ name: c.name, value: c.revenue }))); return (
@@ -649,7 +705,7 @@ const Reports: React.FC = () => {
                       </ResponsiveContainer>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center border border-dashed rounded-lg">
-                        <p className="text-muted-foreground">{isLoading ? 'Loading...' : 'No data.'}</p>
+                        <p className="text-muted-foreground">No data.</p>
                       </div>
                     )}
                   </div>
@@ -672,7 +728,11 @@ const Reports: React.FC = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {categoryData.length > 0 ? categoryData.map((c, i) => (
+                        {tabLoading['categories'] ? (
+                          <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground">Loading...</TableCell></TableRow>
+                        ) : tabError['categories'] ? (
+                          <TableRow><TableCell colSpan={4} className="text-center py-6 text-destructive">{tabError['categories']}</TableCell></TableRow>
+                        ) : categoryData.length > 0 ? categoryData.map((c, i) => (
                           <TableRow key={c.name}>
                             <TableCell className="flex items-center gap-2">
                               <span className="w-3 h-3 rounded-full inline-block shrink-0" style={{ background: PAYMENT_COLORS[i % PAYMENT_COLORS.length] }} />
@@ -685,7 +745,7 @@ const Reports: React.FC = () => {
                         )) : (
                           <TableRow>
                             <TableCell colSpan={4} className="text-center py-6 text-muted-foreground">
-                              {isLoading ? 'Loading...' : 'No category data.'}
+                              {'No category data.'}
                             </TableCell>
                           </TableRow>
                         )}
@@ -718,7 +778,11 @@ const Reports: React.FC = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {topCustomers.length > 0 ? topCustomers.map((c, i) => (
+                      {tabLoading['customers'] ? (
+                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-muted-foreground">Loading customers...</TableCell></TableRow>
+                      ) : tabError['customers'] ? (
+                        <TableRow><TableCell colSpan={6} className="text-center py-6 text-destructive">{tabError['customers']}</TableCell></TableRow>
+                      ) : topCustomers.length > 0 ? topCustomers.map((c, i: number) => (
                         <TableRow key={c.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedCustomer(c)}>
                           <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
                           <TableCell className="font-medium">
@@ -733,7 +797,7 @@ const Reports: React.FC = () => {
                       )) : (
                         <TableRow>
                           <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                            {isLoading ? 'Loading customers...' : 'No customer data.'}
+                            {'No customer data.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -793,10 +857,10 @@ const Reports: React.FC = () => {
 };
 
 function ProductDetailContent({ product, dateParams, detail, setDetail, isLoading, setIsLoading }: {
-  product: any;
+  product: TopProduct | null;
   dateParams: string;
-  detail: any;
-  setDetail: (d: any) => void;
+  detail: ProductDetail | null;
+  setDetail: (d: ProductDetail) => void;
   isLoading: boolean;
   setIsLoading: (v: boolean) => void;
 }) {
@@ -877,8 +941,8 @@ function ProductDetailContent({ product, dateParams, detail, setDetail, isLoadin
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
                 <RechartsTooltip formatter={(v: number) => [v, 'Qty']} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
                 <Bar dataKey="qty" fill="#8b5cf6" radius={[3,3,0,0]} maxBarSize={24}>
-                  {weeklyPattern.map((entry: any, i: number) => (
-                    <Cell key={i} fill={entry.qty === Math.max(...weeklyPattern.map((w: any) => w.qty)) ? '#7c3aed' : '#8b5cf6'} />
+                  {weeklyPattern.map((entry, i: number) => (
+                    <Cell key={i} fill={entry.qty === Math.max(...weeklyPattern.map((w) => w.qty)) ? '#7c3aed' : '#8b5cf6'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -894,8 +958,8 @@ function ProductDetailContent({ product, dateParams, detail, setDetail, isLoadin
                 <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={28} />
                 <RechartsTooltip formatter={(v: number) => [v, 'Qty']} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
                 <Bar dataKey="qty" fill="#f59e0b" radius={[3,3,0,0]} maxBarSize={16}>
-                  {hourlyPattern.map((entry: any, i: number) => (
-                    <Cell key={i} fill={entry.qty === Math.max(...hourlyPattern.map((h: any) => h.qty)) ? '#d97706' : '#f59e0b'} />
+                  {hourlyPattern.map((entry, i: number) => (
+                    <Cell key={i} fill={entry.qty === Math.max(...hourlyPattern.map((h) => h.qty)) ? '#d97706' : '#f59e0b'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -918,7 +982,7 @@ function ProductDetailContent({ product, dateParams, detail, setDetail, isLoadin
               </TableRow>
             </TableHeader>
             <TableBody>
-              {topCustomers.map((c: any, i: number) => (
+              {topCustomers.map((c, i: number) => (
                 <TableRow key={c.id}>
                   <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
                   <TableCell>
@@ -941,10 +1005,10 @@ function ProductDetailContent({ product, dateParams, detail, setDetail, isLoadin
 }
 
 function CustomerDetailContent({ customer, dateParams, detail, setDetail, isLoading, setIsLoading }: {
-  customer: any;
+  customer: TopCustomer | null;
   dateParams: string;
-  detail: any;
-  setDetail: (d: any) => void;
+  detail: CustomerDetail | null;
+  setDetail: (d: CustomerDetail) => void;
   isLoading: boolean;
   setIsLoading: (v: boolean) => void;
 }) {
@@ -1003,7 +1067,7 @@ function CustomerDetailContent({ customer, dateParams, detail, setDetail, isLoad
               </TableRow>
             </TableHeader>
             <TableBody>
-              {detail.topProducts.map((p: any) => (
+              {detail.topProducts.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="text-sm">{p.name}</TableCell>
                   <TableCell className="text-right text-sm">{p.qty}</TableCell>

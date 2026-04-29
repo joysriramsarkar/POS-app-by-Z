@@ -7,16 +7,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import type { Product } from '@/types/pos';
 import { ProductInputSchema } from '@/schemas';
-
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { requirePermission } from '@/lib/api-middleware';
 
 // GET /api/products - Fetch all products
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'products.view');
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);
@@ -92,10 +88,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/products - Create new product
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'products.create');
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -146,7 +140,7 @@ export async function POST(request: NextRequest) {
         );
       }
       return NextResponse.json(
-        { success: false, error: `Database error: ${error.message}` },
+        { success: false, error: 'Failed to create product' },
         { status: 500 }
       );
     }
@@ -160,10 +154,8 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/products - Update product
 export async function PUT(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requirePermission(request, 'products.edit');
+  if (authError) return authError;
 
   try {
     const body = await request.json();
@@ -221,15 +213,8 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/products - Soft delete product
 export async function DELETE(request: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userRole = (session.user as { role?: string })?.role;
-  if (userRole !== 'ADMIN' && userRole !== 'MANAGER') {
-    return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
-  }
+  const authError = await requirePermission(request, 'products.delete');
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(request.url);

@@ -411,9 +411,75 @@ function POSDashboard() {
 
   // Handle checkout completion
 
+  const processOfflineSale = useCallback(async (paymentData: PaymentData) => {
+    let paymentStatus = 'Paid';
+    if (paymentData.amountPaid === 0) paymentStatus = 'Due';
+    else if (paymentData.amountPaid > 0 && paymentData.amountPaid < paymentData.total) paymentStatus = 'Partial';
+
+    const sale: Sale = {
+      id: uuidv4(),
+      invoiceNumber: generateInvoiceNumber(),
+      customerId: paymentData.customerId,
+      userId: (session?.user as { id?: string })?.id,
+      subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
+      discount: paymentData.discount,
+      tax: paymentData.tax,
+      totalAmount: paymentData.total,
+      amountPaid: paymentData.amountPaid,
+      paymentMethod: paymentData.paymentMethod,
+      cashAmount: paymentData.cashAmount,
+      upiAmount: paymentData.upiAmount,
+      paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
+      status: 'Completed',
+      notes: undefined,
+      offlineSynced: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      items: cartItems.map(item => ({
+        id: uuidv4(),
+        saleId: '',
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice,
+        createdAt: new Date(),
+      })),
+    } as Sale;
+
+    await SalesDB.save(sale);
+    await SyncQueueDB.add({
+      id: uuidv4(),
+      entityType: 'Sale',
+      entityId: sale.id,
+      action: 'create',
+      payload: JSON.stringify(sale),
+      synced: false,
+      retryCount: 0,
+      createdAt: new Date(),
+    });
+
+    cartItems.forEach((item) => {
+      updateProductStock(item.productId, -item.quantity);
+      ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
+    });
+
+    if (paymentData.customerId) {
+      const dueAmount = paymentData.total - paymentData.amountPaid;
+      if (dueAmount > 0) {
+        updateCustomerDue(paymentData.customerId, dueAmount);
+        CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
+      }
+    }
+
+    setCurrentSale(sale);
+    setCompletedCheckoutSale(sale);
+    clearCart();
+  }, [cartItems, session, updateProductStock, updateCustomerDue, setCurrentSale, setCompletedCheckoutSale, clearCart]);
+
   const handleCheckoutComplete = useCallback(async (paymentData: PaymentData) => {
     setIsProcessingPayment(true);
-
+    
     const salePayload = {
       items: cartItems.map(item => ({
         productId: item.productId,
@@ -433,72 +499,6 @@ function POSDashboard() {
       prepaidAmountUsed: paymentData.prepaidAmountUsed,
     };
 
-    const processOfflineSale = async () => {
-      let paymentStatus = 'Paid';
-      if (paymentData.amountPaid === 0) paymentStatus = 'Due';
-      else if (paymentData.amountPaid > 0 && paymentData.amountPaid < paymentData.total) paymentStatus = 'Partial';
-
-      const sale: Sale = {
-        id: uuidv4(),
-        invoiceNumber: generateInvoiceNumber(),
-        customerId: paymentData.customerId,
-        userId: (session?.user as { id?: string })?.id,
-        subtotal: cartItems.reduce((s, it) => s + it.totalPrice, 0),
-        discount: paymentData.discount,
-        tax: paymentData.tax,
-        totalAmount: paymentData.total,
-        amountPaid: paymentData.amountPaid,
-        paymentMethod: paymentData.paymentMethod,
-        cashAmount: paymentData.cashAmount,
-        upiAmount: paymentData.upiAmount,
-        paymentStatus: paymentStatus as 'Paid' | 'Partial' | 'Due',
-        status: 'Completed',
-        notes: undefined,
-        offlineSynced: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        items: cartItems.map(item => ({
-          id: uuidv4(),
-          saleId: '',
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          totalPrice: item.totalPrice,
-          createdAt: new Date(),
-        })),
-      } as Sale;
-
-      await SalesDB.save(sale);
-      await SyncQueueDB.add({
-        id: uuidv4(),
-        entityType: 'Sale',
-        entityId: sale.id,
-        action: 'create',
-        payload: JSON.stringify(sale),
-        synced: false,
-        retryCount: 0,
-        createdAt: new Date(),
-      });
-
-      cartItems.forEach((item) => {
-        updateProductStock(item.productId, -item.quantity);
-        ProductsDB.updateStock(item.productId, -item.quantity).catch(console.error);
-      });
-
-      if (paymentData.customerId) {
-        const dueAmount = paymentData.total - paymentData.amountPaid;
-        if (dueAmount > 0) {
-          updateCustomerDue(paymentData.customerId, dueAmount);
-          CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
-        }
-      }
-
-      setCurrentSale(sale);
-      setCompletedCheckoutSale(sale);
-      clearCart();
-    };
-
     try {
       if (isOnline) {
         try {
@@ -513,28 +513,22 @@ function POSDashboard() {
             try {
               const errorData = await response.json();
               errorMessage = errorData.error || errorMessage;
-            } catch (parseError) {
-              // If response is not JSON, use status text
+            } catch {
               errorMessage = `Server error: ${response.statusText}`;
             }
             
-            // ⚠️ CRITICAL: Catch ALL database/server errors that should trigger offline fallback
-            // Include 5xx server errors, connection issues, and transaction timeouts
             const shouldFallbackToOffline = 
-              response.status >= 500 || // Any server error (500, 502, 503, etc.)
-              errorMessage.includes('P1001') || // Prisma: Can't reach database
-              errorMessage.includes('connection') || // Generic connection error
-              errorMessage.includes('Can\'t reach') || // Prisma connection error
-              errorMessage.includes('Transaction API error') || // Transaction timeout/pool exhaustion
-              errorMessage.includes('Unable to start a transaction') || // Transaction start failure
-              errorMessage.includes('timed out') || // Query timeout
-              errorMessage.includes('pool') || // Connection pool issue
-              errorMessage.includes('ECONNREFUSED') || // Connection refused
-              errorMessage.includes('ECONNRESET'); // Connection reset
+              response.status >= 500 || 
+              errorMessage.includes('P1001') || 
+              errorMessage.includes('connection') || 
+              errorMessage.includes('Can\'t reach') || 
+              errorMessage.includes('Transaction') || 
+              errorMessage.includes('timed out') || 
+              errorMessage.includes('pool') || 
+              errorMessage.includes('ECONN');
             
             if (shouldFallbackToOffline) {
-              console.warn('⚠️ Database unreachable or overloaded, falling back to offline mode');
-              console.warn('📋 Error details:', { status: response.status, message: errorMessage });
+              console.warn('⚠️ Database unavailable, falling back to offline');
               throw new Error('DATABASE_UNAVAILABLE');
             }
             
@@ -544,81 +538,43 @@ function POSDashboard() {
           const responseData = await response.json();
           const completedSale = responseData.data;
 
-          // Set the completed sale to trigger success modal in CheckoutDialog
           setCompletedCheckoutSale(completedSale);
           setCurrentSale(completedSale);
           clearCart();
 
-          // refresh products and customers from server
-          const [productsResult, customersResult] = await Promise.allSettled([
+          // Refresh data
+          const [productsResult] = await Promise.allSettled([
             fetch('/api/products?limit=10000'),
-            fetch('/api/customers'),
           ]);
 
           if (productsResult.status === 'fulfilled' && productsResult.value.ok) {
             const { data: updatedProducts, nextCursor } = await productsResult.value.json();
-            const hasMore = !!nextCursor;
-            setProducts(updatedProducts, hasMore, nextCursor);
+            setProducts(updatedProducts, !!nextCursor, nextCursor);
           }
 
-          if (customersResult.status === 'fulfilled' && customersResult.value.ok && paymentData.customerId) {
-            // we know how much due to add
-            const dueAmount = paymentData.total - paymentData.amountPaid;
-            if (dueAmount > 0) {
-              updateCustomerDue(paymentData.customerId, dueAmount);
-            }
-          }
-
-          // Add change as prepayment if requested
           if (paymentData.addChangeAsPrepayment && paymentData.customerId && paymentData.change > 0) {
             await fetch('/api/prepayment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ customerId: paymentData.customerId, amount: paymentData.change }),
-            });
+            }).catch(console.error);
           }
         } catch (fetchError) {
-          if (fetchError instanceof Error) {
-            // If database is unavailable, also fallback to offline
-            if (fetchError.message === 'DATABASE_UNAVAILABLE') {
-              console.warn('⚠️ Falling back to offline mode due to database unavailability');
-              // Treat as offline, continue to offline block below
-              throw new Error('FALL_BACK_TO_OFFLINE');
-            }
-            console.error('Fetch error:', fetchError.message);
-            throw fetchError;
-          } else {
-            throw new Error('Network error while creating sale');
+          if (fetchError instanceof Error && fetchError.message === 'DATABASE_UNAVAILABLE') {
+            await processOfflineSale(paymentData);
+            toast({ title: 'Database offline', description: 'Sale saved locally.' });
+            return;
           }
+          throw fetchError;
         }
       } else {
-        // --- OFFLINE FALLBACK ------------------------------------------------
-        await processOfflineSale();
-        toast({ title: 'Offline sale saved', description: 'Will sync when connection is restored.' });
+        await processOfflineSale(paymentData);
+        toast({ title: 'Offline sale saved', description: 'Will sync when online.' });
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unable to complete sale';
+      const errorMessage = error instanceof Error ? error.message : 'Checkout failed';
+      console.error('Checkout failed:', error);
       
-      // If DATABASE_UNAVAILABLE or FALL_BACK_TO_OFFLINE, switch to offline mode
-      if (errorMessage === 'DATABASE_UNAVAILABLE' || errorMessage === 'FALL_BACK_TO_OFFLINE') {
-        // Re-run the offline flow
-        try {
-          setIsOnline(false);
-          await processOfflineSale();
-          toast({ title: 'Database offline', description: 'Sale saved locally. Will sync when connection restored.' });
-          return;
-        } catch (offlineError) {
-          console.error('Offline fallback failed:', offlineError);
-        }
-      }
-      
-      console.error('Checkout failed:', {
-        error: error,
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      
-      // Reset checkout state on error
       setCompletedCheckoutSale(null);
       setCheckoutOpen(false);
       
@@ -630,23 +586,7 @@ function POSDashboard() {
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [
-    cartItems,
-    isOnline,
-    session,
-    setCurrentSale,
-    setCompletedCheckoutSale,
-    setPrintDialogOpen,
-    clearCart,
-    setProducts,
-    updateCustomerDue,
-    updateProductStock,
-    setCheckoutOpen,
-    setIsOnline,
-    setPendingCount,
-    pendingCount,
-    toast,
-  ]);
+  }, [isOnline, processOfflineSale, setProducts, clearCart, setCurrentSale, setCompletedCheckoutSale, setCheckoutOpen, toast, cartItems]);
 
   const handleOpenCheckout = useCallback(() => {
     setCheckoutOpen(true);

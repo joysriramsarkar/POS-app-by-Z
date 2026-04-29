@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { ProductInputSchema, SaleInputSchema, CustomerInputSchema } from '@/schemas';
+import { addMoney, subtractMoney, toMoneyNumber } from '@/lib/money';
 
 
 const ProductSyncPayloadSchema = z.union([
@@ -380,11 +381,11 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
     }
 
     // Update customer due if applicable
-    const amountPaid = saleData.amountPaid || 0;
-    const totalAmount = saleData.totalAmount || 0;
+    const amountPaid = toMoneyNumber(saleData.amountPaid || 0);
+    const totalAmount = toMoneyNumber(saleData.totalAmount || 0);
 
     if (saleData.customerId && amountPaid < totalAmount) {
-      const dueAmount = totalAmount - amountPaid;
+      const dueAmount = subtractMoney(totalAmount, amountPaid);
 
       // Fetch customer BEFORE updating for correct balance calculation
       const customer = await tx.customer.findUnique({
@@ -392,7 +393,7 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
       });
 
       if (customer) {
-        const newTotalDue = customer.totalDue + dueAmount;
+        const newTotalDue = addMoney(customer.totalDue, dueAmount);
 
         await tx.customer.update({
           where: { id: saleData.customerId },
@@ -422,7 +423,7 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
               customerId: saleData.customerId,
               entryType: "debit",
               amount: amountPaid,
-              balanceAfter: newTotalDue - amountPaid,
+              balanceAfter: subtractMoney(newTotalDue, amountPaid),
               description: `Offline sync payment for: ${saleData.invoiceNumber}`,
               referenceId: sale.id,
             },
