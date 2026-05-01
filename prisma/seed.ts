@@ -1,7 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from '../src/lib/db';
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+
 
 async function main() {
   try {
@@ -127,10 +127,13 @@ async function main() {
         "suppliers.view",
       ],
       VIEWER: [
-        // Viewer can only view reports
+        // Viewer can only view
         "reports.view",
         "products.view",
         "sales.view",
+        "customers.view",
+        "stock.view",
+        "suppliers.view",
       ],
     };
 

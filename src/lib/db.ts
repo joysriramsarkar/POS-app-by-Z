@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 
@@ -25,34 +25,38 @@ function createPrismaClient(): PrismaClient {
   // Use dummy connection string if building to prevent throw
   const pool = new Pool({
     connectionString: connectionString || "postgresql://dummy:dummy@localhost:5432/dummy",
-    // Required for PgBouncer transaction pooling mode
-    max: 1,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   })
   // Compatibility workaround between different pg @types versions used by Prisma adapter
   const adapter = new PrismaPg(pool as unknown as any)
 
+  const prismaLogs: Prisma.LogDefinition[] =
+    process.env.PRISMA_QUERY_LOG === 'true'
+      ? [{ emit: 'stdout', level: 'query' }]
+      : []
+  const shouldLogLifecycle =
+    process.env.PRISMA_LOG === 'true' || process.env.NODE_ENV === 'development'
+
   const client = new PrismaClient({
     adapter,
-    log: [
-      {
-        emit: 'stdout',
-        level: 'query',
-      },
-    ],
+    log: prismaLogs,
   })
 
   // Log successful connection to PostgreSQL
   client.$connect().then(() => {
-    console.log('[PrismaClient] ✅ Successfully connected to PostgreSQL (Supabase with PgBouncer)')
+    if (shouldLogLifecycle) {
+      console.log('[PrismaClient] Successfully connected to PostgreSQL')
+    }
   }).catch((error) => {
-    console.error('[PrismaClient] ❌ Connection failed:', error)
+    console.error('[PrismaClient] Connection failed:', error)
   })
 
   // Auto-disconnect on process termination (fixes PgBouncer prepared statement conflicts on Vercel)
   process.on('SIGTERM', async () => {
-    console.log('[PrismaClient] SIGTERM received, disconnecting...')
+    if (shouldLogLifecycle) {
+      console.log('[PrismaClient] SIGTERM received, disconnecting...')
+    }
     await client.$disconnect()
     process.exit(0)
   })

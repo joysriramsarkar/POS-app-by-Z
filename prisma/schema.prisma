@@ -178,6 +178,7 @@ model Supplier {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   purchases Purchase[]
+  expenses  Expense[]
 
   @@map("suppliers")
 }
@@ -281,6 +282,7 @@ model User {
 
   // Relations
   sales Sale[]
+  auditLogs AuditLog[]
 
   @@map("users")
 }
@@ -320,12 +322,44 @@ model RolePermission {
 // ============================================================================
 
 model Expense {
-  id          String   @id @default(cuid())
-  amount      Float
-  category    String
-  notes       String?
-  date        DateTime @default(now())
-  createdAt   DateTime @default(now()) @map("created_at")
+  id           String    @id @default(cuid())
+  amount       Float
+  category     String
+  notes        String?
+  date         DateTime  @default(now())
+  supplierId   String?   @map("supplier_id")
+  supplierName String?   @map("supplier_name")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@index([date])
+  @@index([supplierId])
   @@map("expenses")
 }
+
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?  @map("user_id")
+  action      String   // e.g., "CREATE_PRODUCT", "DELETE_SALE", "UPDATE_CUSTOMER", "LOGIN"
+  entityType  String   // e.g., "Product", "Sale", "Customer", "User"
+  entityId    String?  @map("entity_id")
+  details     String?  // JSON stringified details of the change
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+

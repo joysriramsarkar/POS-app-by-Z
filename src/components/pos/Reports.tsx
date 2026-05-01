@@ -39,7 +39,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   TrendingUp, TrendingDown, DollarSign, Package, Users,
-  AlertTriangle, Download, BarChart2, Lightbulb, ChevronRight
+  AlertTriangle, Download, BarChart2, Lightbulb, ChevronRight, Receipt, ExternalLink
 } from 'lucide-react';
 import {
   Dialog,
@@ -63,7 +63,7 @@ function mergeSmallSlices(data: { name: string; value: number }[], threshold = 0
   return [...main, { name: 'Others', value: others.reduce((s, d) => s + d.value, 0) }];
 }
 
-const Reports: React.FC = () => {
+const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate }) => {
   const [salesData, setSalesData] = useState<SaleChartPoint[]>([]);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [stockData, setStockData] = useState<StockItem[]>([]);
@@ -87,6 +87,9 @@ const Reports: React.FC = () => {
   const [productDetail, setProductDetail] = useState<ProductDetail | null>(null);
   const [isProductDetailLoading, setIsProductDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('sales');
+  const [expensesData, setExpensesData] = useState<any[]>([]);
+  const [expensesLoaded, setExpensesLoaded] = useState(false);
+  const [expensesLoading, setExpensesLoading] = useState(false);
 
   // Date filter state
   const [preset, setPreset] = useState<DatePreset>('30');
@@ -162,13 +165,25 @@ const Reports: React.FC = () => {
 
   // Load active tab data when tab changes (if not already loaded or date changed)
   const fetchedTabs = React.useRef<Set<string>>(new Set());
-  useEffect(() => { fetchedTabs.current.clear(); }, [dateParams]);
+  useEffect(() => { fetchedTabs.current.clear(); setExpensesLoaded(false); }, [dateParams]);
   useEffect(() => {
-    if (activeTab === 'sales') return; // already fetched above
+    if (activeTab === 'sales') return;
+    if (activeTab === 'expenses') {
+      if (!expensesLoaded) {
+        setExpensesLoading(true);
+        // parse dateParams to get from/to for filtering
+        fetch('/api/expenses')
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d) { setExpensesData(d.data ?? []); setExpensesLoaded(true); } })
+          .catch(console.error)
+          .finally(() => setExpensesLoading(false));
+      }
+      return;
+    }
     if (fetchedTabs.current.has(activeTab)) return;
     fetchedTabs.current.add(activeTab);
     fetchTab(activeTab, dateParams);
-  }, [activeTab, dateParams, fetchTab]);
+  }, [activeTab, dateParams, fetchTab, expensesLoaded]);
 
   const isLoading = tabLoading['sales'] ?? false;
   const errorMessage = tabError[activeTab] ?? null;
@@ -183,7 +198,7 @@ const Reports: React.FC = () => {
     return Object.entries(summaryData.paymentBreakdown).map(([name, value]) => ({ name, value: value as number }));
   }, [summaryData]);
 
-  // CSV export
+  // CSV export — Sales
   const handleExportCSV = useCallback(() => {
     if (!salesData.length) return;
     const header = isToday ? ['Hour', 'Revenue', 'Profit', 'Orders'] : ['Date', 'Revenue', 'Profit', 'Orders'];
@@ -200,6 +215,17 @@ const Reports: React.FC = () => {
     a.click();
     URL.revokeObjectURL(url);
   }, [salesData, isToday]);
+
+  const downloadCSV = useCallback((rows: (string | number)[][], filename: string) => {
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
 
   const DateFilter = (
     <div className="flex flex-wrap items-end gap-2 shrink-0">
@@ -278,10 +304,6 @@ const Reports: React.FC = () => {
             <span className="hidden sm:inline">Ask AI</span>
           </Button>
           {DateFilter}
-          <Button variant="outline" onClick={handleExportCSV} className="gap-2 border-primary/20 hover:bg-primary/5 min-h-9 touch-manipulation">
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">CSV</span>
-          </Button>
         </div>
       </div>
 
@@ -375,6 +397,7 @@ const Reports: React.FC = () => {
               <TabsTrigger className="flex-1 sm:flex-none" value="products">Top Items</TabsTrigger>
               <TabsTrigger className="flex-1 sm:flex-none" value="categories">Categories</TabsTrigger>
               <TabsTrigger className="flex-1 sm:flex-none" value="customers">Customers</TabsTrigger>
+              <TabsTrigger className="flex-1 sm:flex-none" value="expenses">Expenses</TabsTrigger>
             </TabsList>
           </div>
 
@@ -386,15 +409,14 @@ const Reports: React.FC = () => {
                   <CardTitle>Sales Trend</CardTitle>
                   <CardDescription>{isToday ? 'Hourly sales for today' : 'Daily sales and profit for selected period'}</CardDescription>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1 min-h-9"
-                  onClick={() => setChartType(t => t === 'bar' ? 'line' : 'bar')}
-                >
-                  <BarChart2 className="w-4 h-4" />
-                  {chartType === 'bar' ? 'Line' : 'Bar'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="gap-1 min-h-9" onClick={handleExportCSV}>
+                    <Download className="w-4 h-4" /> CSV
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1 min-h-9" onClick={() => setChartType(t => t === 'bar' ? 'line' : 'bar')}>
+                    <BarChart2 className="w-4 h-4" />{chartType === 'bar' ? 'Line' : 'Bar'}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="w-full h-64 md:h-80">
@@ -579,9 +601,15 @@ const Reports: React.FC = () => {
           {/* Dues Tab */}
           <TabsContent value="dues">
             <Card className="rounded-xl">
-              <CardHeader>
-                <CardTitle>Outstanding Customer Dues</CardTitle>
-                <CardDescription>Customers with pending payments — Total: ₹{outstandingDues}</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle>Outstanding Customer Dues</CardTitle>
+                  <CardDescription>Customers with pending payments — Total: ₹{outstandingDues}</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => downloadCSV(
+                  [['Customer','Phone','Total Due','Last Purchase'], ...dueData.map(c => [c.name, c.phone||'', c.totalDue.toFixed(2), new Date(c.updatedAt).toLocaleDateString()])],
+                  'dues'
+                )}><Download className="w-4 h-4" /> CSV</Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -628,9 +656,15 @@ const Reports: React.FC = () => {
           {/* Top Products Tab */}
           <TabsContent value="products">
             <Card className="rounded-xl">
-              <CardHeader>
-                <CardTitle>Top Selling Products</CardTitle>
-                <CardDescription>Best performing items — click any row for detailed report</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle>Top Selling Products</CardTitle>
+                  <CardDescription>Best performing items — click any row for detailed report</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => downloadCSV(
+                  [['#','Product','Qty Sold','Revenue','Profit'], ...topProducts.map((p,i) => [i+1, p.name, p.quantity, p.revenue.toFixed(2), p.profit.toFixed(2)])],
+                  'top-products'
+                )}><Download className="w-4 h-4" /> CSV</Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -757,12 +791,23 @@ const Reports: React.FC = () => {
             </div>
           </TabsContent>
 
+          {/* Expenses Tab */}
+          <TabsContent value="expenses">
+            <ExpensesTabContent expenses={expensesData} dateParams={dateParams} onNavigate={onNavigate} isLoading={expensesLoading} />
+          </TabsContent>
+
           {/* Customers Tab */}
           <TabsContent value="customers">
             <Card className="rounded-xl">
-              <CardHeader>
-                <CardTitle>Top Customers</CardTitle>
-                <CardDescription>Highest spending customers for selected period</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between flex-wrap gap-2">
+                <div>
+                  <CardTitle>Top Customers</CardTitle>
+                  <CardDescription>Highest spending customers for selected period</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="gap-1" onClick={() => downloadCSV(
+                  [['#','Customer','Phone','Spent','Orders','AOV'], ...topCustomers.map((c,i) => [i+1, c.name, c.phone||'', c.totalSpent.toFixed(2), c.orderCount, c.aov.toFixed(2)])],
+                  'top-customers'
+                )}><Download className="w-4 h-4" /> CSV</Button>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -1083,3 +1128,155 @@ function CustomerDetailContent({ customer, dateParams, detail, setDetail, isLoad
 }
 
 export default React.memo(Reports);
+
+const CHART_COLORS = ['#ef4444', '#f59e0b', '#8b5cf6', '#3b82f6', '#10b981', '#ec4899'];
+const fp = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(n);
+
+function ExpensesTabContent({ expenses, dateParams, onNavigate, isLoading }: {
+  expenses: any[];
+  dateParams: string;
+  onNavigate?: (page: string) => void;
+  isLoading?: boolean;
+}) {
+  // Filter expenses by dateParams range
+  const filtered = useMemo(() => {
+    const p = new URLSearchParams(dateParams);
+    const from = p.get('from') ? new Date(p.get('from')!) : null;
+    const to = p.get('to') ? new Date(p.get('to')!) : null;
+    if (to) to.setHours(23, 59, 59, 999);
+    return expenses.filter(e => {
+      const d = new Date(e.date);
+      return (!from || d >= from) && (!to || d <= to);
+    });
+  }, [expenses, dateParams]);
+
+  const total = filtered.reduce((s, e) => s + (e.amount ?? 0), 0);
+
+  const categoryTotals = useMemo(() => {
+    const map: Record<string, number> = {};
+    filtered.forEach(e => { map[e.category] = (map[e.category] ?? 0) + (e.amount ?? 0); });
+    return Object.entries(map).sort((a, b) => b[1] - a[1]);
+  }, [filtered]);
+
+  const pieData = categoryTotals.map(([name, value]) => ({ name, value }));
+
+  const monthlyData = useMemo(() => {
+    const map: Record<string, number> = {};
+    filtered.forEach(e => {
+      const k = format(new Date(e.date), 'MMM yy');
+      map[k] = (map[k] ?? 0) + (e.amount ?? 0);
+    });
+    return Object.entries(map).map(([month, amount]) => ({ month, amount }));
+  }, [filtered]);
+
+  const handleDownloadCSV = () => {
+    if (!filtered.length) return;
+    const rows = [
+      ['Date', 'Category', 'Supplier', 'Notes', 'Amount'],
+      ...filtered.map(e => [
+        format(new Date(e.date), 'dd/MM/yyyy'),
+        e.category,
+        e.supplierName || '',
+        e.notes || '',
+        e.amount,
+      ]),
+      ['', '', '', 'Total', total],
+    ];
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `expenses-${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (isLoading) return <div className="py-16 text-center text-muted-foreground">Loading expenses...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-sm text-muted-foreground">ফিল্টার সময়ের মোট খরচ: <span className="font-bold text-red-600">{fp(total)}</span> ({filtered.length}টি)</p>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={handleDownloadCSV}>
+            <Download className="w-3.5 h-3.5" /> CSV
+          </Button>
+          {onNavigate && (
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs border-red-200 text-red-600 hover:bg-red-50" onClick={() => onNavigate('expenses-report')}>
+              <ExternalLink className="w-3.5 h-3.5" /> বিস্তারিত রিপোর্ট
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="rounded-xl">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">মাসিক খরচ</CardTitle></CardHeader>
+          <CardContent>
+            {monthlyData.length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm py-8">কোনো ডেটা নেই</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}`} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={45} />
+                  <RechartsTooltip formatter={(v: number) => [fp(v), 'খরচ']} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
+                  <Bar dataKey="amount" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-xl">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">ক্যাটাগরি অনুযায়ী</CardTitle></CardHeader>
+          <CardContent>
+            {pieData.length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm py-8">কোনো ডেটা নেই</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75}>
+                    {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <RechartsTooltip formatter={(v: number) => fp(v)} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
+                  <Legend wrapperStyle={{ fontSize: '11px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="rounded-xl">
+        <CardHeader className="pb-2"><CardTitle className="text-sm">ক্যাটাগরি ব্রেকডাউন</CardTitle></CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ক্যাটাগরি</TableHead>
+                <TableHead className="text-right">সংখ্যা</TableHead>
+                <TableHead className="text-right">মোট</TableHead>
+                <TableHead className="text-right">%</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {categoryTotals.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="text-center py-6 text-muted-foreground text-sm">কোনো ডেটা নেই</TableCell></TableRow>
+              ) : categoryTotals.map(([cat, amt]) => (
+                <TableRow key={cat}>
+                  <TableCell className="text-sm">{cat}</TableCell>
+                  <TableCell className="text-right text-sm">{filtered.filter(e => e.category === cat).length}</TableCell>
+                  <TableCell className="text-right font-semibold text-sm">{fp(amt)}</TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">{total > 0 ? ((amt/total)*100).toFixed(1) : 0}%</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

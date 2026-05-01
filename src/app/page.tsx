@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useSession } from 'next-auth/react';
 
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { useTranslations } from 'next-intl';
 import type { Product as ProductType } from '@/types/pos';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 const CartPanel = dynamic(() => import('@/components/pos/CartPanel'), { ssr: false });
@@ -17,7 +18,7 @@ import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDia
 import { PartiesManagement } from '@/components/pos/PartiesManagement';
 import { UsersManagement } from '@/components/pos/UsersManagement';
 import { TransactionHistory } from '@/components/pos/TransactionHistory';
-import { Reports } from '@/components/pos';
+import { Reports, AuditLogs } from '@/components/pos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -62,8 +63,10 @@ import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 // Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
 
 import { Expenses } from '@/components/pos/Expenses';
+import { ExpensesReport } from '@/components/pos/ExpensesReport';
+import { ProductStatistics } from '@/components/pos/ProductStatistics';
 
-type PageType = 'dashboard' | 'billing' | 'stock' | 'parties' | 'reports' | 'transactions' | 'expenses' | 'settings' | 'users' | 'menu';
+type PageType = 'dashboard' | 'billing' | 'stock' | 'stock-statistics' | 'parties' | 'reports' | 'transactions' | 'expenses' | 'expenses-report' | 'settings' | 'users' | 'menu' | 'audit';
 
 const navItems: { id: Exclude<PageType, 'menu'>; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -75,6 +78,7 @@ const navItems: { id: Exclude<PageType, 'menu'>; label: string; icon: React.Reac
   { id: 'expenses', label: 'Expenses', icon: <Banknote className="w-5 h-5" /> },
   { id: 'users', label: 'Users', icon: <UserCog className="w-5 h-5" /> },
   { id: 'settings', label: 'Settings', icon: <Settings className="w-5 h-5" /> },
+  { id: 'audit', label: 'Audit Logs', icon: <History className="w-5 h-5" /> },
 ];
 
 // নতুন মোবাইল বটম নেভিগেশন আইটেম যোগ
@@ -95,6 +99,7 @@ const formatPrice = (price: number) => {
 };
 
 function POSDashboard() {
+  const t = useTranslations('Navigation');
   const [currentPage, setCurrentPage] = useState<PageType>('billing');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
@@ -516,6 +521,14 @@ function POSDashboard() {
             } catch {
               errorMessage = `Server error: ${response.statusText}`;
             }
+
+            if (response.status === 401) {
+              throw new Error('আপনি লগইন করা নেই। পুনরায় লগইন করুন।');
+            }
+
+            if (response.status === 403) {
+              throw new Error('আপনার এই কাজ করার অনুমতি নেই।');
+            }
             
             const shouldFallbackToOffline = 
               response.status >= 500 || 
@@ -579,7 +592,7 @@ function POSDashboard() {
       setCheckoutOpen(false);
       
       toast({
-        title: 'Checkout error',
+        title: 'চেকআউট ব্যর্থ হয়েছে',
         description: errorMessage,
         variant: 'destructive',
       });
@@ -612,8 +625,13 @@ function POSDashboard() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('Stock entry failed:', errorData.error);
-          toast({ title: 'Stock entry failed', description: errorData.error, variant: 'destructive' });
+          const msg = response.status === 403
+            ? 'আপনার স্টক যোগ করার অনুমতি নেই।'
+            : response.status === 401
+            ? 'আপনি লগইন করা নেই। পুনরায় লগইন করুন।'
+            : errorData.error;
+          console.error('Stock entry failed:', msg);
+          toast({ title: 'স্টক এন্ট্রি ব্যর্থ', description: msg, variant: 'destructive' });
           return;
         }
 
@@ -738,7 +756,12 @@ function POSDashboard() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to update product');
+          const msg = response.status === 403
+            ? 'আপনার প্রডাক্ট এডিট করার অনুমতি নেই।'
+            : response.status === 401
+            ? 'আপনি লগইন করা নেই। পুনরায় লগইন করুন।'
+            : errorData.error || 'Failed to update product';
+          throw new Error(msg);
         }
         
         const { data: updatedProduct } = await response.json();
@@ -754,7 +777,12 @@ function POSDashboard() {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create product');
+          const msg = response.status === 403
+            ? 'আপনার নতুন প্রডাক্ট যোগ করার অনুমতি নেই।'
+            : response.status === 401
+            ? 'আপনি লগইন করা নেই। পুনরায় লগইন করুন।'
+            : errorData.error || 'Failed to create product';
+          throw new Error(msg);
         }
 
         const { data: newProduct } = await response.json();
@@ -847,7 +875,7 @@ function POSDashboard() {
             )}>
               {item.icon}
             </div>
-            <span className="font-medium tracking-tight">{item.label}</span>
+            <span className="font-medium tracking-tight">{t(item.id as any)}</span>
           </button>
         ))}
       </div>
@@ -1000,16 +1028,23 @@ function POSDashboard() {
             onEditProduct={handleEditProduct}
             onAddStock={handleAddStock}
             onDeleteProduct={handleDeleteProduct}
+            onStatistics={() => setCurrentPage('stock-statistics')}
           />
         );
+      case 'stock-statistics':
+        return <ProductStatistics onBack={() => setCurrentPage('stock')} />;
       case 'parties':
         return <PartiesManagement />;
       case 'reports':
-        return <Reports />;
+        return <Reports onNavigate={handleNavigate} />;
       case 'transactions':
         return <TransactionHistory />;
       case 'expenses':
-        return <Expenses />;
+        return <Expenses onReport={() => setCurrentPage('expenses-report')} />;
+      case 'expenses-report':
+        return <ExpensesReport onBack={() => setCurrentPage('expenses')} />;
+      case 'audit':
+        return <AuditLogs />;
       case 'menu':
         return (
           <div className="p-4 overflow-y-auto h-full">
@@ -1021,7 +1056,7 @@ function POSDashboard() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               {filteredNavItems
-                .filter((item) => ['reports', 'settings', 'parties', 'users', 'transactions', 'expenses'].includes(item.id))
+                .filter((item) => ['reports', 'settings', 'parties', 'users', 'transactions', 'expenses', 'audit'].includes(item.id))
                 .map((item) => (
                   <button
                     key={item.id}
@@ -1029,7 +1064,7 @@ function POSDashboard() {
                     className="flex flex-col items-center justify-center p-4 rounded-xl border bg-card hover:bg-primary/10 transition-colors gap-2"
                   >
                     {item.icon}
-                    <span className="text-sm font-medium">{item.label}</span>
+                    <span className="text-sm font-medium">{t(item.id as any)}</span>
                   </button>
                 ))}
             </div>
@@ -1098,10 +1133,10 @@ function POSDashboard() {
                 'flex flex-col items-center justify-center flex-1 py-1 rounded-lg text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary transition',
                 currentPage === item.id ? 'bg-primary/10 text-primary font-semibold' : ''
               )}
-              aria-label={item.label}
+              aria-label={t(item.id as any)}
             >
               {item.icon}
-              <span className="mt-0.5 text-[10px] leading-none">{item.label}</span>
+              <span className="mt-0.5 text-[10px] leading-none">{t(item.id as any)}</span>
             </button>
           ))}
         </div>

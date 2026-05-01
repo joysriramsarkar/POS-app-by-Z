@@ -216,12 +216,6 @@ critical principles with production-ready code:
    - Code examples
    - Testing strategy
 
-7. src/components/pos/CheckoutDialogIntegrationExample.tsx (350 lines)
-   - Complete implementation example
-   - Local-first checkout
-   - Network status display
-   - Device ID management
-
 ## FILES MODIFIED
 
 1. src/app/api/sync/route.ts

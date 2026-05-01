@@ -1,0 +1,44 @@
+{
+  "Navigation": {
+    "dashboard": "Dashboard",
+    "billing": "Billing",
+    "stock": "Inventory",
+    "parties": "Parties",
+    "reports": "Reports",
+    "transactions": "Transactions",
+    "expenses": "Expenses",
+    "users": "Users",
+    "settings": "Settings",
+    "audit": "Audit Logs",
+    "menu": "Menu",
+    "home": "Home",
+    "bill": "Bill",
+    "stock-statistics": "Stock Statistics",
+    "expenses-report": "Expenses Report",
+    "offline": "Offline",
+    "online": "Online",
+    "syncing": "Syncing",
+    "pending": "pending"
+  },
+  "Dashboard": {
+    "welcome": "Welcome back",
+    "today_sales": "Today's Sales",
+    "total_due": "Total Due",
+    "low_stock": "Low Stock Items",
+    "recent_transactions": "Recent Transactions",
+    "today_orders": "Today's Orders",
+    "quick_actions": "Quick Actions",
+    "new_sale": "New Sale",
+    "add_stock": "Add Stock",
+    "add_party": "Add Party",
+    "due_payments": "Due Payments"
+  },
+  "Common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "search": "Search..."
+  }
+}

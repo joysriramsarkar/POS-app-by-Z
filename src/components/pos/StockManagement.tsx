@@ -31,6 +31,7 @@ import {
   ArrowUpDown,
   X,
   Upload,
+  BarChart2,
 } from 'lucide-react';
 import type { Product } from '@/types/pos';
 import { useProductsStore } from '@/stores/pos-store';
@@ -41,12 +42,13 @@ interface StockManagementProps {
   onEditProduct?: (product: Product) => void;
   onAddStock?: (product: Product) => void;
   onDeleteProduct?: (product: Product) => void;
+  onStatistics?: () => void;
 }
 
 type SortField = 'name' | 'stock' | 'price' | 'category';
 type SortOrder = 'asc' | 'desc';
 
-export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDeleteProduct }: StockManagementProps) {
+export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDeleteProduct, onStatistics }: StockManagementProps) {
   const { data: session } = useSession();
   const userRole = (session?.user as { role?: string })?.role;
   const canDelete = userRole === 'ADMIN' || userRole === 'MANAGER';
@@ -213,7 +215,11 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
               {storeProducts.length} items • Total Value: {formatPrice(totalStockValue)} • {negativeStockCount > 0 && <span className="text-red-600 font-semibold">{negativeStockCount} negative stock • </span>}{lowStockCount} low stock • {outOfStockCount} out of stock
             </p>
           </div>
-          <div className='flex gap-2'>
+          <div className='flex gap-2 flex-wrap'>
+            <Button variant="outline" onClick={onStatistics}>
+                <BarChart2 className="w-4 h-4 mr-2" />
+                Statistics
+            </Button>
             <Button variant="outline" onClick={() => setIsBulkUpdateOpen(true)}>
                 <Upload className="w-4 h-4 mr-2" />
                 Bulk Update

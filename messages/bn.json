@@ -1,0 +1,44 @@
+{
+  "Navigation": {
+    "dashboard": "ড্যাশবোর্ড",
+    "billing": "বিলিং",
+    "stock": "স্টক",
+    "parties": "পার্টি (বাকি/জমা)",
+    "reports": "রিপোর্ট",
+    "transactions": "লেনদেন",
+    "expenses": "খরচ",
+    "users": "ব্যবহারকারী",
+    "settings": "সেটিংস",
+    "audit": "অডিট লগ",
+    "menu": "মেনু",
+    "home": "হোম",
+    "bill": "বিল",
+    "stock-statistics": "স্টক পরিসংখ্যান",
+    "expenses-report": "খরচের রিপোর্ট",
+    "offline": "অফলাইন",
+    "online": "অনলাইন",
+    "syncing": "সিঙ্ক হচ্ছে",
+    "pending": "বাকি"
+  },
+  "Dashboard": {
+    "welcome": "স্বাগতম",
+    "today_sales": "আজকের বিক্রি",
+    "total_due": "মোট বাকি",
+    "low_stock": "কম স্টক",
+    "recent_transactions": "সাম্প্রতিক লেনদেন",
+    "today_orders": "আজকের অর্ডার",
+    "quick_actions": "দ্রুত কাজ",
+    "new_sale": "নতুন বিক্রি",
+    "add_stock": "স্টক যোগ করুন",
+    "add_party": "পার্টি যোগ করুন",
+    "due_payments": "বাকি পাওনা"
+  },
+  "Common": {
+    "save": "সেভ করুন",
+    "cancel": "বাতিল",
+    "delete": "মুছে ফেলুন",
+    "edit": "এডিট",
+    "loading": "লোড হচ্ছে...",
+    "search": "খুঁজুন..."
+  }
+}

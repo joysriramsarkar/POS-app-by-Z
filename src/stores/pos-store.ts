@@ -113,11 +113,14 @@ export const useCartStore = create<CartState & CartActions>()(
       }),
 
       removeTab: (tabId: string) => set((state) => {
-        if (state.tabs.length === 1) return state; // Don't remove last tab
-        const newTabs = state.tabs.filter(t => t.id !== tabId);
+        if (state.tabs.length === 1) return state;
+        const newTabs = state.tabs.filter(t => t.id !== tabId).map((t, i) => ({ ...t, name: `Bill ${i + 1}` }));
         let newActiveTabId = state.activeTabId;
         if (state.activeTabId === tabId) {
-          newActiveTabId = newTabs[newTabs.length - 1].id;
+          const removedIndex = state.tabs.findIndex(t => t.id === tabId);
+          const nextTab = state.tabs[removedIndex + 1] || state.tabs[removedIndex - 1];
+          const newTab = newTabs.find(t => t.id === nextTab.id);
+          newActiveTabId = newTab ? newTab.id : newTabs[newTabs.length - 1].id;
         }
         return { tabs: newTabs, activeTabId: newActiveTabId };
       }),
@@ -435,6 +438,7 @@ interface CustomersActions {
   addCustomer: (customer: Customer) => void;
   updateCustomer: (id: string, data: Partial<Customer>) => void;
   updateCustomerDue: (id: string, amount: number) => void;
+  updateCustomerPrepaid: (id: string, amount: number) => void;
   reset: () => void;
 }
 
@@ -467,6 +471,16 @@ export const useCustomersStore = create<CustomersState & CustomersActions>((set,
       customers: state.customers.map((c) =>
         c.id === id
           ? { ...c, totalDue: c.totalDue + amount }
+          : c
+      ),
+    }));
+  },
+
+  updateCustomerPrepaid: (id, amount) => {
+    set((state) => ({
+      customers: state.customers.map((c) =>
+        c.id === id
+          ? { ...c, prepaidBalance: Math.max(0, c.prepaidBalance + amount) }
           : c
       ),
     }));

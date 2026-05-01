@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db as prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/api-middleware";
+import { requirePermission, getAuthenticatedUser } from "@/lib/api-middleware";
+import { logAudit } from "@/lib/audit";
+
+const getIp = (req: NextRequest) => req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
 import { toMoneyNumber } from "@/lib/money";
 
 export async function GET(request: NextRequest) {
@@ -8,9 +11,22 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
+    const { searchParams } = new URL(request.url);
+    const dateFrom = searchParams.get("dateFrom");
+    const dateTo = searchParams.get("dateTo");
+
+    const where: Record<string, unknown> = {};
+    if (dateFrom || dateTo) {
+      where.date = {
+        ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+        ...(dateTo ? { lte: new Date(dateTo) } : {}),
+      };
+    }
+
     const expenses = await prisma.expense.findMany({
+      where,
       orderBy: { date: "desc" },
-      take: 100,
+      take: 500,
     });
     return NextResponse.json({ success: true, data: expenses });
   } catch (error: unknown) {
@@ -27,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { amount, category, notes, date } = body;
+    const { amount, category, notes, date, supplierId, supplierName } = body;
 
     if (!amount || !category) {
       return NextResponse.json(
@@ -36,44 +52,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Handle invalid dates (like those submitted in Bengali localized formats like DD/MM/YYYY)
+    const convertBengaliToEnglishNumerals = (input: string) => {
+      const map: Record<string, string> = { "০":"0","১":"1","২":"2","৩":"3","৪":"4","৫":"5","৬":"6","৭":"7","৮":"8","৯":"9" };
+      return input.replace(/[০-৯]/g, (m) => map[m] || m);
+    };
+
     let parsedDate = new Date();
     if (date) {
-      // First normalize the date string if it contains Bengali numerals
-      const convertBengaliToEnglishNumerals = (input: string) => {
-        const bengaliToEnglish: { [key: string]: string } = {
-          "০": "0",
-          "১": "1",
-          "২": "2",
-          "৩": "3",
-          "৪": "4",
-          "৫": "5",
-          "৬": "6",
-          "৭": "7",
-          "৮": "8",
-          "৯": "9",
-        };
-        return input.replace(
-          /[০-৯]/g,
-          (match) => bengaliToEnglish[match] || match,
-        );
-      };
-
-      const normalizedDateStr = convertBengaliToEnglishNumerals(date);
-
-      // If the date looks like DD/MM/YYYY, convert to YYYY-MM-DD
-      const ddmmyyyyMatch = normalizedDateStr.match(
-        /^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/,
-      );
-      if (ddmmyyyyMatch) {
-        parsedDate = new Date(
-          `${ddmmyyyyMatch[3]}-${ddmmyyyyMatch[2]}-${ddmmyyyyMatch[1]}`,
-        );
+      const normalized = convertBengaliToEnglishNumerals(date);
+      const ddmm = normalized.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+      if (ddmm) {
+        parsedDate = new Date(`${ddmm[3]}-${ddmm[2]}-${ddmm[1]}`);
       } else {
-        const attemptedDate = new Date(normalizedDateStr);
-        if (!isNaN(attemptedDate.getTime())) {
-          parsedDate = attemptedDate;
-        }
+        const d = new Date(normalized);
+        if (!isNaN(d.getTime())) parsedDate = d;
       }
     }
 
@@ -83,9 +75,13 @@ export async function POST(request: NextRequest) {
         category,
         notes,
         date: parsedDate,
+        supplierId: supplierId || null,
+        supplierName: supplierName || null,
       },
     });
 
+    const user = await getAuthenticatedUser(request);
+    await logAudit({ userId: (user as any)?.id, action: 'CREATE_EXPENSE', entityType: 'Expense', entityId: expense.id, details: { amount: expense.amount, category: expense.category, notes: expense.notes }, ipAddress: getIp(request) });
     return NextResponse.json({ success: true, data: expense });
   } catch (error: unknown) {
     return NextResponse.json(
@@ -110,10 +106,9 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await prisma.expense.delete({
-      where: { id },
-    });
-
+    await prisma.expense.delete({ where: { id } });
+    const user2 = await getAuthenticatedUser(request);
+    await logAudit({ userId: (user2 as any)?.id, action: 'DELETE_EXPENSE', entityType: 'Expense', entityId: id, ipAddress: getIp(request) });
     return NextResponse.json({ success: true, message: "Expense deleted" });
   } catch (error: unknown) {
     return NextResponse.json(
@@ -122,3 +117,6 @@ export async function DELETE(request: NextRequest) {
     );
   }
 }
+
+
+

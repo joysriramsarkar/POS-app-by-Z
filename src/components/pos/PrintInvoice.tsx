@@ -162,7 +162,7 @@ function ThermalInvoice({
             {sale.items.map((item) => (
               <tr key={item.id} style={{ borderBottom: '1px dotted #ccc' }}>
                 <td className="w-[52%] pr-1 align-top py-0.5 whitespace-normal">{item.productName}</td>
-                <td className="w-[16%] text-right align-top py-0.5">{item.quantity}</td>
+                <td className="w-[16%] text-right align-top py-0.5">{item.quantity}{(item as any).unit ? ` ${(item as any).unit}` : ''}</td>
                 <td className="w-[16%] text-right align-top py-0.5">{(item.unitPrice ?? 0).toFixed(0)}</td>
                 <td className="w-[16%] text-right align-top py-0.5 font-medium">{(item.totalPrice ?? 0).toFixed(0)}</td>
               </tr>
@@ -318,7 +318,7 @@ function StandardInvoice({
             <tr key={item.id} style={{ borderBottom: '1px solid #e5e5e5', background: index % 2 === 0 ? '#fff' : '#fafafa' }}>
               <td style={{ padding: '7px 10px', color: '#888' }}>{index + 1}</td>
               <td style={{ padding: '7px 10px', fontWeight: 500 }}>{item.productName}</td>
-              <td style={{ padding: '7px 10px', textAlign: 'center' }}>{item.quantity}</td>
+              <td style={{ padding: '7px 10px', textAlign: 'center' }}>{item.quantity}{(item as any).unit ? ` ${(item as any).unit}` : ''}</td>
               <td style={{ padding: '7px 10px', textAlign: 'right' }}>{formatCurrency(item.unitPrice)}</td>
               <td style={{ padding: '7px 10px', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.totalPrice)}</td>
             </tr>

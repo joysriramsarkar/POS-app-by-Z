@@ -6,10 +6,10 @@
 // ENUMS
 // ============================================================================
 
-export type PaymentMethod = 'Cash' | 'UPI' | 'Mixed' | 'Due';
+export type PaymentMethod = 'Cash' | 'UPI' | 'Mixed' | 'Due' | 'Prepaid';
 export type PaymentStatus = 'Paid' | 'Partial' | 'Due';
 export type SaleStatus = 'Completed' | 'Cancelled' | 'Refunded';
-export type EntryType = 'credit' | 'debit';
+export type EntryType = 'credit' | 'debit' | 'prepayment-used' | 'prepayment-added' | 'prepayment-restored';
 export type StockChangeType = 'purchase' | 'sale' | 'adjustment' | 'return';
 
 // ============================================================================
@@ -99,6 +99,7 @@ export interface SaleItem {
   quantity: number | null;
   unitPrice: number | null;
   totalPrice: number | null;
+  unit?: string;
   createdAt: Date;
 }
 

@@ -117,6 +117,7 @@ export function ProductDialog({
   const [formError, setFormError] = useState<string | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isWebScannerOpen, setIsWebScannerOpen] = useState(false);
+  const [isNameBnTouched, setIsNameBnTouched] = useState(false);
 
   const isNativeApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
 
@@ -149,6 +150,7 @@ export function ProductDialog({
         setCurrentStock(product.currentStock.toString());
         setMinStockLevel(product.minStockLevel.toString());
         setIsActive(product.isActive);
+        setIsNameBnTouched(true);
       } else {
         // Reset for new product
         setName('');
@@ -162,9 +164,53 @@ export function ProductDialog({
         setCurrentStock('0');
         setMinStockLevel('5');
         setIsActive(true);
+        setIsNameBnTouched(false);
       }
     }
   }, [open, product]);
+
+  // Auto-translate name to Bengali
+  useEffect(() => {
+    if (!name.trim()) {
+      if (!isNameBnTouched) setNameBn('');
+      return;
+    }
+    
+    const timeoutId = setTimeout(async () => {
+      if (!isNameBnTouched) {
+        try {
+          // Convert English digits to Bengali digits first
+          const englishDigits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+          const bengaliDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
+          let digitConvertedName = name.trim();
+          for (let i = 0; i < englishDigits.length; i++) {
+            digitConvertedName = digitConvertedName.split(englishDigits[i]).join(bengaliDigits[i]);
+          }
+
+          const processedName = digitConvertedName
+            .replace(/\b(rs|rupees?)\b\.?\s*([০-৯0-9]+)/gi, '$2 taka') // Swap "Rs. 20" to "20 taka"
+            .replace(/\b(rs|rupees?)\b\.?/gi, 'taka') // Fallback for standalone "Rs"
+            .replace(/\b(yellow)\b/gi, 'holud')
+            .replace(/\b(red)\b/gi, 'lal')
+            .replace(/\b(green)\b/gi, 'sobuj')
+            .replace(/\b(blue)\b/gi, 'nil')
+            .replace(/\b(black)\b/gi, 'kalo')
+            .replace(/\b(white)\b/gi, 'sada');
+
+          const res = await fetch(`https://inputtools.google.com/request?text=${encodeURIComponent(processedName)}&itc=bn-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8&app=demopage`);
+          const data = await res.json();
+          if (data && data[1] && data[1][0] && data[1][0][1] && data[1][0][1][0]) {
+            // Double check if it hasn't been touched while fetching
+            setNameBn((prev) => isNameBnTouched ? prev : data[1][0][1][0]);
+          }
+        } catch (err) {
+          console.error("Auto-translate failed:", err);
+        }
+      }
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [name, isNameBnTouched]);
 
   const handleGenerateBarcode = () => {
     setBarcode(generateBarcode());
@@ -233,7 +279,7 @@ export function ProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] w-[95vw] max-h-[90dvh] overflow-y-auto p-4 md:p-6">
+      <DialogContent onInteractOutside={(e) => e.preventDefault()} className="sm:max-w-[425px] w-[95vw] max-h-[90dvh] overflow-y-auto p-4 md:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
@@ -266,7 +312,10 @@ export function ProductDialog({
             <Input
               id="product-form-nameBn"
               value={nameBn}
-              onChange={(e) => setNameBn(e.target.value)}
+              onChange={(e) => {
+                setNameBn(e.target.value);
+                setIsNameBnTouched(true);
+              }}
               placeholder="e.g., টাটা লবণ"
             />
           </div>

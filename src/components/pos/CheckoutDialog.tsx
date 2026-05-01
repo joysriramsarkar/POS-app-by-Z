@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import {
   Dialog,
   DialogContent,
@@ -27,7 +26,7 @@ import {
   Receipt,
   Wallet,
 } from 'lucide-react';
-import type { PaymentMethod, Sale, SaleItem, Customer } from '@/types/pos';
+import type { PaymentMethod, Sale, Customer } from '@/types/pos';
 import { useCartStore, useUIStore, useProductsStore, useCustomersStore } from '@/stores/pos-store';
 import { cn } from '@/lib/utils';
 
@@ -270,46 +269,33 @@ export function CheckoutDialog({
       return;
     }
 
-    const saleItems: SaleItem[] = items.map((item) => ({
-      id: uuidv4(),
-      saleId: '',
-      productId: item.productId,
-      productName: item.productName,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      totalPrice: item.totalPrice,
-      createdAt: new Date(),
-    }));
-
     const finalPaymentMethod = remainingTotal === 0 ? 'Prepaid' : paymentMethod;
+    const changeAmount = finalPaymentMethod === 'Due' ? 0 : Math.max(0, change);
+    const externalAmountApplied = finalPaymentMethod === 'Due'
+      ? 0
+      : Math.min(parsedAmount, remainingTotal);
 
-    let amountPaidForSale = prepaidAmountToUse;
-    if (finalPaymentMethod !== 'Due') {
-        if (customerId && parsedAmount < remainingTotal) {
-            amountPaidForSale += parsedAmount; // Partial payment
-        } else {
-            amountPaidForSale += remainingTotal;
-        }
-    }
+    const amountPaidForSale = prepaidAmountToUse + externalAmountApplied;
 
     let finalCashAmount = 0;
     let finalUpiAmount = 0;
 
     if (finalPaymentMethod === 'Mixed') {
-        finalUpiAmount = Number(upiReceived) || 0;
-        finalCashAmount = (Number(cashReceived) || 0) - Math.max(0, change);
-        if (finalCashAmount < 0) finalCashAmount = 0;
+      const cashTendered = Number(cashReceived) || 0;
+      const upiTendered = Number(upiReceived) || 0;
+      finalCashAmount = Math.min(cashTendered, externalAmountApplied);
+      finalUpiAmount = Math.min(upiTendered, Math.max(0, externalAmountApplied - finalCashAmount));
     } else if (finalPaymentMethod === 'Cash') {
-        finalCashAmount = amountPaidForSale;
+      finalCashAmount = externalAmountApplied;
     } else if (finalPaymentMethod === 'UPI') {
-        finalUpiAmount = amountPaidForSale;
+      finalUpiAmount = externalAmountApplied;
     }
 
     const paymentData: PaymentData = {
       amountReceived: parsedAmount,
       amountPaid: amountPaidForSale,
-      change: finalPaymentMethod === 'Due' ? 0 : Math.max(0, change),
-      paymentMethod: finalPaymentMethod as any,
+      change: changeAmount,
+      paymentMethod: finalPaymentMethod,
       cashAmount: finalCashAmount,
       upiAmount: finalUpiAmount,
       customerId,
@@ -420,7 +406,7 @@ export function CheckoutDialog({
           <div className="space-y-2">
             {items.map((item) => (
               <div key={item.id} className="flex justify-between text-sm">
-                <span className="truncate flex-1">{item.productName}<span className="text-muted-foreground ml-1">×{item.quantity}</span></span>
+                <span className="truncate flex-1">{item.productName}<span className="text-muted-foreground ml-1">×{item.quantity}{item.unit ? ` ${item.unit}` : ''}</span></span>
                 <span className="font-medium ml-2">{formatPrice(item.totalPrice)}</span>
               </div>
             ))}
@@ -475,11 +461,14 @@ export function CheckoutDialog({
                       <Input
                         id="cash-received"
                         type="text"
+                        inputMode="numeric"
                         value={cashReceived}
                         onChange={handleCashChange}
                         placeholder="0"
                         className="pl-8 text-xl h-12 font-semibold text-right"
                         disabled={isProcessing}
+                        readOnly
+                        onFocus={e => e.currentTarget.removeAttribute('readonly')}
                       />
                     </div>
                   </div>
@@ -490,11 +479,14 @@ export function CheckoutDialog({
                       <Input
                         id="upi-received"
                         type="text"
+                        inputMode="numeric"
                         value={upiReceived}
                         onChange={handleUpiChange}
                         placeholder="0"
                         className="pl-8 text-xl h-12 font-semibold text-right"
                         disabled={isProcessing}
+                        readOnly
+                        onFocus={e => e.currentTarget.removeAttribute('readonly')}
                       />
                     </div>
                   </div>
@@ -505,11 +497,14 @@ export function CheckoutDialog({
                   <Input
                     id="amount-received"
                     type="text"
+                    inputMode="numeric"
                     value={amountReceived}
                     onChange={handleAmountChange}
                     placeholder="0"
                     className="pl-8 text-xl h-12 font-semibold text-right"
                     disabled={isProcessing}
+                    readOnly
+                    onFocus={e => e.currentTarget.removeAttribute('readonly')}
                   />
                 </div>
               )}
@@ -537,6 +532,12 @@ export function CheckoutDialog({
                     <span className="text-sm">Add {formatPrice(change)} as prepayment?</span>
                   </Label>
                   <Switch id="add-prepayment" checked={addAsPrePayment} onCheckedChange={setAddAsPrePayment} />
+                </div>
+              )}
+
+              {change > 0 && !customerId && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                  <p className="text-sm text-green-700 font-medium">Return {formatPrice(change)} to customer</p>
                 </div>
               )}
             </div>

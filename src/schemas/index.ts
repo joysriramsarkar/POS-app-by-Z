@@ -33,6 +33,7 @@ export const SaleInputSchema = z.object({
   items: z.array(SaleItemInputSchema).min(1, 'Items must be a non-empty array'),
   customerId: z.string().nullable().optional(),
   paymentMethod: z.string().optional().default('Cash'),
+  amountReceived: money().pipe(z.number().nonnegative()).optional().default(0),
   amountPaid: money().pipe(z.number().nonnegative()).optional().default(0),
   cashAmount: money().pipe(z.number().nonnegative()).optional(),
   upiAmount: money().pipe(z.number().nonnegative()).optional(),
@@ -45,6 +46,7 @@ export const SaleInputSchema = z.object({
   status: z.string().optional(),
   usePrepaid: z.boolean().optional().default(false),
   prepaidAmountUsed: money().pipe(z.number().nonnegative()).optional().default(0),
+  changeAsPrepayment: money().pipe(z.number().nonnegative()).optional().default(0),
 });
 
 export type SaleItemInput = z.infer<typeof SaleItemInputSchema>;

@@ -38,8 +38,19 @@ export async function requirePermission(
 
   const hasAccess = await hasPermission(userId, permissionCode);
   if (!hasAccess) {
+    const actionMap: Record<string, string> = {
+      'sales.create': 'বিক্রি তৈরি',
+      'sales.view': 'বিক্রির তথ্য দেখা',
+      'sales.edit': 'বিক্রি সম্পাদনা',
+      'stock.create': 'স্টক যোগ',
+      'stock.edit': 'স্টক সম্পাদনা',
+      'products.create': 'পণ্য তৈরি',
+      'products.edit': 'পণ্য সম্পাদনা',
+      'products.delete': 'পণ্য মুছে ফেলা',
+    };
+    const actionLabel = actionMap[permissionCode] || permissionCode;
     return NextResponse.json(
-      { error: `You don't have permission to perform this action` },
+      { error: `আপনার "${actionLabel}" করার অনুমতি নেই।` },
       { status: 403 }
     );
   }
@@ -64,7 +75,7 @@ export async function requireRole(
 
   if (!userRole || !allowedRoles.includes(userRole)) {
     return NextResponse.json(
-      { error: "Insufficient permissions" },
+      { error: "আপনার এই কাজ করার অনুমতি নেই।" },
       { status: 403 }
     );
   }

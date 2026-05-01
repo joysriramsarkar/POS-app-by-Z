@@ -11,6 +11,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { ProductInputSchema, SaleInputSchema, CustomerInputSchema } from '@/schemas';
 import { addMoney, subtractMoney, toMoneyNumber } from '@/lib/money';
+import {
+  aggregateSaleItemQuantities,
+  findSaleItemTotalMismatch,
+} from '@/lib/sale-calculations';
 
 
 const ProductSyncPayloadSchema = z.union([
@@ -265,10 +269,14 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
     // already in tx
     // VALIDATION PHASE: Check all prerequisites before creating anything
 
+    const itemTotalMismatch = findSaleItemTotalMismatch(saleData.items);
+    if (itemTotalMismatch) {
+      throw new Error(itemTotalMismatch);
+    }
+
     // 1. Validate all products exist and check current stock levels
-    const productIds = Array.from(
-      new Set(saleData.items.map((item) => item.productId)),
-    );
+    const stockDeductions = aggregateSaleItemQuantities(saleData.items);
+    const productIds = stockDeductions.map((item) => item.productId);
     const products = await tx.product.findMany({
       where: { id: { in: productIds } },
     });
@@ -276,9 +284,7 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
     const productMap = new Map<string, any>(
       products.map((p: any) => [p.id, p]),
     );
-    const productsToValidate: { product: any; item: any }[] = [];
-
-    for (const item of saleData.items) {
+    for (const item of stockDeductions) {
       const product = productMap.get(item.productId);
 
       if (!product) {
@@ -294,8 +300,6 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
           `Warning: Product ${product.name} has insufficient stock (have: ${product.currentStock}, need: ${item.quantity}) during sync. Sale will be recorded but may cause stock issues.`,
         );
       }
-
-      productsToValidate.push({ product, item });
     }
 
     // 2. Validate customer exists if specified
@@ -318,6 +322,29 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
 
     if ((saleData.totalAmount || 0) < 0) {
       throw new Error("Total amount cannot be negative");
+    }
+
+    const totalAmount = toMoneyNumber(saleData.totalAmount || 0);
+    const amountReceived = Math.max(0, toMoneyNumber(saleData.amountReceived || 0));
+    const amountPaid = Math.max(0, toMoneyNumber(saleData.amountPaid || 0));
+    const prepaidToUse = Math.max(0, toMoneyNumber(saleData.prepaidAmountUsed || 0));
+    const changeAsPrepayment = Math.max(0, toMoneyNumber(saleData.changeAsPrepayment || 0));
+    const externalPaidAmount = subtractMoney(amountPaid, prepaidToUse);
+
+    if (amountPaid > totalAmount) {
+      throw new Error("Amount paid cannot exceed sale total");
+    }
+
+    if (prepaidToUse > amountPaid) {
+      throw new Error("Prepaid amount cannot exceed total amount paid");
+    }
+
+    if (!saleData.customerId && (prepaidToUse > 0 || changeAsPrepayment > 0)) {
+      throw new Error("Prepaid balance can only be used with a selected customer");
+    }
+
+    if (changeAsPrepayment > 0 && amountReceived < addMoney(externalPaidAmount, changeAsPrepayment)) {
+      throw new Error("Received amount does not cover sale payment and prepaid change");
     }
 
     // CREATE PHASE: Now that validation passed, create records
@@ -350,9 +377,9 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
     });
 
       // Update stock for all products
-      if (saleData.items.length > 0) {
-        const productIds = saleData.items.map((i) => i.productId);
-        const quantities = saleData.items.map((i) => i.quantity);
+      if (stockDeductions.length > 0) {
+        const productIds = stockDeductions.map((i) => i.productId);
+        const quantities = stockDeductions.map((i) => i.quantity);
 
 
       await tx.$executeRaw`
@@ -366,7 +393,7 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
         `;
 
         // Create stock history for audit trail
-        const historyData = saleData.items.map((item) => ({
+        const historyData = stockDeductions.map((item) => ({
           productId: item.productId,
           changeType: 'sale',
           quantity: -item.quantity,
@@ -380,11 +407,8 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
       });
     }
 
-    // Update customer due if applicable
-    const amountPaid = toMoneyNumber(saleData.amountPaid || 0);
-    const totalAmount = toMoneyNumber(saleData.totalAmount || 0);
-
-    if (saleData.customerId && amountPaid < totalAmount) {
+    // Update customer due/prepaid if applicable
+    if (saleData.customerId && (amountPaid < totalAmount || prepaidToUse > 0 || changeAsPrepayment > 0)) {
       const dueAmount = subtractMoney(totalAmount, amountPaid);
 
       // Fetch customer BEFORE updating for correct balance calculation
@@ -393,38 +417,87 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
       });
 
       if (customer) {
-        const newTotalDue = addMoney(customer.totalDue, dueAmount);
+        if (prepaidToUse > 0) {
+          if (customer.prepaidBalance < prepaidToUse) {
+            throw new Error(
+              `Insufficient prepaid balance. Available: ${customer.prepaidBalance}, Tried to use: ${prepaidToUse}`,
+            );
+          }
 
-        await tx.customer.update({
-          where: { id: saleData.customerId },
-          data: {
-            totalDue: { increment: dueAmount },
-            updatedAt: new Date(),
-          },
-        });
+          await tx.customer.update({
+            where: { id: saleData.customerId },
+            data: {
+              prepaidBalance: { decrement: prepaidToUse },
+              updatedAt: new Date(),
+            },
+          });
 
-        // Add ledger entries for double-entry bookkeeping tracking
-        // Add credit for the total amount
-        await tx.ledgerEntry.create({
-          data: {
-            customerId: saleData.customerId,
-            entryType: "credit",
-            amount: totalAmount,
-            balanceAfter: newTotalDue,
-            description: `Offline sync credit purchase: ${saleData.invoiceNumber}`,
-            referenceId: sale.id,
-          },
-        });
+          await tx.ledgerEntry.create({
+            data: {
+              customerId: saleData.customerId,
+              entryType: "prepayment-used",
+              amount: prepaidToUse,
+              balanceAfter: customer.totalDue,
+              description: `Prepaid used for offline sale: ${saleData.invoiceNumber}`,
+              referenceId: sale.id,
+            },
+          });
+        }
 
-        // Add debit for the amount paid if partial payment
-        if (amountPaid > 0) {
+        if (dueAmount > 0) {
+          const creditAmount = subtractMoney(totalAmount, prepaidToUse);
+          const creditBalanceAfter = addMoney(customer.totalDue, creditAmount);
+          const newTotalDue = subtractMoney(creditBalanceAfter, externalPaidAmount);
+
+          await tx.customer.update({
+            where: { id: saleData.customerId },
+            data: {
+              totalDue: { increment: dueAmount },
+              updatedAt: new Date(),
+            },
+          });
+
+          await tx.ledgerEntry.create({
+            data: {
+              customerId: saleData.customerId,
+              entryType: "credit",
+              amount: creditAmount,
+              balanceAfter: creditBalanceAfter,
+              description: `Offline sync credit purchase: ${saleData.invoiceNumber}`,
+              referenceId: sale.id,
+            },
+          });
+
+          if (externalPaidAmount > 0) {
+            await tx.ledgerEntry.create({
+              data: {
+                customerId: saleData.customerId,
+                entryType: "debit",
+                amount: externalPaidAmount,
+                balanceAfter: newTotalDue,
+                description: `Offline sync payment for: ${saleData.invoiceNumber}`,
+                referenceId: sale.id,
+              },
+            });
+          }
+        }
+
+        if (changeAsPrepayment > 0) {
+          await tx.customer.update({
+            where: { id: saleData.customerId },
+            data: {
+              prepaidBalance: { increment: changeAsPrepayment },
+              updatedAt: new Date(),
+            },
+          });
+
           await tx.ledgerEntry.create({
             data: {
               customerId: saleData.customerId,
               entryType: "debit",
-              amount: amountPaid,
-              balanceAfter: subtractMoney(newTotalDue, amountPaid),
-              description: `Offline sync payment for: ${saleData.invoiceNumber}`,
+              amount: changeAsPrepayment,
+              balanceAfter: customer.totalDue,
+              description: `Offline sync change added as prepaid: ${saleData.invoiceNumber}`,
               referenceId: sale.id,
             },
           });

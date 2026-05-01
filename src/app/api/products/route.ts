@@ -8,6 +8,11 @@ import { db } from '@/lib/db';
 import type { Product } from '@/types/pos';
 import { ProductInputSchema } from '@/schemas';
 import { requirePermission } from '@/lib/api-middleware';
+import { logAudit } from '@/lib/audit';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+
+const MAX_PRODUCT_LIMIT = 10000;
 
 // GET /api/products - Fetch all products
 export async function GET(request: NextRequest) {
@@ -23,7 +28,10 @@ export async function GET(request: NextRequest) {
     const cursor = searchParams.get('cursor');
     const limitParam = searchParams.get('limit');
 
-    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
+    const parsedLimit = limitParam ? parseInt(limitParam, 10) : undefined;
+    const limit = typeof parsedLimit === 'number' && Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), MAX_PRODUCT_LIMIT)
+      : undefined;
 
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -68,8 +76,8 @@ export async function GET(request: NextRequest) {
 
     let nextCursor: string | undefined = undefined;
     if (limit && products.length > limit) {
-      const nextItem = products.pop();
-      nextCursor = nextItem?.id;
+      products.pop();
+      nextCursor = products[products.length - 1]?.id;
     }
 
     return NextResponse.json({
@@ -121,6 +129,17 @@ export async function POST(request: NextRequest) {
         minStockLevel: validatedData.minStockLevel,
         isActive: validatedData.isActive,
       },
+    });
+
+    const session = await getServerSession(authOptions);
+    await logAudit({
+      userId: session?.user?.id,
+      action: 'CREATE_PRODUCT',
+      entityType: 'Product',
+      entityId: product.id,
+      details: { name: product.name, category: product.category, barcode: product.barcode },
+      ipAddress: request.headers.get('x-forwarded-for') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
     });
 
     return NextResponse.json({
@@ -197,6 +216,17 @@ export async function PUT(request: NextRequest) {
       },
     });
 
+    const session = await getServerSession(authOptions);
+    await logAudit({
+      userId: session?.user?.id,
+      action: 'UPDATE_PRODUCT',
+      entityType: 'Product',
+      entityId: product.id,
+      details: { name: product.name, changes: validatedData },
+      ipAddress: request.headers.get('x-forwarded-for') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
+    });
+
     return NextResponse.json({
       success: true,
       data: product,
@@ -231,6 +261,16 @@ export async function DELETE(request: NextRequest) {
     const product = await db.product.update({
       where: { id },
       data: { isActive: false, updatedAt: new Date() },
+    });
+
+    const session = await getServerSession(authOptions);
+    await logAudit({
+      userId: session?.user?.id,
+      action: 'DELETE_PRODUCT',
+      entityType: 'Product',
+      entityId: id,
+      ipAddress: request.headers.get('x-forwarded-for') || undefined,
+      userAgent: request.headers.get('user-agent') || undefined,
     });
 
     return NextResponse.json({

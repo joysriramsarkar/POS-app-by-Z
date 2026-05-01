@@ -6,8 +6,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { StockEntryInputSchema } from '@/schemas';
-import { requirePermission } from '@/lib/api-middleware';
+import { requirePermission, getAuthenticatedUser } from '@/lib/api-middleware';
 import { multiplyMoney, toMoneyNumber } from '@/lib/money';
+import { logAudit } from '@/lib/audit';
+
+const getIp = (req: NextRequest) => req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
 
 // POST /api/stock-entry - Create stock entry (purchase)
 export async function POST(request: NextRequest) {
@@ -131,6 +134,17 @@ export async function POST(request: NextRequest) {
       return updatedProduct;
     });
 
+    const user = await getAuthenticatedUser(request);
+    const userId = (user as any)?.id;
+    await logAudit({
+      userId,
+      action: 'STOCK_ENTRY',
+      entityType: 'Product',
+      entityId: transactionResult.id,
+      details: { productName: transactionResult.name, quantity, purchasePrice, supplierId },
+      ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
+    });
+
     return NextResponse.json({
       success: true,
       data: transactionResult,
@@ -147,3 +161,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useTranslations } from 'next-intl';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +51,7 @@ interface DashboardProps {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
+  const t = useTranslations('Dashboard');
   const handleLogout = useLogout();
   const { data: session } = useSession();
   const userName = (session?.user as { name?: string; username?: string })?.name
@@ -279,7 +281,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {/* Today's Sales */}
             <Card className="bg-linear-to-br from-green-50 to-green-100/50 dark:from-green-950/40 dark:to-green-900/20 border-green-200 dark:border-green-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">Today's Sales</CardTitle>
+                <CardTitle className="text-sm font-medium text-green-700 dark:text-green-400">{t('today_sales')}</CardTitle>
                 <div className="w-8 h-8 rounded-full bg-green-200/50 dark:bg-green-800/50 flex items-center justify-center">
                   <IndianRupee className="h-4 w-4 text-green-600 dark:text-green-400" />
                 </div>
@@ -300,7 +302,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {/* Today's Orders */}
             <Card className="bg-linear-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/40 dark:to-blue-900/20 border-blue-200 dark:border-blue-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">Today's Orders</CardTitle>
+                <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-400">{t('today_orders')}</CardTitle>
                 <div className="w-8 h-8 rounded-full bg-blue-200/50 dark:bg-blue-800/50 flex items-center justify-center">
                   <ShoppingCart className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
@@ -321,7 +323,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {/* Low Stock Items */}
             <Card className="bg-linear-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/40 dark:to-amber-900/20 border-amber-200 dark:border-amber-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">Low Stock</CardTitle>
+                <CardTitle className="text-sm font-medium text-amber-700 dark:text-amber-400">{t('low_stock')}</CardTitle>
                 <div className="w-8 h-8 rounded-full bg-amber-200/50 dark:bg-amber-800/50 flex items-center justify-center">
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 </div>
@@ -335,7 +337,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {/* Due Payments */}
             <Card className="bg-linear-to-br from-red-50 to-red-100/50 dark:from-red-950/40 dark:to-red-900/20 border-red-200 dark:border-red-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">Due Payments</CardTitle>
+                <CardTitle className="text-sm font-medium text-red-700 dark:text-red-400">{t('due_payments')}</CardTitle>
                 <div className="w-8 h-8 rounded-full bg-red-200/50 dark:bg-red-800/50 flex items-center justify-center">
                   <Clock className="h-4 w-4 text-red-600 dark:text-red-400" />
                 </div>
@@ -350,7 +352,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           {/* Quick Actions */}
           <Card className="rounded-2xl shadow-sm border-border/50 bg-gradient-to-br from-card to-muted/20">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
+              <CardTitle className="text-base font-bold">{t('quick_actions')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-3 md:gap-4">
@@ -362,7 +364,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <ShoppingCart className="w-5 h-5 text-primary" />
                   </div>
-                  <span className="text-sm font-semibold">New Sale</span>
+                  <span className="text-sm font-semibold">{t('new_sale')}</span>
                 </Button>
                 <Button 
                   variant="outline" 
@@ -372,7 +374,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Package className="w-5 h-5 text-primary" />
                   </div>
-                  <span className="text-sm font-semibold">Add Stock</span>
+                  <span className="text-sm font-semibold">{t('add_stock')}</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -382,7 +384,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Users className="w-5 h-5 text-primary" />
                   </div>
-                  <span className="text-sm font-semibold">Add Party</span>
+                  <span className="text-sm font-semibold">{t('add_party')}</span>
                 </Button>
               </div>
             </CardContent>

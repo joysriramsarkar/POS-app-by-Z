@@ -289,6 +289,14 @@ export const CustomersDB = {
     }
   },
 
+  async updatePrepaid(customerId: string, amountChange: number): Promise<void> {
+    const customer = await this.getById(customerId);
+    if (customer) {
+      customer.prepaidBalance = Math.max(0, (customer.prepaidBalance || 0) + amountChange);
+      await putToStore(STORES.CUSTOMERS, customer);
+    }
+  },
+
   async clear(): Promise<void> {
     return clearStore(STORES.CUSTOMERS);
   },

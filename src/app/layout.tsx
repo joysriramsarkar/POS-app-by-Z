@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { OfflineProvider } from "@/lib/offline/offline-context";
+import { I18nProvider } from "@/components/providers/I18nProvider";
 
 import { Noto_Sans_Bengali } from "next/font/google";
 
@@ -63,8 +64,10 @@ export default function RootLayout({
         <SessionProvider>
           <OfflineProvider>
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-              {children}
-              <Toaster />
+              <I18nProvider>
+                {children}
+                <Toaster />
+              </I18nProvider>
             </ThemeProvider>
           </OfflineProvider>
         </SessionProvider>

@@ -20,6 +20,7 @@ export type { User as UserType } from './UsersManagement';
 export { AddUserDialog } from './AddUserDialog';
 export { default as SettingsManagement } from './SettingsManagement';
 export { TransactionHistory } from './transaction-history';
+export { AuditLogs } from './AuditLogs';
 
 // Print Components
 export { PrintInvoice, InvoicePreview } from './PrintInvoice';
