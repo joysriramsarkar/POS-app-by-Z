@@ -80,7 +80,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       try {
         const [salesResult, statsResult] = await Promise.allSettled([
           fetch('/api/sales?limit=5'),
-          fetch('/api/stats'),
+          fetch(`/api/stats?tzOffset=${new Date().getTimezoneOffset()}`),
         ]);
 
         // Safe sales handling

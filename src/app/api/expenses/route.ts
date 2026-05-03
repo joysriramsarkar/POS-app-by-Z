@@ -17,18 +17,24 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {};
     if (dateFrom || dateTo) {
+      const toDate = dateTo ? new Date(dateTo) : undefined;
+      if (toDate && !dateTo?.includes('T')) toDate.setHours(23, 59, 59, 999);
       where.date = {
         ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
-        ...(dateTo ? { lte: new Date(dateTo) } : {}),
+        ...(toDate ? { lte: toDate } : {}),
       };
     }
 
     const expenses = await prisma.expense.findMany({
       where,
       orderBy: { date: "desc" },
-      take: 500,
+      include: { supplier: { select: { id: true, name: true } } },
     });
-    return NextResponse.json({ success: true, data: expenses });
+    const data = expenses.map(e => ({
+      ...e,
+      supplierName: e.supplier?.name ?? e.supplierName ?? null,
+    }));
+    return NextResponse.json({ success: true, data });
   } catch (error: unknown) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch expenses" },

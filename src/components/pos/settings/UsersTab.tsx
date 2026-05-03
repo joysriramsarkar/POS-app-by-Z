@@ -111,7 +111,7 @@ export default function UsersTab({ session }: UsersTabProps) {
                   required
                   value={passwords[field]}
                   onChange={(e) => setPasswords({ ...passwords, [field]: e.target.value })}
-                  className={`pr-9 ${field === "confirm" && passwords.confirm ? (passwordsMatch ? "border-green-500" : "border-red-400") : ""}`}
+                  className={`pr-9 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden [&::-webkit-credentials-auto-fill-button]:hidden ${field === "confirm" && passwords.confirm ? (passwordsMatch ? "border-green-500" : "border-red-400") : ""}`}
                 />
                 <button
                   type="button"

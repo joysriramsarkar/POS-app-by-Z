@@ -96,7 +96,6 @@ export function Expenses({ onReport }: ExpensesProps) {
     setIsLoading(true);
     try {
       const { convertBengaliToEnglishNumerals } = await import('@/lib/utils');
-      const selectedSupplier = suppliers.find(s => s.id === supplierId);
       const res = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,7 +105,6 @@ export function Expenses({ onReport }: ExpensesProps) {
           notes,
           date: today,
           supplierId: category === 'Supplies' && supplierId && supplierId !== 'none' ? supplierId : null,
-          supplierName: category === 'Supplies' && selectedSupplier ? selectedSupplier.name : null,
         }),
       });
       if (res.ok) {

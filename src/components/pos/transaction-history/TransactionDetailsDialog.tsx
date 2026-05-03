@@ -1,9 +1,7 @@
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -17,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Share2 } from "lucide-react";
+import { Share2, X } from "lucide-react";
 import { formatPrice, getPaymentStatusColor } from "./utils";
 import { Transaction, TransactionItem } from "./types";
 import { useState } from "react";
@@ -125,17 +123,26 @@ export function TransactionDetailsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] w-[95vw] md:w-full overflow-y-auto p-4 md:p-6">
-        <DialogHeader>
-          <DialogTitle className="text-lg md:text-xl">
-            Transaction Details - {transaction.invoiceNumber}
-          </DialogTitle>
-          <DialogDescription className="text-xs md:text-sm">
-            {format(transaction.createdAt, "dd MMMM yyyy HH:mm:ss")}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent showCloseButton={false} className="max-w-2xl w-[95vw] md:w-full p-0 overflow-hidden flex flex-col max-h-[85vh]">
+        {/* Sticky header */}
+        <div className="sticky top-0 z-10 bg-background border-b px-4 py-3 md:px-6 md:py-4 flex items-start justify-between gap-3 shrink-0">
+          <div className="min-w-0">
+            <h2 className="text-lg md:text-xl font-semibold leading-tight">
+              Transaction Details - {transaction.invoiceNumber}
+            </h2>
+            <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
+              {format(transaction.createdAt, "dd MMMM yyyy HH:mm:ss")}
+            </p>
+          </div>
+          <DialogClose className="shrink-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity mt-0.5">
+            <X className="w-5 h-5" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
+        </div>
 
-        <div className="space-y-6">
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 p-4 md:p-6">
+          <div className="space-y-4 md:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             <Card className="bg-muted/30">
               <CardContent className="p-3 md:pt-4 md:p-6 pb-3 md:pb-4">
@@ -259,6 +266,16 @@ export function TransactionDetailsDialog({
             </Card>
           </div>
 
+          <div className="flex items-center justify-between border rounded-lg px-4 py-3 bg-muted/30">
+            <span className="text-sm text-muted-foreground">Order Status</span>
+            <Badge
+              variant={transaction.status === 'Completed' ? 'default' : 'destructive'}
+              className={transaction.status === 'Cancelled' ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400' : transaction.status === 'Refunded' ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400' : ''}
+            >
+              {transaction.status}
+            </Badge>
+          </div>
+
           <div className="flex flex-col gap-3 mt-4">
             <div className="text-sm font-medium">Actions</div>
             <div className="flex flex-wrap gap-2">
@@ -290,6 +307,7 @@ export function TransactionDetailsDialog({
                 </>
               )}
             </div>
+          </div>
           </div>
         </div>
       </DialogContent>

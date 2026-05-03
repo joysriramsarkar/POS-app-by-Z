@@ -134,6 +134,7 @@ async function main() {
         "customers.view",
         "stock.view",
         "suppliers.view",
+        "expenses.view",
       ],
     };
 

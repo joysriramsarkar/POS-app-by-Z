@@ -13,11 +13,15 @@ export async function GET(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    // Get the start and end of today in the local timezone
-    // Note: This assumes the server runs in the same timezone as the business.
-    // For production, you might want to handle timezones more explicitly.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { searchParams } = new URL(request.url);
+    // tzOffset = client's getTimezoneOffset() in minutes (e.g. IST = -330)
+    const tzOffset = parseInt(searchParams.get('tzOffset') ?? '0', 10);
+
+    // Calculate local midnight in UTC
+    const nowUtc = Date.now();
+    const localNow = new Date(nowUtc - tzOffset * 60 * 1000);
+    localNow.setUTCHours(0, 0, 0, 0);
+    const today = new Date(localNow.getTime() + tzOffset * 60 * 1000);
 
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);

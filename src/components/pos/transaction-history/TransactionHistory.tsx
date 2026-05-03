@@ -19,6 +19,7 @@ export function TransactionHistory() {
   const [pagination, setPagination] = useState<PaginationData | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export function TransactionHistory() {
     };
 
     fetchTransactions();
-  }, [currentPage, searchQuery, filterStatus, toast]);
+  }, [currentPage, searchQuery, filterStatus, refreshKey, toast]);
 
   const handleViewDetails = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
@@ -118,10 +119,9 @@ export function TransactionHistory() {
 
       setSelectedTransaction(updatedTransaction);
       setTransactions((prev) =>
-        prev.map((transaction) =>
-          transaction.id === updatedTransaction.id ? updatedTransaction : transaction
-        )
+        prev.map((t) => t.id === updatedTransaction.id ? updatedTransaction : t)
       );
+      setRefreshKey(k => k + 1);
 
       toast({
         title: 'Success',
