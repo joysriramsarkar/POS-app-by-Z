@@ -318,10 +318,13 @@ model User {
   password  String
   name      String
   phone     String?
-  role      UserRole @default(VIEWER)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  role                   UserRole @default(VIEWER)
+  isActive               Boolean  @default(true) @map("is_active")
+  requiresPasswordChange Boolean  @default(false) @map("requires_password_change")
+  failedLoginAttempts    Int      @default(0) @map("failed_login_attempts")
+  lockedUntil            DateTime? @map("locked_until")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
   // Relations
   sales       Sale[]

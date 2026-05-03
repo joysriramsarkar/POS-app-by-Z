@@ -50,12 +50,19 @@ export default function BackupTab() {
     }
   };
 
-  const handleRestoreClick = () => {
-    if (
-      confirm(
-        "সতর্কতা: রিস্টোর করলে বর্তমান ডাটা মুছে যাবে! আপনি কি নিশ্চিত? (Warning: Restoring will overwrite existing data! Are you sure?)",
-      )
-    ) {
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+
+  const handleRestoreClick = async () => {
+    // Force a backup first
+    await handleBackup();
+    setShowRestorePrompt(true);
+  };
+
+  const confirmRestore = () => {
+    if (restoreConfirmText === "RESTORE") {
+      setShowRestorePrompt(false);
+      setRestoreConfirmText("");
       fileInputRef.current?.click();
     }
   };
@@ -165,19 +172,54 @@ export default function BackupTab() {
               ref={fileInputRef}
               onChange={handleFileChange}
             />
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={handleRestoreClick}
-              disabled={isRestoring}
-            >
-              {isRestoring ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="mr-2 h-4 w-4" />
-              )}
-              রিস্টোর করুন
-            </Button>
+            {showRestorePrompt ? (
+              <div className="space-y-2 mt-4 p-4 border border-destructive/50 rounded-md bg-destructive/10">
+                <p className="text-sm font-bold text-destructive">
+                  To confirm, type "RESTORE" below:
+                </p>
+                <input
+                  type="text"
+                  className="w-full p-2 text-sm border rounded-md bg-background"
+                  value={restoreConfirmText}
+                  onChange={(e) => setRestoreConfirmText(e.target.value)}
+                  placeholder="RESTORE"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => {
+                      setShowRestorePrompt(false);
+                      setRestoreConfirmText("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={confirmRestore}
+                    disabled={restoreConfirmText !== "RESTORE"}
+                  >
+                    Confirm
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={handleRestoreClick}
+                disabled={isRestoring || isBackuping}
+              >
+                {isRestoring ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
+                রিস্টোর করুন
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
