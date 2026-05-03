@@ -293,11 +293,10 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
         );
       }
 
-      // Note: During offline sync, we may not have exact stock levels, so we log warnings but allow the sync
-      // This prevents losing sales data. Stock discrepancies should be reconciled via inventory management
+      // Warn on conflict but allow sync — sale data is preserved, stock floors at 0
       if (product.currentStock < item.quantity) {
         console.warn(
-          `Warning: Product ${product.name} has insufficient stock (have: ${product.currentStock}, need: ${item.quantity}) during sync. Sale will be recorded but may cause stock issues.`,
+          `Stock conflict: Product "${product.name}" has ${product.currentStock} units but sale requires ${item.quantity}. Stock will be set to 0 (not negative).`,
         );
       }
     }
@@ -382,9 +381,10 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
         const quantities = stockDeductions.map((i) => i.quantity);
 
 
+      // GREATEST(0, ...) prevents negative stock from concurrent offline sales
       await tx.$executeRaw`
           UPDATE products AS p
-          SET "current_stock" = p."current_stock" - update_data.quantity,
+          SET "current_stock" = GREATEST(0, p."current_stock" - update_data.quantity),
               "updated_at" = NOW()
           FROM (
             SELECT unnest(${productIds}::text[]) AS id, unnest(${quantities}::float[]) AS quantity
@@ -615,14 +615,22 @@ async function syncProduct(tx: Prisma.TransactionClient, productData: z.infer<ty
     if ("productId" in productData && "quantityChange" in productData) {
       const { productId, quantityChange } = productData;
 
-      // already in tx
-      const updated = await tx.product.update({
-        where: { id: productId },
-        data: {
-          currentStock: { increment: quantityChange },
-          updatedAt: new Date(),
-        },
-      });
+      // For stock deductions (negative quantityChange), floor at 0 to prevent negative stock
+      let updated;
+      if (quantityChange < 0) {
+        await tx.$executeRaw`
+          UPDATE products
+          SET "current_stock" = GREATEST(0, "current_stock" + ${quantityChange}),
+              "updated_at" = NOW()
+          WHERE id = ${productId}
+        `;
+        updated = await tx.product.findUniqueOrThrow({ where: { id: productId } });
+      } else {
+        updated = await tx.product.update({
+          where: { id: productId },
+          data: { currentStock: { increment: quantityChange }, updatedAt: new Date() },
+        });
+      }
 
       await tx.stockHistory.create({
         data: {

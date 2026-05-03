@@ -249,7 +249,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </div>
         <div className="hidden sm:block mt-3">
-          <Card className="rounded-2xl shadow-sm border-border/50 bg-gradient-to-br from-card to-muted/20">
+          <Card className="rounded-2xl shadow-sm border-border/50 bg-linear-to-br from-card to-muted/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-bold">Today's Payments Breakdown</CardTitle>
             </CardHeader>
@@ -350,7 +350,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           </div>
 
           {/* Quick Actions */}
-          <Card className="rounded-2xl shadow-sm border-border/50 bg-gradient-to-br from-card to-muted/20">
+          <Card className="rounded-2xl shadow-sm border-border/50 bg-linear-to-br from-card to-muted/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-bold">{t('quick_actions')}</CardTitle>
             </CardHeader>

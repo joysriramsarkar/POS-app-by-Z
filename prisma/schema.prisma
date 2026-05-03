@@ -123,7 +123,7 @@ model Sale {
   amountPaid    Float    @default(0) @map("amount_paid")
   paymentMethod String   @default("Cash") @map("payment_method") // Cash, UPI, Due
   paymentStatus String   @default("Paid") @map("payment_status") // Paid, Partial, Due
-  status        String   @default("Completed") // Completed, Cancelled, Refunded
+  status        String   @default("Completed") // Completed, Cancelled, Refunded, PartialReturn
   cashAmount    Float?   @map("cash_amount")
   upiAmount     Float?   @map("upi_amount")
   notes         String?
@@ -132,9 +132,10 @@ model Sale {
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   // Relations
-  customer Customer?  @relation(fields: [customerId], references: [id])
-  user     User?      @relation(fields: [userId], references: [id])
+  customer Customer?    @relation(fields: [customerId], references: [id])
+  user     User?        @relation(fields: [userId], references: [id])
   items    SaleItem[]
+  returns  SaleReturn[]
 
   @@index([customerId])
   @@index([userId])
@@ -153,12 +154,54 @@ model SaleItem {
   totalPrice  Float    @map("total_price")
   createdAt   DateTime @default(now()) @map("created_at")
 
-  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
+  sale        Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product     Product          @relation(fields: [productId], references: [id])
+  returnItems SaleReturnItem[]
 
   @@index([saleId])
   @@index([productId])
   @@map("sale_items")
+}
+
+// ============================================================================
+// PARTIAL RETURNS
+// ============================================================================
+
+model SaleReturn {
+  id           String   @id @default(cuid())
+  saleId       String   @map("sale_id")
+  userId       String?  @map("user_id")
+  refundAmount Float    @map("refund_amount")
+  refundMethod String   @default("Cash") @map("refund_method") // Cash, Prepaid
+  reason       String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sale  Sale             @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  user  User?            @relation(fields: [userId], references: [id])
+  items SaleReturnItem[]
+
+  @@index([saleId])
+  @@index([createdAt])
+  @@map("sale_returns")
+}
+
+model SaleReturnItem {
+  id           String   @id @default(cuid())
+  saleReturnId String   @map("sale_return_id")
+  saleItemId   String   @map("sale_item_id")
+  productId    String   @map("product_id")
+  productName  String   @map("product_name")
+  quantity     Float
+  unitPrice    Float    @map("unit_price")
+  totalPrice   Float    @map("total_price")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  saleReturn SaleReturn @relation(fields: [saleReturnId], references: [id], onDelete: Cascade)
+  saleItem   SaleItem   @relation(fields: [saleItemId], references: [id])
+
+  @@index([saleReturnId])
+  @@index([saleItemId])
+  @@map("sale_return_items")
 }
 
 // ============================================================================
@@ -281,8 +324,9 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  sales Sale[]
-  auditLogs AuditLog[]
+  sales       Sale[]
+  saleReturns SaleReturn[]
+  auditLogs   AuditLog[]
 
   @@map("users")
 }
@@ -338,7 +382,6 @@ model Expense {
   @@map("expenses")
 }
 
-
 // ============================================================================
 // AUDIT LOG
 // ============================================================================
@@ -362,4 +405,3 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
-
