@@ -14,8 +14,6 @@ import {
   findSaleItemTotalMismatch,
 } from "@/lib/sale-calculations";
 
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { requirePermission, getAuthenticatedUser } from "@/lib/api-middleware";
 import { logAudit } from "@/lib/audit";
 
@@ -37,7 +35,6 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "50");
 
-    // If specific ID requested
     if (id) {
       const sale = await db.sale.findUnique({
         where: { id },
@@ -59,51 +56,24 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, data: saleWithUnit });
     }
 
-    // Build where clause
     const where: any = {};
 
     if (invoiceNumber) {
-      // Extended search: check invoiceNumber OR customer name OR customer phone OR items productName
       where.OR = [
         { invoiceNumber: { contains: invoiceNumber, mode: "insensitive" } },
-        {
-          customer: { name: { contains: invoiceNumber, mode: "insensitive" } },
-        },
-        {
-          customer: { phone: { contains: invoiceNumber, mode: "insensitive" } },
-        },
-        {
-          items: {
-            some: {
-              productName: { contains: invoiceNumber, mode: "insensitive" },
-            },
-          },
-        },
+        { customer: { name: { contains: invoiceNumber, mode: "insensitive" } } },
+        { customer: { phone: { contains: invoiceNumber, mode: "insensitive" } } },
+        { items: { some: { productName: { contains: invoiceNumber, mode: "insensitive" } } } },
       ];
     }
 
-    if (customerId) {
-      where.customerId = customerId;
-    }
-
-    if (status) {
-      where.status = status;
-    }
+    if (customerId) where.customerId = customerId;
+    if (status) where.status = status;
 
     if (dateFrom || dateTo) {
       where.createdAt = {};
-      if (dateFrom) {
-        where.createdAt = {
-          ...(where.createdAt as object),
-          gte: new Date(dateFrom),
-        };
-      }
-      if (dateTo) {
-        where.createdAt = {
-          ...(where.createdAt as object),
-          lte: new Date(dateTo),
-        };
-      }
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
 
     const [sales, total] = await Promise.all([
@@ -149,25 +119,21 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const authError = await requirePermission(request, "sales.create");
   if (authError) return authError;
-  const session = await getServerSession(authOptions);
 
   try {
     let body;
     try {
       body = await request.json();
-    } catch (parseError) {
+    } catch {
       return NextResponse.json(
         { success: false, error: "Invalid request body: JSON parsing failed" },
         { status: 400 },
       );
     }
 
-    // Validate with Zod
     const result = SaleInputSchema.safeParse(body);
     if (!result.success) {
-      const errors = Object.values(result.error.flatten().fieldErrors)
-        .flat()
-        .join(", ");
+      const errors = Object.values(result.error.flatten().fieldErrors).flat().join(", ");
       return NextResponse.json(
         { success: false, error: errors || "Validation failed" },
         { status: 400 },
@@ -175,22 +141,13 @@ export async function POST(request: NextRequest) {
     }
 
     const validatedData = result.data;
-    const {
-      items: validatedItems,
-      customerId,
-      paymentMethod,
-      notes,
-    } = validatedData;
+    const { items: validatedItems, customerId, paymentMethod, notes } = validatedData;
 
     const itemTotalMismatch = findSaleItemTotalMismatch(validatedItems);
     if (itemTotalMismatch) {
-      return NextResponse.json(
-        { success: false, error: itemTotalMismatch },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: itemTotalMismatch }, { status: 400 });
     }
 
-    // Calculate totals with validated numeric values
     const subtotal = addMoney(...validatedItems.map((item) => item.totalPrice));
     const discountAmount = Math.max(0, toMoneyNumber(validatedData.discount));
     const taxAmount = Math.max(0, toMoneyNumber(validatedData.tax));
@@ -202,66 +159,36 @@ export async function POST(request: NextRequest) {
     const externalPaidAmount = subtractMoney(amountPaidValue, prepaidToUse);
 
     if (amountPaidValue > totalAmount) {
-      return NextResponse.json(
-        { success: false, error: "Amount paid cannot exceed sale total" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "Amount paid cannot exceed sale total" }, { status: 400 });
     }
-
     if (prepaidToUse > amountPaidValue) {
-      return NextResponse.json(
-        { success: false, error: "Prepaid amount cannot exceed total amount paid" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "Prepaid amount cannot exceed total amount paid" }, { status: 400 });
     }
-
     if (!customerId && (prepaidToUse > 0 || changeAsPrepayment > 0)) {
-      return NextResponse.json(
-        { success: false, error: "Prepaid balance can only be used with a selected customer" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "Prepaid balance can only be used with a selected customer" }, { status: 400 });
     }
-
     if (changeAsPrepayment > 0 && amountReceived < addMoney(externalPaidAmount, changeAsPrepayment)) {
-      return NextResponse.json(
-        { success: false, error: "Received amount does not cover sale payment and prepaid change" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "Received amount does not cover sale payment and prepaid change" }, { status: 400 });
     }
 
-    // Validate payment status based on customer type
     let paymentStatus = "Paid";
     if (customerId) {
-      // For regular customers, can have partial/due payments
-      if (amountPaidValue === 0) {
-        paymentStatus = "Due";
-      } else if (amountPaidValue > 0 && amountPaidValue < totalAmount) {
-        paymentStatus = "Partial";
-      }
+      if (amountPaidValue === 0) paymentStatus = "Due";
+      else if (amountPaidValue < totalAmount) paymentStatus = "Partial";
     } else {
-      // Walk-in customers must pay full amount
       if (amountPaidValue < totalAmount) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Walk-in customers must pay the full amount",
-          },
-          { status: 400 },
-        );
+        return NextResponse.json({ success: false, error: "Walk-in customers must pay the full amount" }, { status: 400 });
       }
-      paymentStatus = "Paid";
     }
 
-    // Generate invoice number (now async, must be done before transaction)
     const invoiceNumber = await generateServerInvoiceNumber();
 
-    // Get current user ID from session
-    const userId = (session?.user as { id?: string })?.id || null;
+    // Get current user ID — single session call
+    const authUser = await getAuthenticatedUser(request);
+    const userId = (authUser as { id?: string })?.id || null;
 
-    // Create sale with items in transaction (30 second timeout for complex operations)
     const sale = await db.$transaction(
       async (tx) => {
-        // Create sale with proper Prisma syntax
         const saleCreateData: any = {
           invoiceNumber,
           subtotal,
@@ -287,17 +214,8 @@ export async function POST(request: NextRequest) {
           },
         };
 
-        if (customerId) {
-          saleCreateData.customer = {
-            connect: { id: customerId },
-          };
-        }
-
-        if (userId) {
-          saleCreateData.user = {
-            connect: { id: userId },
-          };
-        }
+        if (customerId) saleCreateData.customer = { connect: { id: customerId } };
+        if (userId) saleCreateData.user = { connect: { id: userId } };
 
         const newSale = await tx.sale.create({
           data: saleCreateData,
@@ -308,40 +226,24 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        // Flatten unit
         (newSale as any).items = (newSale as any).items.map((item: any) => ({ ...item, unit: item.product?.unit ?? '' }));
 
-        // Validate and update stock for each item BEFORE using customer data
-        // Check all items in a single batch query for better performance
         const stockDeductions = aggregateSaleItemQuantities(validatedItems);
         const productIds = stockDeductions.map((item) => item.productId);
         const productsInDb = await tx.product.findMany({
-          where: {
-            id: { in: productIds },
-          },
-          select: {
-            id: true,
-            name: true,
-            currentStock: true,
-          },
+          where: { id: { in: productIds } },
+          select: { id: true, name: true, currentStock: true },
         });
 
-        // Verify all products exist and have sufficient stock
         const productMap = new Map(productsInDb.map((p) => [p.id, p]));
         for (const item of stockDeductions) {
           const product = productMap.get(item.productId);
-          if (!product) {
-            throw new Error(`Product ${item.productId} not found`);
-          }
+          if (!product) throw new Error(`Product ${item.productId} not found`);
           if (product.currentStock < item.quantity) {
-            throw new Error(
-              `Insufficient stock for product ${product.name}. Available: ${product.currentStock}, Requested: ${item.quantity}`,
-            );
+            throw new Error(`Insufficient stock for product ${product.name}. Available: ${product.currentStock}, Requested: ${item.quantity}`);
           }
         }
 
-        // Second pass: atomically update stock for all items in a single batch
-        // Use raw SQL with UNNEST for efficient atomic conditional updates to prevent race conditions
         if (stockDeductions.length > 0) {
           const itemProductIds = stockDeductions.map((item) => item.productId);
           const itemQuantities = stockDeductions.map((item) => item.quantity);
@@ -358,13 +260,10 @@ export async function POST(request: NextRequest) {
         `;
 
           if (updateResult !== stockDeductions.length) {
-            throw new Error(
-              `Atomic stock update failed. Another transaction may have depleted stock.`,
-            );
+            throw new Error(`Atomic stock update failed. Another transaction may have depleted stock.`);
           }
         }
 
-        // Third pass: Create all stock history entries in a single batch to minimize round-trips
         await tx.stockHistory.createMany({
           data: stockDeductions.map((item) => ({
             productId: item.productId,
@@ -375,49 +274,31 @@ export async function POST(request: NextRequest) {
           })),
         });
 
-        // Handle due, prepaid, and full payments for customers
         if (customerId) {
-          const customer = await tx.customer.findUnique({
-            where: { id: customerId },
-          });
+          const customer = await tx.customer.findUnique({ where: { id: customerId } });
+          if (!customer) throw new Error(`Customer ${customerId} not found`);
 
-          if (!customer) {
-            throw new Error(`Customer ${customerId} not found`);
-          }
-
-          // 1. Handle Prepaid Balance Deduction
           if (prepaidToUse > 0) {
             if (customer.prepaidBalance < prepaidToUse) {
-              throw new Error(
-                `Insufficient prepaid balance. Available: ${customer.prepaidBalance}, Tried to use: ${prepaidToUse}`,
-              );
+              throw new Error(`Insufficient prepaid balance. Available: ${customer.prepaidBalance}, Tried to use: ${prepaidToUse}`);
             }
-
-            const newPrepaidBalance = subtractMoney(customer.prepaidBalance, prepaidToUse);
-
             await tx.customer.update({
               where: { id: customerId },
-              data: {
-                prepaidBalance: newPrepaidBalance,
-                updatedAt: new Date(),
-              },
+              data: { prepaidBalance: subtractMoney(customer.prepaidBalance, prepaidToUse), updatedAt: new Date() },
             });
-
             await tx.ledgerEntry.create({
               data: {
                 customerId,
                 entryType: "prepayment-used",
                 amount: prepaidToUse,
-                balanceAfter: customer.totalDue, // This doesn't affect the due balance directly
+                balanceAfter: customer.totalDue,
                 description: `Prepaid used for sale: ${newSale.invoiceNumber}`,
                 referenceId: newSale.id,
               },
             });
           }
 
-          // 2. Handle Due Amount Calculation
           const dueAmount = subtractMoney(totalAmount, amountPaidValue);
-
           if (dueAmount > 0) {
             const creditAmount = subtractMoney(totalAmount, prepaidToUse);
             const creditBalanceAfter = addMoney(customer.totalDue, creditAmount);
@@ -425,13 +306,8 @@ export async function POST(request: NextRequest) {
 
             await tx.customer.update({
               where: { id: customerId },
-              data: {
-                totalDue: { increment: dueAmount },
-                updatedAt: new Date(),
-              },
+              data: { totalDue: { increment: dueAmount }, updatedAt: new Date() },
             });
-
-            // Create ledger entry for the credit (the sale itself)
             await tx.ledgerEntry.create({
               data: {
                 customerId,
@@ -442,8 +318,6 @@ export async function POST(request: NextRequest) {
                 referenceId: newSale.id,
               },
             });
-
-            // Create ledger entry for the part paid by cash/other methods
             if (externalPaidAmount > 0) {
               await tx.ledgerEntry.create({
                 data: {
@@ -461,12 +335,8 @@ export async function POST(request: NextRequest) {
           if (changeAsPrepayment > 0) {
             await tx.customer.update({
               where: { id: customerId },
-              data: {
-                prepaidBalance: { increment: changeAsPrepayment },
-                updatedAt: new Date(),
-              },
+              data: { prepaidBalance: { increment: changeAsPrepayment }, updatedAt: new Date() },
             });
-
             await tx.ledgerEntry.create({
               data: {
                 customerId,
@@ -482,25 +352,26 @@ export async function POST(request: NextRequest) {
 
         return newSale;
       },
-      {
-        timeout: 60000, // 60 second timeout for complex transaction
-        maxWait: 10000, // Max wait time for acquiring connection
-      },
+      { timeout: 60000, maxWait: 10000 },
     );
 
-    const user = await getAuthenticatedUser(request);
-    await logAudit({ userId: (user as any)?.id, action: 'CREATE_SALE', entityType: 'Sale', entityId: sale.id, details: { invoiceNumber: (sale as any).invoiceNumber, totalAmount: (sale as any).totalAmount }, ipAddress: getIp(request) });
+    await logAudit({
+      userId: userId ?? undefined,
+      action: 'CREATE_SALE',
+      entityType: 'Sale',
+      entityId: sale.id,
+      details: { invoiceNumber: (sale as any).invoiceNumber, totalAmount: (sale as any).totalAmount },
+      ipAddress: getIp(request),
+    });
 
     return NextResponse.json({ success: true, data: sale, message: "Sale completed successfully" });
   } catch (error) {
     console.error("Error creating sale:", error);
 
-    // Extract meaningful error message
     let errorMessage = "Failed to create sale";
     let statusCode = 500;
 
     if (error instanceof Error) {
-      // Check for specific error patterns
       if (error.message.includes("Insufficient stock")) {
         errorMessage = error.message;
         statusCode = 400;
@@ -511,21 +382,11 @@ export async function POST(request: NextRequest) {
         errorMessage = error.message;
         statusCode = 400;
       } else {
-        // For Prisma errors and others, try to extract meaningful message
         errorMessage = error.message || "Failed to create sale";
       }
     }
 
-    console.error("Sale creation error details:", {
-      message: errorMessage,
-      originalError: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-
-    return NextResponse.json(
-      { success: false, error: errorMessage },
-      { status: statusCode },
-    );
+    return NextResponse.json({ success: false, error: errorMessage }, { status: statusCode });
   }
 }
 
@@ -539,51 +400,36 @@ export async function PUT(request: NextRequest) {
     const { id, status, reason } = body;
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: "Sale ID is required" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "Sale ID is required" }, { status: 400 });
     }
 
-    // Get existing sale
     const existingSale = await db.sale.findUnique({
       where: { id },
       include: { items: true, customer: true },
     });
 
     if (!existingSale) {
-      return NextResponse.json(
-        { success: false, error: "Sale not found" },
-        { status: 404 },
-      );
+      return NextResponse.json({ success: false, error: "Sale not found" }, { status: 404 });
     }
 
     if (existingSale.status !== "Completed") {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Only completed sales can be cancelled or refunded",
-        },
+        { success: false, error: "Only completed sales can be cancelled or refunded" },
         { status: 400 },
       );
     }
 
-    // Update sale and restore stock
     const sale = await db.$transaction(async (tx) => {
-      // Update sale status
       const updatedSale = await tx.sale.update({
         where: { id },
         data: {
           status,
-          notes: reason
-            ? `${existingSale.notes || ""}\n${status}: ${reason}`
-            : existingSale.notes,
+          notes: reason ? `${existingSale.notes || ""}\n${status}: ${reason}` : existingSale.notes,
           updatedAt: new Date(),
         },
         include: { items: true },
       });
 
-      // Restore stock for cancelled/refunded items
       const productReturnQuantities = existingSale.items.reduce((acc, item) => {
         acc.set(item.productId, (acc.get(item.productId) || 0) + item.quantity);
         return acc;
@@ -603,80 +449,46 @@ export async function PUT(request: NextRequest) {
           WHERE p.id = update_data.id
         `;
 
-        const historyData = productIds.map((id, index) => ({
-          productId: id,
-          changeType: "return",
-          quantity: quantities[index],
-          reason: `${status}: ${existingSale.invoiceNumber}`,
-          referenceId: existingSale.id,
-        }));
-
         await tx.stockHistory.createMany({
-          data: historyData,
+          data: productIds.map((id, index) => ({
+            productId: id,
+            changeType: "return",
+            quantity: quantities[index],
+            reason: `${status}: ${existingSale.invoiceNumber}`,
+            referenceId: existingSale.id,
+          })),
         });
       }
 
       if (existingSale.customerId) {
-        const relatedLedgerEntries = await tx.ledgerEntry.findMany({
-          where: {
-            customerId: existingSale.customerId,
-            referenceId: existingSale.id,
-          },
-          select: {
-            entryType: true,
-            amount: true,
-            description: true,
-          },
-        });
+        const [relatedLedgerEntries, customer] = await Promise.all([
+          tx.ledgerEntry.findMany({
+            where: { customerId: existingSale.customerId, referenceId: existingSale.id },
+            select: { entryType: true, amount: true, description: true },
+          }),
+          tx.customer.findUnique({ where: { id: existingSale.customerId } }),
+        ]);
+
+        if (!customer) throw new Error(`Customer ${existingSale.customerId} not found`);
 
         const prepaidUsedAmount = addMoney(
-          ...relatedLedgerEntries
-            .filter((entry) => entry.entryType === "prepayment-used")
-            .map((entry) => entry.amount),
+          ...relatedLedgerEntries.filter((e) => e.entryType === "prepayment-used").map((e) => e.amount),
         );
         const changePrepaymentAmount = addMoney(
-          ...relatedLedgerEntries
-            .filter((entry) => entry.description?.startsWith("Change added as prepaid:"))
-            .map((entry) => entry.amount),
+          ...relatedLedgerEntries.filter((e) => e.description?.startsWith("Change added as prepaid:")).map((e) => e.amount),
         );
-        const dueAmount = Math.max(
-          0,
-          subtractMoney(existingSale.totalAmount, existingSale.amountPaid),
-        );
+        const dueAmount = Math.max(0, subtractMoney(existingSale.totalAmount, existingSale.amountPaid));
 
-        const customer = await tx.customer.findUnique({
-          where: { id: existingSale.customerId },
-        });
-
-        if (!customer) {
-          throw new Error(`Customer ${existingSale.customerId} not found`);
-        }
-
-        const newTotalDue = dueAmount > 0
-          ? Math.max(0, subtractMoney(customer.totalDue, dueAmount))
-          : customer.totalDue;
-        const prepaidBalanceAdjustment = subtractMoney(
-          prepaidUsedAmount,
-          changePrepaymentAmount,
-        );
-        const newPrepaidBalance = Math.max(
-          0,
-          addMoney(customer.prepaidBalance, prepaidBalanceAdjustment),
-        );
+        const newTotalDue = dueAmount > 0 ? Math.max(0, subtractMoney(customer.totalDue, dueAmount)) : customer.totalDue;
+        const prepaidBalanceAdjustment = subtractMoney(prepaidUsedAmount, changePrepaymentAmount);
+        const newPrepaidBalance = Math.max(0, addMoney(customer.prepaidBalance, prepaidBalanceAdjustment));
 
         const customerUpdateData: any = { updatedAt: new Date() };
-        if (dueAmount > 0) {
-          customerUpdateData.totalDue = newTotalDue;
-        }
-        if (prepaidBalanceAdjustment !== 0) {
-          customerUpdateData.prepaidBalance = newPrepaidBalance;
-        }
+        if (dueAmount > 0) customerUpdateData.totalDue = newTotalDue;
+        if (prepaidBalanceAdjustment !== 0) customerUpdateData.prepaidBalance = newPrepaidBalance;
 
         if (dueAmount > 0 || prepaidBalanceAdjustment !== 0) {
-          await tx.customer.update({
-            where: { id: existingSale.customerId },
-            data: customerUpdateData,
-          });
+          await tx.customer.update({ where: { id: existingSale.customerId }, data: customerUpdateData });
         }
 
         if (dueAmount > 0) {
@@ -691,7 +503,6 @@ export async function PUT(request: NextRequest) {
             },
           });
         }
-
         if (prepaidUsedAmount > 0) {
           await tx.ledgerEntry.create({
             data: {
@@ -704,7 +515,6 @@ export async function PUT(request: NextRequest) {
             },
           });
         }
-
         if (changePrepaymentAmount > 0) {
           await tx.ledgerEntry.create({
             data: {
@@ -722,18 +532,9 @@ export async function PUT(request: NextRequest) {
       return updatedSale;
     });
 
-    return NextResponse.json({
-      success: true,
-      data: sale,
-      message: `Sale ${status.toLowerCase()} successfully`,
-    });
+    return NextResponse.json({ success: true, data: sale, message: `Sale ${status.toLowerCase()} successfully` });
   } catch (error) {
     console.error("Error updating sale:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to update sale" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Failed to update sale" }, { status: 500 });
   }
 }
-
-

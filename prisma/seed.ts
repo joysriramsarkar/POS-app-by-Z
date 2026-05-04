@@ -1,17 +1,21 @@
 import { db as prisma } from '../src/lib/db';
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import type { PrismaClient, UserRole } from '@prisma/client';
 
 const p = prisma as unknown as PrismaClient;
-
-
 
 async function main() {
   try {
     console.log("🌱 Starting database seeding...");
 
-    // Hash the admin password
-    const hashedPassword = await bcrypt.hash("admin123", 10);
+    // C1: Use env var; generate random password if not set (never hardcode)
+    const seedPassword = process.env.SEED_ADMIN_PASSWORD ?? randomBytes(16).toString("hex");
+    if (!process.env.SEED_ADMIN_PASSWORD) {
+      console.log(`⚠️  SEED_ADMIN_PASSWORD not set. Generated one-time password: ${seedPassword}`);
+      console.log("   Set SEED_ADMIN_PASSWORD in .env to use a fixed password.");
+    }
+    const hashedPassword = await bcrypt.hash(seedPassword, 12);
 
     // Upsert the admin user (create if doesn't exist, update if it does)
     const adminUser = await p.user.upsert({
@@ -101,7 +105,6 @@ async function main() {
     // Define role permissions
     const rolePermissions = {
       ADMIN: [
-        // Admin has all permissions
         "users.view", "users.create", "users.edit", "users.delete",
         "products.view", "products.create", "products.edit", "products.delete",
         "sales.view", "sales.create", "sales.edit", "sales.delete",
@@ -113,7 +116,6 @@ async function main() {
         "expenses.view", "expenses.create", "expenses.delete",
       ],
       MANAGER: [
-        // Manager can do most things except user management and settings
         "products.view", "products.create", "products.edit",
         "sales.view", "sales.create", "sales.edit",
         "stock.view", "stock.edit", "stock.import",
@@ -123,14 +125,12 @@ async function main() {
         "expenses.view", "expenses.create", "expenses.delete",
       ],
       CASHIER: [
-        // Cashier can only do sales, view products and customers
         "products.view",
         "sales.view", "sales.create",
         "customers.view", "customers.create",
         "suppliers.view",
       ],
       VIEWER: [
-        // Viewer can only view
         "reports.view",
         "products.view",
         "sales.view",
@@ -147,22 +147,16 @@ async function main() {
     // Seed role permissions
     for (const [role, codes] of Object.entries(rolePermissions) as [UserRole, string[]][]) {
       for (const code of codes) {
-        const permission = await p.permission.findUnique({
-          where: { code },
-        });
+        const permission = await p.permission.findUnique({ where: { code } });
         if (permission) {
           await p.rolePermission.create({
-            data: {
-              role,
-              permissionId: permission.id,
-            },
+            data: { role, permissionId: permission.id },
           });
         }
       }
     }
 
     console.log("✅ Role permissions seeded successfully");
-
     console.log("🎉 Database seeding completed!");
   } catch (error) {
     console.error("❌ Seeding failed:", error);

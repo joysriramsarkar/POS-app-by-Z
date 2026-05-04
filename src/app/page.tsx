@@ -8,17 +8,22 @@ import { useTranslations } from 'next-intl';
 import type { Product as ProductType } from '@/types/pos';
 import { ProductGrid } from '@/components/pos/ProductGrid';
 const CartPanel = dynamic(() => import('@/components/pos/CartPanel'), { ssr: false });
+const Dashboard = dynamic(() => import('@/components/pos/Dashboard').then(m => ({ default: m.Dashboard })), { ssr: false });
+const StockManagement = dynamic(() => import('@/components/pos/StockManagement').then(m => ({ default: m.StockManagement })), { ssr: false });
+const PartiesManagement = dynamic(() => import('@/components/pos/PartiesManagement').then(m => ({ default: m.PartiesManagement })), { ssr: false });
+const UsersManagement = dynamic(() => import('@/components/pos/UsersManagement').then(m => ({ default: m.UsersManagement })), { ssr: false });
+const TransactionHistory = dynamic(() => import('@/components/pos/TransactionHistory').then(m => ({ default: m.TransactionHistory })), { ssr: false });
+const Reports = dynamic(() => import('@/components/pos').then(m => ({ default: m.Reports })), { ssr: false });
+const AuditLogs = dynamic(() => import('@/components/pos').then(m => ({ default: m.AuditLogs })), { ssr: false });
+const Expenses = dynamic(() => import('@/components/pos/Expenses').then(m => ({ default: m.Expenses })), { ssr: false });
+const ExpensesReport = dynamic(() => import('@/components/pos/ExpensesReport').then(m => ({ default: m.ExpensesReport })), { ssr: false });
+const ProductStatistics = dynamic(() => import('@/components/pos/ProductStatistics').then(m => ({ default: m.ProductStatistics })), { ssr: false });
+const SettingsManagement = dynamic(() => import('@/components/pos/SettingsManagement'), { ssr: false });
+import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDialog';
+import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDialog';
 import { CameraScannerDialog } from '@/components/pos/CameraScannerDialog';
 import { CheckoutDialog, type PaymentData } from '@/components/pos/CheckoutDialog';
 import { PrintDialog } from '@/components/pos/PrintDialog';
-import { Dashboard } from '@/components/pos/Dashboard';
-import { StockManagement } from '@/components/pos/StockManagement';
-import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDialog';
-import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDialog';
-import { PartiesManagement } from '@/components/pos/PartiesManagement';
-import { UsersManagement } from '@/components/pos/UsersManagement';
-import { TransactionHistory } from '@/components/pos/TransactionHistory';
-import { Reports, AuditLogs } from '@/components/pos';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -50,7 +55,6 @@ import { useSettingsStore } from '@/stores/settings-store';
 import { useSimpleBarcodeScanner } from '@/hooks/use-barcode-scanner';
 import { ProductsDB, SalesDB, SyncQueueDB, CustomersDB } from '@/lib/offline/indexeddb';
 import { STORE_CONFIG } from '@/types/pos';
-import SettingsManagement from '@/components/pos/SettingsManagement';
 import type { Product, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
@@ -60,11 +64,6 @@ import { generateInvoiceNumber } from '@/lib/invoice';
 import { Capacitor } from '@capacitor/core';
 import { BarcodeScanner } from '@capacitor-mlkit/barcode-scanning';
 
-// Removing SAMPLE_PRODUCTS as we load them dynamically from the database now.
-
-import { Expenses } from '@/components/pos/Expenses';
-import { ExpensesReport } from '@/components/pos/ExpensesReport';
-import { ProductStatistics } from '@/components/pos/ProductStatistics';
 
 type PageType = 'dashboard' | 'billing' | 'stock' | 'stock-statistics' | 'parties' | 'reports' | 'transactions' | 'expenses' | 'expenses-report' | 'settings' | 'users' | 'menu' | 'audit';
 
@@ -148,10 +147,7 @@ function POSDashboard() {
   const addItem = useCartStore((state) => state.addItem);
   const clearCart = useCartStore((state) => state.clearCart);
   const setLastScannedBarcode = useCartStore((state) => state.setLastScannedBarcode);
-  const getItemCount = useCartStore((state) => state.getItemCount);
-  const getTotal = useCartStore((state) => state.getTotal);
-  const activeTab = useCartStore((state) => state.getActiveTab());
-  const cartItems = activeTab.items;
+  const cartItems = useCartStore((state) => state.tabs.find(t => t.id === state.activeTabId)?.items ?? state.tabs[0].items);
 
   // Removed isOnline from useSyncStore - now using useOfflineContext above
   const setOnline = useSyncStore((state) => state.setOnline);
@@ -167,8 +163,6 @@ function POSDashboard() {
   const currentSale = useUIStore((state) => state.currentSale);
   const setCurrentSale = useUIStore((state) => state.setCurrentSale);
 
-  const itemCount = getItemCount();
-  const total = getTotal();
 
   // Filter nav items based on user role
   const filteredNavItems = useMemo(() => {
@@ -353,8 +347,8 @@ function POSDashboard() {
     // Check on mount
     checkConnectivity();
 
-    // Check periodically (every 10 seconds)
-    const interval = setInterval(checkConnectivity, 10000);
+    // Check periodically (every 30 seconds — reduced from 10s to avoid background load)
+    const interval = setInterval(checkConnectivity, 30000);
 
     // Listen to navigator online/offline events
     const handleOnline = () => checkConnectivity();
@@ -503,12 +497,14 @@ function POSDashboard() {
       customerId: paymentData.customerId,
       paymentMethod: paymentData.paymentMethod,
       amountPaid: paymentData.amountPaid,
+      amountReceived: paymentData.amountReceived ?? (paymentData.cashAmount ?? 0) + (paymentData.upiAmount ?? 0),
       cashAmount: paymentData.cashAmount,
       upiAmount: paymentData.upiAmount,
       discount: paymentData.discount,
       tax: paymentData.tax,
       usePrepaid: paymentData.usePrepaid,
       prepaidAmountUsed: paymentData.prepaidAmountUsed,
+      changeAsPrepayment: (paymentData.addChangeAsPrepayment && paymentData.change > 0) ? paymentData.change : 0,
     };
 
     try {
@@ -560,17 +556,15 @@ function POSDashboard() {
 
           setCompletedCheckoutSale(completedSale);
           setCurrentSale(completedSale);
-          clearCart();
 
-          // Refresh data
-          const [productsResult] = await Promise.allSettled([
-            fetch('/api/products?limit=10000'),
-          ]);
-
-          if (productsResult.status === 'fulfilled' && productsResult.value.ok) {
-            const { data: updatedProducts, nextCursor } = await productsResult.value.json();
-            setProducts(updatedProducts, !!nextCursor, nextCursor);
+          // Update stock locally from the completed sale items instead of refetching all products
+          if (completedSale?.items) {
+            completedSale.items.forEach((item: any) => {
+              updateProductStock(item.productId, -item.quantity);
+            });
           }
+
+          clearCart();
 
           if (paymentData.addChangeAsPrepayment && paymentData.customerId && paymentData.change > 0) {
             await fetch('/api/prepayment', {
@@ -606,7 +600,7 @@ function POSDashboard() {
     } finally {
       setIsProcessingPayment(false);
     }
-  }, [isOnline, processOfflineSale, setProducts, clearCart, setCurrentSale, setCompletedCheckoutSale, setCheckoutOpen, toast, cartItems]);
+  }, [isOnline, processOfflineSale, clearCart, setCurrentSale, setCompletedCheckoutSale, setCheckoutOpen, toast, cartItems, updateProductStock]);
 
   const handleOpenCheckout = useCallback(() => {
     setCheckoutOpen(true);
@@ -655,6 +649,8 @@ function POSDashboard() {
           setProducts(refreshedProducts, hasMore, nextCursor);
         }
 
+        const productName = products.find(p => p.id === data.productId)?.name ?? 'পণ্য';
+        toast({ title: 'স্টক যোগ সফল', description: `"${productName}" এ ${data.quantity} যোগ হয়েছে।` });
         console.log('Stock entry successful:', updatedProduct);
       } else {
         // offline: update local store and queue sync
@@ -681,7 +677,7 @@ function POSDashboard() {
         variant: 'destructive'
       });
     }
-  }, [isOnline, updateProductStock, setProducts, pendingCount, toast]);
+  }, [isOnline, updateProductStock, setProducts, pendingCount, toast, products]);
 
   // Handle product save
   const handleProductSave = useCallback(async (data: ProductFormData) => {
@@ -794,6 +790,8 @@ function POSDashboard() {
 
         const { data: newProduct } = await response.json();
         addProduct(newProduct);
+        toast({ title: 'প্রোডাক্ট যোগ হয়েছে', description: `"${newProduct.name}" ইনভেন্টরিতে যোগ করা হয়েছে।` });
+        return newProduct;
       }
     } catch (error) {
       console.error("Failed to save product:", error);
@@ -955,7 +953,7 @@ function POSDashboard() {
                       type="text"
                       placeholder="Search products by name or barcode..."
                       value={mobileSearchQuery}
-                      onChange={(e) => handleMobileSearchChange(e.target.value)}
+                      onChange={(e) => handleMobileSearchChange(convertBengaliToEnglishNumerals(e.target.value))}
                       className="pl-9 h-8 text-sm"
                     />
                     {mobileSearchQuery && (

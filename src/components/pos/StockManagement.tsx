@@ -78,6 +78,26 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
   // Use search results when actively searching, otherwise use store products
   const products: Product[] = searchResults !== null ? searchResults : storeProducts;
 
+  // When a new product is added to the store while searching, inject it into results
+  const prevStoreCountRef = useRef(storeProducts.length);
+  useEffect(() => {
+    const prev = prevStoreCountRef.current;
+    prevStoreCountRef.current = storeProducts.length;
+    if (searchResults !== null && storeProducts.length > prev) {
+      // New product(s) added — re-run search against updated store
+      const lowerQuery = searchQuery.toLowerCase();
+      const normalizedQuery = convertBengaliToEnglishNumerals(searchQuery);
+      setSearchResults(storeProducts.filter(p =>
+        p.isActive && (
+          p.name.toLowerCase().includes(lowerQuery) ||
+          p.nameBn?.includes(searchQuery) ||
+          p.barcode?.includes(searchQuery) ||
+          convertBengaliToEnglishNumerals(p.barcode || '').includes(normalizedQuery)
+        )
+      ));
+    }
+  }, [storeProducts, searchResults, searchQuery]);
+
   // Server-side search with debounce
   const handleSearchChange = useCallback((query: string) => {
     setSearchQuery(query);
@@ -242,7 +262,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
               name="stock-search"
               placeholder="Search items..."
               value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              onChange={(e) => handleSearchChange(convertBengaliToEnglishNumerals(e.target.value))}
               className="pl-9"
               aria-label="Search items"
             />

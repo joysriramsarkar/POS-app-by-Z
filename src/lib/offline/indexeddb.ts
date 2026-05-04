@@ -230,7 +230,7 @@ export const ProductsDB = {
   async updateStock(productId: string, quantityChange: number): Promise<void> {
     const product = await this.getById(productId);
     if (product) {
-      product.currentStock += quantityChange;
+      product.currentStock = Math.max(0, product.currentStock + quantityChange);
       await putToStore(STORES.PRODUCTS, product);
     }
   },

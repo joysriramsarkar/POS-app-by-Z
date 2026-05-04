@@ -1,22 +1,13 @@
 <div align="center">
   <img src="https://img.icons8.com/color/96/000000/shop.png" alt="POS Logo" width="80" height="80">
-  <h1 align="center">Next.js Point of Sale (POS) System</h1>
-  <p align="center">
-    A robust, modern, offline-first Point of Sale PWA designed for seamless retail operations.
-  </p>
-  
-  <p align="center">
-    <a href="#-features"><strong>Features</strong></a> ·
-    <a href="#%EF%B8%8F-technology-stack"><strong>Tech Stack</strong></a> ·
-    <a href="#-quick-start"><strong>Quick Start</strong></a> ·
-    <a href="#-latest-updates"><strong>Latest Updates</strong></a>
-  </p>
+  <h1>Next.js Point of Sale (POS) System</h1>
+  <p>A modern, offline-first Point of Sale PWA for seamless retail operations.</p>
 
-  <p align="center">
-    <img src="https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js" alt="Next.js" />
-    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-    <img src="https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white" alt="Prisma" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" />
+  <p>
+    <img src="https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js" />
+    <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" />
+    <img src="https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" />
   </p>
 </div>
 
@@ -24,25 +15,16 @@
 
 ## ✨ Features
 
-- 📶 **Offline-First Architecture**: Keep your business running without internet! Uses an IndexedDB local cache and action queue that intelligently syncs to the primary database when back online.
-- 🌍 **Bilingual & Smart Transliteration (New!)**: Full support for English and Bengali. Features an integrated **Google Input Tools** engine that intelligently transliterates English product names (e.g., `Lays Yellow Rs. 20` ➔ `লেস হলুদ ২০ টাকা`) on the fly while typing.
-- 🛡️ **Comprehensive Audit Logging (New!)**: Track all critical inventory changes, modifications, and system events with an easy-to-use Admin Audit interface.
-- 📱 **Barcode Scanning**: Built-in global barcode scanning across desktop (webcam) and mobile (device camera native integration via Capacitor ML Kit).
-- 🛒 **Cart & Checkout**: Robust cart management with accurate floating-point arithmetic for precise billing.
-- 🧾 **Invoice Generation**: Automated, unique invoice generation and printing capabilities formatted beautifully for thermal printers.
-- 📦 **Inventory & Product Management**: Efficient product lookups, weighted average cost (WAC) calculations for stock, and comprehensive stock entry handling.
-- 📊 **Dashboard & Analytics**: Real-time sales data visualization using Recharts to track daily performance.
-- 🔐 **Secure Authentication**: Built-in role-based access control with NextAuth.js.
-
----
-
-## 🚀 Latest Updates (v2.0 Highlights)
-
-- **i18n Implementation**: Introduced `next-intl` for seamless switching between English and Bengali interfaces.
-- **Smart English-to-Bengali Transliteration Engine**: Added custom transliteration hooks for product creation. It accurately converts English digits to Bengali digits and translates standard pricing terms natively.
-- **System Audit Logs**: Added detailed database-level logging to track user activity, product modifications, and stock adjustments.
-- **UX Polishes**: Protected data-entry dialogs against accidental closures when clicking outside, ensuring zero data loss during fast-paced operations.
-- **Database Hardening**: Strengthened seed scripts and RBAC access checks, fixing middleware routing issues.
+- 📶 **Offline-First**: IndexedDB local cache with intelligent sync queue. Sales, stock updates, and customer changes work without internet and sync automatically when back online.
+- 🌍 **Bilingual (EN/BN)**: Full English and Bengali UI via `next-intl`. Integrated Google Input Tools engine for live English-to-Bengali transliteration while typing product names.
+- 📱 **Barcode Scanning**: Global keyboard-wedge scanner support on desktop. Native camera scanning on Android via Capacitor ML Kit.
+- 🛒 **Cart & Checkout**: Multi-tab cart, prepaid balance, partial/due payments, change-as-prepayment, split Cash+UPI payments.
+- 🧾 **Invoice & Printing**: Auto-generated invoice numbers, thermal printer support (58mm / 80mm), A4/A5 PDF export.
+- 📦 **Inventory Management**: Product CRUD, weighted average cost (WAC), bulk stock entry, stock history audit trail.
+- 👥 **Parties**: Customer and supplier management with ledger-based due tracking and prepaid balance.
+- 📊 **Dashboard & Reports**: Real-time sales stats, category/product/customer reports, expense tracking.
+- 🛡️ **Audit Logs**: Database-level logging of all critical actions (sales, stock changes, user modifications).
+- 🔐 **Role-Based Access**: Admin / Manager / Cashier / Viewer roles via NextAuth.js with per-permission checks on every API route.
 
 ---
 
@@ -53,60 +35,64 @@
 | **Framework** | Next.js 16 (App Router), React 19 |
 | **Language** | TypeScript |
 | **Styling** | Tailwind CSS 4, shadcn/ui |
-| **State Management**| Zustand |
-| **Database & ORM**| Prisma (PostgreSQL / SQLite) |
+| **State Management** | Zustand |
+| **Database & ORM** | Prisma 7 (PostgreSQL via Supabase) |
 | **Offline Storage** | IndexedDB |
 | **Authentication** | NextAuth.js |
-| **Native Integration**| Capacitor, `@capacitor-mlkit/barcode-scanning` |
+| **Native (Android)** | Capacitor, `@capacitor-mlkit/barcode-scanning` |
 | **Localization** | `next-intl`, Google Input Tools API |
+| **Arithmetic** | `decimal.js` (precise money calculations) |
 
 ---
 
 ## 🏁 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) installed on your system.
+- [Node.js](https://nodejs.org/) 18+
+- A PostgreSQL database (e.g. [Supabase](https://supabase.com) free tier)
 
 ### Installation
 
-**1. Clone & Install Dependencies**
+**1. Clone & install dependencies**
 ```bash
 npm install
 ```
 
-**2. Environment Variables**  
-Create a `.env` file in the root directory:
+**2. Environment variables**
+
+Create a `.env` file in the root:
 ```env
-DATABASE_URL="file:./prisma/data.db"
-DIRECT_URL="file:./prisma/data.db"
-NEXTAUTH_SECRET="your_secure_random_string_here"
+DATABASE_URL="postgresql://user:password@host:5432/dbname?schema=public"
+DIRECT_URL="postgresql://user:password@host:5432/dbname?schema=public"
+NEXTAUTH_SECRET="your_secure_random_string"
 NEXTAUTH_URL="http://localhost:3000"
 ```
 
-**3. Database Initialization**  
-Push the schema, generate the client, and seed initial permissions/users:
+**3. Database setup**
 ```bash
 npm run db:push
 npm run db:generate
 npm run db:seed
 ```
 
-**4. Start Development Server**
+**4. Start dev server**
 ```bash
 npm run dev
 ```
-Navigate to `http://localhost:3000` to start using the POS!
+
+Open [http://localhost:3000](http://localhost:3000). Default credentials are created by the seed script.
 
 ---
 
-## 🏗️ Architecture Highlights
+## 🏗️ Architecture
 
-- **Offline Syncing**: The app uses an advanced offline-first syncing architecture (`src/app/api/sync/route.ts`). Financial data uses ledger-based incremental updates to prevent distributed race conditions during synchronization.
-- **Prisma Transactions**: Critical operations like stock verification and checkout validation are heavily protected using Prisma atomic transactions.
-- **High-Density Mobile UI**: The interface is aggressively optimized for mobile POS usage, minimizing padding, reducing text sizes, and strictly avoiding desktop-style regressions on small screens.
+- **Offline Sync** (`src/lib/offline/`): Action queue in IndexedDB with idempotency keys. The sync worker replays queued operations against `/api/sync` when connectivity is restored. Financial data uses ledger-based incremental updates to prevent race conditions.
+- **Atomic Stock Updates**: Raw SQL `UNNEST` batch updates with conditional `WHERE current_stock >= quantity` prevent overselling under concurrent load.
+- **Prisma Singleton** (`src/lib/db.ts`): Single `PrismaClient` instance cached in `globalThis` to prevent connection pool exhaustion during hot-reloads and serverless invocations.
+- **Permission Middleware** (`src/lib/api-middleware.ts`): Every API route calls `requirePermission()` which validates session + RBAC in one pass — no duplicate session fetches.
 
 ---
 
 ## 📜 License
 
-This project is dedicated to the public domain under the [CC0 1.0 Universal (CC0 1.0) Public Domain Dedication](LICENSE).
+Public domain — [CC0 1.0 Universal](LICENSE).

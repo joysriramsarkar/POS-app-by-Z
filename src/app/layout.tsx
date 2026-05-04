@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { OfflineProvider } from "@/lib/offline/offline-context";
 import { I18nProvider } from "@/components/providers/I18nProvider";
 import { ForcePasswordChangeDialog } from "@/components/pos/ForcePasswordChangeDialog";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import { Noto_Sans_Bengali } from "next/font/google";
 
@@ -62,17 +63,19 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${notoBengali.variable} antialiased bg-background text-foreground`}
         suppressHydrationWarning
       >
-        <SessionProvider>
-          <OfflineProvider>
-            <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-              <I18nProvider>
-                {children}
-                <ForcePasswordChangeDialog />
-                <Toaster />
-              </I18nProvider>
-            </ThemeProvider>
-          </OfflineProvider>
-        </SessionProvider>
+        <ErrorBoundary>
+          <SessionProvider>
+            <OfflineProvider>
+              <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+                <I18nProvider>
+                  {children}
+                  <ForcePasswordChangeDialog />
+                  <Toaster />
+                </I18nProvider>
+              </ThemeProvider>
+            </OfflineProvider>
+          </SessionProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

@@ -26,7 +26,7 @@ import { Separator } from '@/components/ui/separator';
 import { Package, Barcode, RefreshCw, Languages, ScanLine, X } from 'lucide-react';
 import type { Product } from '@/types/pos';
 import { useProductsStore } from '@/stores/pos-store';
-import { cn } from '@/lib/utils';
+import { cn, convertBengaliToEnglishNumerals } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { CameraScannerDialog } from './CameraScannerDialog';
 import { useCameraBarcodeScanner } from '@/hooks/use-camera-barcode-scanner';
@@ -330,7 +330,7 @@ export function ProductDialog({
               <Input
                 id="product-form-barcode"
                 value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
+                onChange={(e) => setBarcode(convertBengaliToEnglishNumerals(e.target.value))}
                 placeholder="Scan or enter barcode"
                 className="flex-1 font-mono"
               />

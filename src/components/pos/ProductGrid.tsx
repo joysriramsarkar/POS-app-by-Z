@@ -12,7 +12,6 @@ import { Capacitor } from '@capacitor/core';
 import type { Product } from '@/types/pos';
 import { useProductsStore, useUIStore, useCartStore } from '@/stores/pos-store';
 import { cn, convertBengaliToEnglishNumerals } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = 'grid' | 'compact';
@@ -36,7 +35,6 @@ export function ProductGrid({
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const storeProducts = useProductsStore((state) => state.products);
@@ -49,27 +47,10 @@ export function ProductGrid({
   const setSearchQuery = useUIStore((state) => state.setSearchQuery);
   const setSelectedCategoryId = useUIStore((state) => state.setSelectedCategoryId);
 
-  const isMobile = useIsMobile();
   const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
 
   const { toast } = useToast();
-  const activeTab = useCartStore((state) => state.getActiveTab());
-  const cartItems = activeTab.items;
-  const getTotal = useCartStore((state) => state.getTotal);
-  const getItemCount = useCartStore((state) => state.getItemCount);
   const addItem = useCartStore((state) => state.addItem);
-
-  const total = getTotal();
-  const itemCount = getItemCount();
-
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(price);
-  };
 
   // Use external products if provided, otherwise use store products
   const products = externalProducts || storeProducts;
@@ -135,19 +116,10 @@ export function ProductGrid({
         return;
       }
       setSearchQuery(query);
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-      if (!query.trim()) return;
-      searchTimerRef.current = setTimeout(async () => {
-        try {
-          const res = await fetch(`/api/products?search=${encodeURIComponent(query)}`);
-          if (res.ok) {
-            const { data } = await res.json();
-            appendProducts(data, false, null);
-          }
-        } catch { /* offline — local filter handles it */ }
-      }, 300);
+      // Server-side search removed from here — local filter is sufficient for loaded products.
+      // API search only triggers on Enter (barcode scan path above).
     },
-    [externalProducts, setSearchQuery, appendProducts]
+    [externalProducts, setSearchQuery]
   );
 
   const clearSearch = useCallback(() => {

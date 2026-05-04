@@ -25,7 +25,7 @@ function createPrismaClient(): PrismaClient {
   // Use dummy connection string if building to prevent throw
   const pool = new Pool({
     connectionString: connectionString || "postgresql://dummy:dummy@localhost:5432/dummy",
-    max: 10,
+    max: 5,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
     allowExitOnIdle: true,
@@ -54,7 +54,7 @@ function createPrismaClient(): PrismaClient {
   }
 
   // Auto-disconnect on process termination (fixes PgBouncer prepared statement conflicts on Vercel)
-  process.on('SIGTERM', async () => {
+  process.once('SIGTERM', async () => {
     if (shouldLogLifecycle) {
       console.log('[PrismaClient] SIGTERM received, disconnecting...')
     }
@@ -84,14 +84,8 @@ export const db: PrismaClient = (() => {
 
   const prisma = createPrismaClient()
 
-  // Cache in both development AND production for serverless environments
-  // This prevents connection pool exhaustion on every function invocation
-  if (process.env.NODE_ENV === 'development' || process.env.VERCEL) {
-    globalForPrisma.prisma = prisma
-  } else {
-    // Ensure we cache even in production if possible
-    globalForPrisma.prisma = prisma
-  }
+  // Cache in globalThis to prevent connection pool exhaustion on hot-reloads and serverless invocations
+  globalForPrisma.prisma = prisma
 
   return prisma
 })()

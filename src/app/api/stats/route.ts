@@ -29,46 +29,28 @@ export async function GET(request: NextRequest) {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    // 1. Get Today's Sales and Orders
-    const salesToday = await db.sale.aggregate({
-      where: {
-        createdAt: {
-          gte: today,
-          lt: tomorrow,
+    // 1. Get Today's and Yesterday's Sales in parallel
+    const [salesToday, salesYesterday, totalDue] = await Promise.all([
+      db.sale.aggregate({
+        where: {
+          createdAt: { gte: today, lt: tomorrow },
+          status: 'Completed',
         },
-        status: 'Completed', // Only count completed sales
-      },
-      _sum: {
-        totalAmount: true,
-      },
-      _count: {
-        id: true,
-      },
-    });
-
-    // 1b. Get Yesterday's Sales and Orders
-    const salesYesterday = await db.sale.aggregate({
-      where: {
-        createdAt: {
-          gte: yesterday,
-          lt: today,
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+      db.sale.aggregate({
+        where: {
+          createdAt: { gte: yesterday, lt: today },
+          status: 'Completed',
         },
-        status: 'Completed',
-      },
-      _sum: {
-        totalAmount: true,
-      },
-      _count: {
-        id: true,
-      },
-    });
-
-    // 2. Get Total Due Payments
-    const totalDue = await db.customer.aggregate({
-      _sum: {
-        totalDue: true,
-      },
-    });
+        _sum: { totalAmount: true },
+        _count: { id: true },
+      }),
+      db.customer.aggregate({
+        _sum: { totalDue: true },
+      }),
+    ]);
 
     const todaySales = salesToday._sum.totalAmount || 0;
     const todayOrders = salesToday._count.id || 0;
