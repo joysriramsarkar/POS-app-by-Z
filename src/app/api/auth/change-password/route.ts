@@ -12,13 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body;
-    try {
-      body = await request.json();
-    } catch (e) {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-    const { currentPassword, newPassword } = body;
+    const { currentPassword, newPassword } = await request.json();
 
     if (!currentPassword || !newPassword) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -39,7 +33,7 @@ export async function POST(request: NextRequest) {
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
 
     if (!isPasswordValid) {
-      return NextResponse.json({ error: "Incorrect current password" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid current password" }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
