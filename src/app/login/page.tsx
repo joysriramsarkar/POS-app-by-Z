@@ -27,6 +27,7 @@ export default function LoginPage() {
     setError("");
 
     try {
+
       const result = await signIn("credentials", {
         username,
         password,
@@ -34,11 +35,12 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        setError("Invalid username or password");
+        setError(result.error || "Invalid username or password");
       } else {
         router.push("/");
         router.refresh();
       }
+
     } catch (err) {
       setError("An error occurred during login");
     } finally {

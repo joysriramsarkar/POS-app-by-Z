@@ -17,12 +17,14 @@ async function main() {
         password: hashedPassword,
         name: "Administrator",
         role: "ADMIN",
+        requiresPasswordChange: true,
       },
       create: {
         username: "admin",
         password: hashedPassword,
         name: "Administrator",
         role: "ADMIN",
+        requiresPasswordChange: true,
       },
     });
 

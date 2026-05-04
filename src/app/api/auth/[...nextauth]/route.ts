@@ -2,12 +2,7 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
-import { RateLimiterMemory } from "rate-limiter-flexible";
 
-const rateLimiter = new RateLimiterMemory({
-  points: 5, // 5 attempts
-  duration: 60 * 15, // per 15 minutes
-});
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -22,11 +17,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        try {
-          await rateLimiter.consume(credentials.username);
-        } catch (rejRes) {
-          throw new Error("Too many login attempts. Please try again later.");
-        }
+
 
         const user = await db.user.findUnique({
           where: {
@@ -42,13 +33,33 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        if (user.lockedUntil && user.lockedUntil > new Date()) {
+          throw new Error("Account locked due to too many failed login attempts. Please try again later.");
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
         );
 
         if (!isPasswordValid) {
+          const newFailedAttempts = user.failedLoginAttempts + 1;
+          const updates: any = { failedLoginAttempts: newFailedAttempts };
+          if (newFailedAttempts >= 5) {
+            updates.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+          }
+          await db.user.update({
+            where: { id: user.id },
+            data: updates
+          });
           return null;
+        }
+
+        if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+          await db.user.update({
+            where: { id: user.id },
+            data: { failedLoginAttempts: 0, lockedUntil: null }
+          });
         }
 
         return {
@@ -57,6 +68,7 @@ export const authOptions: NextAuthOptions = {
           username: user.username,
           email: user.email || undefined,
           role: user.role as "ADMIN" | "MANAGER" | "CASHIER" | "VIEWER",
+          requiresPasswordChange: user.requiresPasswordChange,
         };
       }
     })
@@ -71,6 +83,7 @@ export const authOptions: NextAuthOptions = {
         token.username = user.username;
         token.role = user.role;
         token.email = user.email;
+        token.requiresPasswordChange = user.requiresPasswordChange;
       }
       return token;
     },
@@ -80,6 +93,7 @@ export const authOptions: NextAuthOptions = {
         session.user.username = token.username as string;
         session.user.role = token.role as "ADMIN" | "MANAGER" | "CASHIER" | "VIEWER";
         session.user.email = (token.email as string) || undefined;
+        session.user.requiresPasswordChange = token.requiresPasswordChange as boolean;
       }
       return session;
     }
@@ -90,7 +104,7 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 };
 
-if (!authOptions.secret && process.env.NEXT_PHASE !== 'phase-production-build') {
+if (!authOptions.secret && process.env.NEXT_PHASE !== 'phase-production-build' && process.env.NODE_ENV !== 'test') {
   throw new Error("NEXTAUTH_SECRET is not defined. Please set it in your environment variables.");
 }
 

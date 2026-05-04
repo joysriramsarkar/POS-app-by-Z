@@ -15,6 +15,7 @@ import { Dashboard } from '@/components/pos/Dashboard';
 import { StockManagement } from '@/components/pos/StockManagement';
 import { AddStockDialog, type StockEntryData } from '@/components/pos/AddStockDialog';
 import { ProductDialog, type ProductFormData } from '@/components/pos/ProductDialog';
+import { ChangePasswordDialog } from '@/components/pos/ChangePasswordDialog';
 import { PartiesManagement } from '@/components/pos/PartiesManagement';
 import { UsersManagement } from '@/components/pos/UsersManagement';
 import { TransactionHistory } from '@/components/pos/TransactionHistory';
@@ -105,6 +106,7 @@ function POSDashboard() {
 
   // Auth
   const { data: session } = useSession();
+  const requiresPasswordChange = session?.user?.requiresPasswordChange === true;
   const userRole = (session?.user as { id?: string; role?: string; username?: string })?.role;
 
   // Offline context - USE THIS INSTEAD OF SYNC STORE for isOnline
@@ -1183,6 +1185,9 @@ function POSDashboard() {
         product={selectedProduct}
         onSubmit={handleProductSave}
       />
+
+      {/* Change Password Dialog */}
+      <ChangePasswordDialog open={requiresPasswordChange} />
 
       {/* Print Dialog */}
       <PrintDialog
