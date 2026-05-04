@@ -6,6 +6,7 @@ declare module "next-auth" {
     username: string;
     email?: string;
     role?: "ADMIN" | "MANAGER" | "CASHIER" | "VIEWER";
+    requiresPasswordChange?: boolean;
   }
 
   interface Session {
@@ -13,6 +14,7 @@ declare module "next-auth" {
       id: string;
       username?: string;
       role?: "ADMIN" | "MANAGER" | "CASHIER" | "VIEWER";
+      requiresPasswordChange?: boolean;
     };
   }
 }
@@ -22,5 +24,6 @@ declare module "next-auth/jwt" {
     id?: string;
     username?: string;
     role?: "ADMIN" | "MANAGER" | "CASHIER" | "VIEWER";
+    requiresPasswordChange?: boolean;
   }
 }

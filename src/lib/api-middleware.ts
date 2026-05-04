@@ -7,6 +7,31 @@ import { hasPermission } from "@/lib/permissions";
  * Middleware to check if request is authorized (has valid session)
  */
 export async function requireAuth(request: NextRequest) {
+  // CSRF Protection Check
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(request.method)) {
+    const origin = request.headers.get("origin");
+    const host = request.headers.get("host") || request.headers.get("x-forwarded-host");
+
+    // In production or when origin is present, ensure they match to prevent CSRF
+    if (origin && host) {
+      try {
+        const originUrl = new URL(origin);
+        if (originUrl.host !== host) {
+          return {
+            authorized: false,
+            response: NextResponse.json({ error: "Forbidden: CSRF check failed" }, { status: 403 }),
+          };
+        }
+      } catch (e) {
+        // Invalid origin URL
+        return {
+          authorized: false,
+          response: NextResponse.json({ error: "Forbidden: Invalid origin" }, { status: 403 }),
+        };
+      }
+    }
+  }
+
   const session = await getServerSession(authOptions);
   if (!session) {
     return {
@@ -14,6 +39,17 @@ export async function requireAuth(request: NextRequest) {
       response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
+
+  if (session.user?.requiresPasswordChange) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: "Password change required", requiresPasswordChange: true },
+        { status: 403 }
+      ),
+    };
+  }
+
   return { authorized: true, response: null, session };
 }
 
