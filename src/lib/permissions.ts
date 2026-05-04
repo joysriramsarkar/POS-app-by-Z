@@ -102,7 +102,7 @@ export async function getUserPermissions(userId: string): Promise<string[]> {
       },
     });
 
-    return permissions.map((rp: any) => rp.permission.code);
+    return permissions.map((rp) => rp.permission.code);
   } catch (error) {
     console.error("Error getting user permissions:", error);
     return [];
@@ -119,8 +119,8 @@ export async function sessionHasPermission(
   session: Session | null,
   permissionCode: string
 ): Promise<boolean> {
-  if (!session?.user || !(session.user as { id?: string; role?: string; username?: string })?.id) {
+  if (!session?.user?.id) {
     return false;
   }
-  return hasPermission((session.user as { id?: string; role?: string; username?: string }).id as string, permissionCode);
+  return hasPermission(session.user.id, permissionCode);
 }

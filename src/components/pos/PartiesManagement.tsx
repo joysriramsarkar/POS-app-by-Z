@@ -95,15 +95,18 @@ export function PartiesManagement() {
 
   // Fetch customers and suppliers on component mount
   useEffect(() => {
+    const customersController = new AbortController();
+    const suppliersController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      customersController.abort();
+      suppliersController.abort();
+    }, 8000);
+
     const fetchData = async () => {
       try {
-        // Create timeout abortion controller for API calls
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout per request
-        
         const [customersResult, suppliersResult] = await Promise.allSettled([
-          fetch('/api/customers', { signal: controller.signal }),
-          fetch('/api/suppliers', { signal: controller.signal }),
+          fetch('/api/customers', { signal: customersController.signal }),
+          fetch('/api/suppliers', { signal: suppliersController.signal }),
         ]);
 
         clearTimeout(timeoutId);
@@ -130,7 +133,9 @@ export function PartiesManagement() {
             console.error('Failed to load customers from cache:', dbErr);
           }
         } else {
-          console.error('Customers API fetch failed:', customersResult.reason instanceof Error ? customersResult.reason.message : String(customersResult.reason));
+          if (customersResult.reason?.name !== 'AbortError') {
+            console.error('Customers API fetch failed:', customersResult.reason instanceof Error ? customersResult.reason.message : String(customersResult.reason));
+          }
           // Fallback to IndexedDB
           try {
             const { CustomersDB } = await import('@/lib/offline/indexeddb');
@@ -173,7 +178,9 @@ export function PartiesManagement() {
             console.error('Failed to load suppliers from cache:', dbErr);
           }
         } else {
-          console.error('Suppliers API fetch failed:', suppliersResult.reason instanceof Error ? suppliersResult.reason.message : String(suppliersResult.reason));
+          if (suppliersResult.reason?.name !== 'AbortError') {
+            console.error('Suppliers API fetch failed:', suppliersResult.reason instanceof Error ? suppliersResult.reason.message : String(suppliersResult.reason));
+          }
           // Fallback to IndexedDB
           try {
             const { SuppliersDB } = await import('@/lib/offline/indexeddb');
@@ -191,6 +198,11 @@ export function PartiesManagement() {
       }
     };
     fetchData();
+    return () => {
+      clearTimeout(timeoutId);
+      customersController.abort();
+      suppliersController.abort();
+    };
   }, [setCustomers]);
 
 

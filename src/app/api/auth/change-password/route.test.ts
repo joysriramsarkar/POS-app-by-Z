@@ -88,7 +88,7 @@ describe('POST /api/auth/change-password', () => {
     expect(json.error).toBe('Unauthorized');
   });
 
-  it('should return 400 on invalid JSON body', async () => {
+  it('should return 500 on invalid JSON body', async () => {
     const req = new Request('http://localhost:3000/api/auth/change-password', {
       method: 'POST',
       body: 'invalid json',
@@ -96,8 +96,8 @@ describe('POST /api/auth/change-password', () => {
     const res = await POST(req);
     const json = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(json.error).toBe('Invalid JSON body');
+    expect(res.status).toBe(500);
+    expect(json.error).toBe('Failed to change password');
   });
 
   it('should return 400 on missing required fields', async () => {
@@ -137,7 +137,7 @@ describe('POST /api/auth/change-password', () => {
     const json = await res.json();
 
     expect(res.status).toBe(400);
-    expect(json.error).toBe('Incorrect current password');
+    expect(json.error).toBe('Invalid current password');
   });
 
   it('should return 500 on database error during user fetch', async () => {

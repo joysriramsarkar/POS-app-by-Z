@@ -376,6 +376,7 @@ model Expense {
   date         DateTime  @default(now())
   supplierId   String?   @map("supplier_id")
   supplierName String?   @map("supplier_name")
+  isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
 
   supplier Supplier? @relation(fields: [supplierId], references: [id])

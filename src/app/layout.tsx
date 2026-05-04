@@ -6,6 +6,7 @@ import { SessionProvider } from "@/components/providers/SessionProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { OfflineProvider } from "@/lib/offline/offline-context";
 import { I18nProvider } from "@/components/providers/I18nProvider";
+import { ForcePasswordChangeDialog } from "@/components/pos/ForcePasswordChangeDialog";
 
 import { Noto_Sans_Bengali } from "next/font/google";
 
@@ -66,6 +67,7 @@ export default function RootLayout({
             <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
               <I18nProvider>
                 {children}
+                <ForcePasswordChangeDialog />
                 <Toaster />
               </I18nProvider>
             </ThemeProvider>

@@ -196,6 +196,7 @@ export function PrintDialog({
     address: settings.store_address || "",
     phone: settings.store_phone || "",
     gstNumber: settings.store_gst || "",
+    logo: settings.store_logo || "",
   };
 
   React.useEffect(() => {

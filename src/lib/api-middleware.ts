@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { hasPermission } from "@/lib/permissions";
 
 /**
  * Middleware to check if request is authorized (has valid session)
@@ -66,12 +65,13 @@ export async function requirePermission(
   }
 
   const session = authResult.session;
-  const userId = (session?.user as { id?: string; role?: string; username?: string })?.id;
+  const userId = session?.user?.id;
 
   if (!userId) {
     return NextResponse.json({ error: "User not found" }, { status: 401 });
   }
 
+  const { hasPermission } = await import("@/lib/permissions");
   const hasAccess = await hasPermission(userId, permissionCode);
   if (!hasAccess) {
     const actionMap: Record<string, string> = {
@@ -107,7 +107,7 @@ export async function requireRole(
   }
 
   const session = authResult.session;
-  const userRole = (session?.user as { id?: string; role?: string; username?: string })?.role;
+  const userRole = session?.user?.role;
 
   if (!userRole || !allowedRoles.includes(userRole)) {
     return NextResponse.json(

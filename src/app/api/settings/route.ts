@@ -1,7 +1,13 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requirePermission } from "@/lib/api-middleware";
+import { requirePermission, getAuthenticatedUser } from "@/lib/api-middleware";
+import { logAudit } from "@/lib/audit";
+
+const getIp = (req: NextRequest) => req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
+
+// store_logo is audited as changed/cleared, not the full base64 value
+const LOGO_KEY = 'store_logo';
 
 export async function GET(request: NextRequest) {
   try {
@@ -10,7 +16,6 @@ export async function GET(request: NextRequest) {
 
     const settings = await db.setting.findMany();
 
-    // Convert array of key-value pairs into an object
     const settingsObject = settings.reduce((acc: Record<string, string>, setting) => {
       acc[setting.key] = setting.value;
       return acc;
@@ -20,10 +25,7 @@ export async function GET(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Error fetching settings:", error);
     return NextResponse.json(
-      {
-        error: "Failed to fetch settings",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to fetch settings", message: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
@@ -34,10 +36,10 @@ export async function PUT(request: NextRequest) {
     const authError = await requirePermission(request, "settings.edit");
     if (authError) return authError;
 
-    let body;
+    let body: Record<string, unknown>;
     try {
       body = await request.json();
-    } catch (e) {
+    } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
@@ -46,54 +48,75 @@ export async function PUT(request: NextRequest) {
     }
 
     const entries = Object.entries(body);
-    if (entries.length > 0) {
-      const keys: string[] = [];
-      const values: string[] = [];
+    if (entries.length === 0) {
+      return NextResponse.json({ success: true, message: "No settings to update" });
+    }
 
-      for (const [key, value] of entries) {
-        keys.push(key);
-        values.push(typeof value === "string" ? value : String(value));
+    const keys: string[] = [];
+    const values: string[] = [];
+    for (const [key, value] of entries) {
+      keys.push(key);
+      values.push(typeof value === "string" ? value : String(value));
+    }
+
+    // Fetch old values for audit diff
+    const oldSettings = await db.setting.findMany({
+      where: { key: { in: keys } },
+      select: { key: true, value: true },
+    });
+    const oldMap = new Map(oldSettings.map((s) => [s.key, s.value]));
+
+    await db.$transaction(async (tx) => {
+      const existingKeys = new Set(oldMap.keys());
+      const toCreate: { key: string; value: string }[] = [];
+      const toUpdate: { key: string; value: string }[] = [];
+
+      for (let i = 0; i < keys.length; i++) {
+        if (existingKeys.has(keys[i])) {
+          toUpdate.push({ key: keys[i], value: values[i] });
+        } else {
+          toCreate.push({ key: keys[i], value: values[i] });
+        }
       }
 
-      await db.$transaction(async (tx) => {
-        // Find existing keys to determine updates vs inserts
-        const existingSettings = await tx.setting.findMany({
-          where: { key: { in: keys } },
-          select: { key: true }
-        });
-        const existingKeys = new Set(existingSettings.map((s: any) => s.key));
+      if (toUpdate.length > 0) {
+        await Promise.all(
+          toUpdate.map(({ key, value }) =>
+            tx.setting.update({ where: { key }, data: { value } })
+          )
+        );
+      }
+      if (toCreate.length > 0) {
+        await tx.setting.createMany({ data: toCreate });
+      }
+    });
 
-        const toCreate: { key: string, value: string }[] = [];
-        const keysToUpdate: string[] = [];
-        const valuesToUpdate: string[] = [];
+    // Build audit details — exclude logo binary, just note if it changed
+    const changedDetails: Record<string, { from: string; to: string }> = {};
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      const newVal = values[i];
+      const oldVal = oldMap.get(key) ?? '';
+      if (newVal === oldVal) continue;
 
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i];
-          const value = values[i];
-          if (existingKeys.has(key)) {
-            keysToUpdate.push(key);
-            valuesToUpdate.push(value);
-          } else {
-            toCreate.push({ key, value });
-          }
-        }
+      if (key === LOGO_KEY) {
+        changedDetails[key] = {
+          from: oldVal ? '[logo set]' : '[none]',
+          to: newVal ? '[logo set]' : '[removed]',
+        };
+      } else {
+        changedDetails[key] = { from: oldVal, to: newVal };
+      }
+    }
 
-        // Batch update existing settings using Promise.all to prevent sequential N+1 queries
-        if (keysToUpdate.length > 0) {
-          await Promise.all(
-            keysToUpdate.map((key, index) =>
-              tx.setting.update({
-                where: { key },
-                data: { value: valuesToUpdate[index] }
-              })
-            )
-          );
-        }
-
-        // Batch insert new settings
-        if (toCreate.length > 0) {
-          await tx.setting.createMany({ data: toCreate });
-        }
+    if (Object.keys(changedDetails).length > 0) {
+      const user = await getAuthenticatedUser(request);
+      await logAudit({
+        userId: user?.id,
+        action: 'UPDATE_SETTINGS',
+        entityType: 'Setting',
+        details: changedDetails,
+        ipAddress: getIp(request),
       });
     }
 
@@ -101,10 +124,7 @@ export async function PUT(request: NextRequest) {
   } catch (error: unknown) {
     console.error("Error updating settings:", error);
     return NextResponse.json(
-      {
-        error: "Failed to update settings",
-        message: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to update settings", message: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }

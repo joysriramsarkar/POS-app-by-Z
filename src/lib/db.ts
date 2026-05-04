@@ -25,8 +25,10 @@ function createPrismaClient(): PrismaClient {
   // Use dummy connection string if building to prevent throw
   const pool = new Pool({
     connectionString: connectionString || "postgresql://dummy:dummy@localhost:5432/dummy",
+    max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
+    allowExitOnIdle: true,
   })
   // Compatibility workaround between different pg @types versions used by Prisma adapter
   const adapter = new PrismaPg(pool as unknown as any)
@@ -43,14 +45,13 @@ function createPrismaClient(): PrismaClient {
     log: prismaLogs,
   })
 
-  // Log successful connection to PostgreSQL
-  client.$connect().then(() => {
-    if (shouldLogLifecycle) {
+  if (shouldLogLifecycle) {
+    client.$connect().then(() => {
       console.log('[PrismaClient] Successfully connected to PostgreSQL')
-    }
-  }).catch((error) => {
-    console.error('[PrismaClient] Connection failed:', error)
-  })
+    }).catch((error) => {
+      console.error('[PrismaClient] Connection failed:', error)
+    })
+  }
 
   // Auto-disconnect on process termination (fixes PgBouncer prepared statement conflicts on Vercel)
   process.on('SIGTERM', async () => {
@@ -61,9 +62,10 @@ function createPrismaClient(): PrismaClient {
     process.exit(0)
   })
 
-  // Also disconnect on process exit in development
-  process.on('exit', async () => {
+  // Also disconnect on SIGINT (Ctrl+C) in development
+  process.once('SIGINT', async () => {
     await client.$disconnect()
+    process.exit(0)
   })
 
   return client

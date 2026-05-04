@@ -57,13 +57,13 @@ export class OfflineSyncWorker {
           const aPayload = JSON.parse(a.payload);
           const bPayload = JSON.parse(b.payload);
 
-          const getIds = (payload: any) => {
+          const getIds = (payload: Record<string, unknown>) => {
             const ids = new Set<string>();
-            if (payload.id) ids.add(payload.id);
-            if (payload.customerId) ids.add(payload.customerId);
-            if (payload.productId) ids.add(payload.productId);
+            if (typeof payload.id === 'string') ids.add(payload.id);
+            if (typeof payload.customerId === 'string') ids.add(payload.customerId);
+            if (typeof payload.productId === 'string') ids.add(payload.productId);
             if (Array.isArray(payload.items)) {
-              payload.items.forEach((i: any) => {
+              payload.items.forEach((i: { productId?: string }) => {
                 if (i.productId) ids.add(i.productId);
               });
             }

@@ -215,6 +215,7 @@ export const STORE_CONFIG = {
   address: '3 No Gate More, Military Road, Shivmandir, 734011',
   phone: '7584864899',
   gstNumber: '',
+  logo: '',
 } as const;
 
 // ============================================================================

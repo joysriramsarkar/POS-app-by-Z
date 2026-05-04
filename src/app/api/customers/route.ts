@@ -42,7 +42,6 @@ export async function GET(request: NextRequest) {
 
     const customers = await db.customer.findMany({
       where,
-      include: { _count: { select: { sales: true } } },
       orderBy: [{ totalDue: 'desc' }, { name: 'asc' }],
     });
 

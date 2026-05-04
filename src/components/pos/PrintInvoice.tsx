@@ -21,6 +21,7 @@ interface PrintInvoiceProps {
     address: string;
     phone: string;
     gstNumber?: string;
+    logo?: string;
   };
 }
 
@@ -63,6 +64,7 @@ interface ThermalInvoiceProps {
     address: string;
     phone: string;
     gstNumber?: string;
+    logo?: string;
   };
 }
 
@@ -101,9 +103,13 @@ function ThermalInvoice({
       <div className={`text-center space-y-0.5 ${sectionPadding} pb-2`}>
         {showLogo && (
           <div className="flex justify-center mb-1">
-            <div style={{ width: 36, height: 36, background: '#111', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#fff', fontWeight: 900, fontSize: 14 }}>LB</span>
-            </div>
+            {config.logo ? (
+              <img src={config.logo} alt="logo" style={{ width: 36, height: 36, objectFit: 'contain' }} />
+            ) : (
+              <div style={{ width: 36, height: 36, background: '#111', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ color: '#fff', fontWeight: 900, fontSize: 14 }}>LB</span>
+              </div>
+            )}
           </div>
         )}
         <h1 className="font-bold text-sm tracking-wide uppercase">{config.name}</h1>
@@ -246,6 +252,7 @@ interface StandardInvoiceProps {
     address: string;
     phone: string;
     gstNumber?: string;
+    logo?: string;
   };
 }
 
@@ -273,9 +280,13 @@ function StandardInvoice({
       <div style={{ background: '#111', color: '#fff', padding: '16px 24px', marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {showLogo && (
-            <div style={{ width: 44, height: 44, background: '#fff', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ color: '#111', fontWeight: 900, fontSize: 18 }}>LB</span>
-            </div>
+            config.logo ? (
+              <img src={config.logo} alt="logo" style={{ width: 44, height: 44, objectFit: 'contain', borderRadius: 6, background: '#fff', flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: 44, height: 44, background: '#fff', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ color: '#111', fontWeight: 900, fontSize: 18 }}>LB</span>
+              </div>
+            )
           )}
           <div>
             <div style={{ fontWeight: 800, fontSize: isA4 ? 20 : 16, letterSpacing: 1 }}>{config.name}</div>
@@ -483,6 +494,7 @@ interface InvoicePreviewProps {
     address: string;
     phone: string;
     gstNumber?: string;
+    logo?: string;
   };
 }
 

@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db as prisma } from "@/lib/db";
 import { requirePermission, getAuthenticatedUser } from "@/lib/api-middleware";
 import { logAudit } from "@/lib/audit";
+import { ExpenseInputSchema } from "@/schemas";
 
 const getIp = (req: NextRequest) => req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
-import { toMoneyNumber } from "@/lib/money";
 
 export async function GET(request: NextRequest) {
   const authError = await requirePermission(request, "expenses.view");
@@ -14,8 +14,12 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
+    const includeInactive = searchParams.get("includeInactive") === "true";
+    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") ?? "50", 10)));
 
     const where: Record<string, unknown> = {};
+    if (!includeInactive) where.isActive = true;
     if (dateFrom || dateTo) {
       const toDate = dateTo ? new Date(dateTo) : undefined;
       if (toDate && !dateTo?.includes('T')) toDate.setHours(23, 59, 59, 999);
@@ -25,21 +29,25 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const expenses = await prisma.expense.findMany({
-      where,
-      orderBy: { date: "desc" },
-      include: { supplier: { select: { id: true, name: true } } },
-    });
+    const [total, expenses] = await Promise.all([
+      prisma.expense.count({ where }),
+      prisma.expense.findMany({
+        where,
+        orderBy: { date: "desc" },
+        include: { supplier: { select: { id: true, name: true } } },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+
     const data = expenses.map(e => ({
       ...e,
       supplierName: e.supplier?.name ?? e.supplierName ?? null,
     }));
-    return NextResponse.json({ success: true, data });
+
+    return NextResponse.json({ success: true, data, total, page, pageSize });
   } catch (error: unknown) {
-    return NextResponse.json(
-      { success: false, error: "Failed to fetch expenses" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Failed to fetch expenses" }, { status: 500 });
   }
 }
 
@@ -49,14 +57,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { amount, category, notes, date, supplierId, supplierName } = body;
-
-    if (!amount || !category) {
-      return NextResponse.json(
-        { success: false, error: "Amount and category are required" },
-        { status: 400 },
-      );
+    const parsed = ExpenseInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error.issues[0].message }, { status: 400 });
     }
+
+    const { amount, category, notes, date, supplierId, supplierName } = parsed.data;
 
     const convertBengaliToEnglishNumerals = (input: string) => {
       const map: Record<string, string> = { "০":"0","১":"1","২":"2","৩":"3","৪":"4","৫":"5","৬":"6","৭":"7","৮":"8","৯":"9" };
@@ -76,24 +82,15 @@ export async function POST(request: NextRequest) {
     }
 
     const expense = await prisma.expense.create({
-      data: {
-        amount: toMoneyNumber(amount),
-        category,
-        notes,
-        date: parsedDate,
-        supplierId: supplierId || null,
-        supplierName: supplierName || null,
-      },
+      data: { amount, category, notes, date: parsedDate, supplierId: supplierId ?? null, supplierName: supplierName ?? null },
     });
 
     const user = await getAuthenticatedUser(request);
-    await logAudit({ userId: (user as any)?.id, action: 'CREATE_EXPENSE', entityType: 'Expense', entityId: expense.id, details: { amount: expense.amount, category: expense.category, notes: expense.notes }, ipAddress: getIp(request) });
+    await logAudit({ userId: user?.id, action: 'CREATE_EXPENSE', entityType: 'Expense', entityId: expense.id, details: { amount: expense.amount, category: expense.category, notes: expense.notes ?? undefined }, ipAddress: getIp(request) });
+
     return NextResponse.json({ success: true, data: expense });
   } catch (error: unknown) {
-    return NextResponse.json(
-      { success: false, error: "Failed to create expense" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Failed to create expense" }, { status: 500 });
   }
 }
 
@@ -106,23 +103,16 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: "ID is required" },
-        { status: 400 },
-      );
+      return NextResponse.json({ success: false, error: "ID is required" }, { status: 400 });
     }
 
-    await prisma.expense.delete({ where: { id } });
-    const user2 = await getAuthenticatedUser(request);
-    await logAudit({ userId: (user2 as any)?.id, action: 'DELETE_EXPENSE', entityType: 'Expense', entityId: id, ipAddress: getIp(request) });
+    await prisma.expense.update({ where: { id }, data: { isActive: false } });
+
+    const user = await getAuthenticatedUser(request);
+    await logAudit({ userId: user?.id, action: 'DELETE_EXPENSE', entityType: 'Expense', entityId: id, ipAddress: getIp(request) });
+
     return NextResponse.json({ success: true, message: "Expense deleted" });
   } catch (error: unknown) {
-    return NextResponse.json(
-      { success: false, error: "Failed to delete expense" },
-      { status: 500 },
-    );
+    return NextResponse.json({ success: false, error: "Failed to delete expense" }, { status: 500 });
   }
 }
-
-
-

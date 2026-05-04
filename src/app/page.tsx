@@ -173,16 +173,21 @@ function POSDashboard() {
   // Filter nav items based on user role
   const filteredNavItems = useMemo(() => {
     if (userRole === 'ADMIN') {
-      return navItems; // Admin can see all items
+      return navItems;
     } else if (userRole === 'MANAGER') {
-      return navItems.filter(item => item.id !== 'users' && item.id !== 'settings');
+      return navItems.filter(item => item.id !== 'users' && item.id !== 'settings' && item.id !== 'audit');
+    } else if (userRole === 'CASHIER') {
+      return navItems.filter(item =>
+        item.id === 'dashboard' ||
+        item.id === 'billing' ||
+        item.id === 'parties' ||
+        item.id === 'transactions'
+      );
     } else {
-      // Cashier and Viewer - limit access
-      return navItems.filter(item => 
-        item.id === 'dashboard' || 
-        item.id === 'billing' || 
-        item.id === 'parties' || 
-        item.id === 'reports' || 
+      // VIEWER
+      return navItems.filter(item =>
+        item.id === 'dashboard' ||
+        item.id === 'reports' ||
         item.id === 'transactions'
       );
     }
@@ -232,6 +237,7 @@ function POSDashboard() {
 
   // Load customers on mount
   useEffect(() => {
+    if (session?.user?.requiresPasswordChange) return;
     const loadCustomers = async () => {
       setCustomersLoading(true);
       try {
@@ -247,10 +253,11 @@ function POSDashboard() {
       }
     };
     loadCustomers();
-  }, [setCustomers, setCustomersLoading]);
+  }, [setCustomers, setCustomersLoading, session?.user?.requiresPasswordChange]);
 
   // Load products on mount
   useEffect(() => {
+    if (session?.user?.requiresPasswordChange) return;
     const loadProducts = async () => {
       setLoading(true);
       try {
@@ -301,7 +308,7 @@ function POSDashboard() {
     };
 
     loadProducts();
-  }, [setProducts, setLoading, setOnline]);
+  }, [setProducts, setLoading, setOnline, session?.user?.requiresPasswordChange]);
 
   // Monitor online status - check both navigator.onLine AND actual API connectivity
   useEffect(() => {

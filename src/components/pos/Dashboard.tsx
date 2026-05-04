@@ -21,6 +21,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useProductsStore, useCartStore } from '@/stores/pos-store';
+import { useSettingsStore } from '@/stores/settings-store';
 import { STORE_CONFIG, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { useLogout } from '@/hooks/use-logout';
@@ -71,6 +72,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [fullTransactions, setFullTransactions] = useState<Transaction[]>([]);
   
   const products = useProductsStore((state) => state.products);
+  const { settings } = useSettingsStore();
+  const storeName = settings.store_name || STORE_CONFIG.name;
+  const storeNameBn = settings.store_name_bn || STORE_CONFIG.nameBn;
+  const storeLogo = settings.store_logo;
   const lowStockProducts = products.filter(p => p.currentStock <= p.minStockLevel && p.isActive);
 
 
@@ -211,8 +216,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div className="shrink-0 border-b bg-background px-4 pt-3 pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <h1 className="text-lg font-bold leading-tight">{STORE_CONFIG.name}</h1>
-            <p className="text-xs text-muted-foreground">{STORE_CONFIG.nameBn}</p>
+            <div className="flex items-center gap-2">
+              {storeLogo && <img src={storeLogo} alt="logo" className="w-7 h-7 object-contain rounded" />}
+              <div>
+                <h1 className="text-lg font-bold leading-tight">{storeName}</h1>
+                <p className="text-xs text-muted-foreground">{storeNameBn}</p>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <div className="text-right hidden sm:block">

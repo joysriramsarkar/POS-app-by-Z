@@ -74,3 +74,25 @@ export const StockEntryInputSchema = z.object({
 });
 
 export type StockEntryInput = z.infer<typeof StockEntryInputSchema>;
+
+export const SupplierInputSchema = z.object({
+  name: z.string().min(1, 'Supplier name is required'),
+  phone: z.string().nullable().optional().transform(v => v === '' ? null : v),
+  address: z.string().nullable().optional().transform(v => v === '' ? null : v),
+  email: z.string().email('Invalid email').nullable().optional().transform(v => v === '' ? null : v),
+  gstNumber: z.string().nullable().optional().transform(v => v === '' ? null : v),
+  notes: z.string().nullable().optional().transform(v => v === '' ? null : v),
+});
+
+export type SupplierInput = z.infer<typeof SupplierInputSchema>;
+
+export const ExpenseInputSchema = z.object({
+  amount: money().pipe(z.number().positive('Amount must be positive')),
+  category: z.string().min(1, 'Category is required'),
+  notes: z.string().nullable().optional(),
+  date: z.string().optional(),
+  supplierId: z.string().nullable().optional(),
+  supplierName: z.string().nullable().optional(),
+});
+
+export type ExpenseInput = z.infer<typeof ExpenseInputSchema>;

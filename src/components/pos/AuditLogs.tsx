@@ -38,7 +38,8 @@ export function AuditLogs() {
   }, [page]);
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col h-full overflow-y-auto">
+      <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Audit Logs</h2>
       </div>
@@ -124,6 +125,7 @@ export function AuditLogs() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

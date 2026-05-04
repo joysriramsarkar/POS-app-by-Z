@@ -89,7 +89,10 @@ export default function BackupTab() {
 
       const response = await fetch("/api/backup", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-restore-confirmation": "CONFIRM_RESTORE_DELETE_ALL_DATA",
+        },
         body: JSON.stringify(backupData),
       });
 

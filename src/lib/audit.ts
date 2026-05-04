@@ -5,7 +5,7 @@ type CreateAuditLogParams = {
   action: string;
   entityType: string;
   entityId?: string;
-  details?: any;
+  details?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
 };

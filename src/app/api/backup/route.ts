@@ -3,6 +3,9 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/api-middleware";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import type { Prisma } from "@prisma/client";
+
+type UserRestoreInput = Prisma.UserCreateManyInput;
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +109,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // CRITICAL: Require confirmation token to prevent accidental data loss
+    const confirmationToken = request.headers.get('x-restore-confirmation');
+    if (confirmationToken !== 'CONFIRM_RESTORE_DELETE_ALL_DATA') {
+      return NextResponse.json(
+        { error: "Restore confirmation required. This operation will DELETE ALL existing data." },
+        { status: 400 },
+      );
+    }
+
     const {
       products = [],
       categories = [],
@@ -126,12 +138,12 @@ export async function POST(request: NextRequest) {
     // cryptographically strong random passwords upon restore and will require a password reset
     // by an administrator (or through an email reset flow if implemented).
     // Use chunking to avoid blocking the event loop with too many concurrent bcrypt operations.
-    const usersWithPassword: any[] = [];
+    const usersWithPassword: UserRestoreInput[] = [];
     const CHUNK_SIZE = 5;
     for (let i = 0; i < users.length; i += CHUNK_SIZE) {
       const chunk = users.slice(i, i + CHUNK_SIZE);
       const processedChunk = await Promise.all(
-        chunk.map(async (user: any) => {
+        chunk.map(async (user: UserRestoreInput) => {
           if (!user.password) {
             // Generate a strong 32-character random hex string as the new temporary password
             const randomPassword = crypto.randomBytes(16).toString("hex");

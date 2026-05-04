@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { requirePermission, getAuthenticatedUser } from '@/lib/api-middleware';
 import { logAudit } from '@/lib/audit';
+import { SupplierInputSchema } from '@/schemas';
 
 const getIp = (req: NextRequest) => req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || undefined;
 
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get('id');
     const search = searchParams.get('search');
     const includeInactive = searchParams.get('includeInactive') === 'true';
+    const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10));
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') ?? '50', 10)));
 
     if (id) {
       const supplier = await db.supplier.findUnique({
@@ -34,13 +37,18 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    const suppliers = await db.supplier.findMany({
-      where,
-      include: { _count: { select: { purchases: true } } },
-      orderBy: [{ name: 'asc' }],
-    });
+    const [total, suppliers] = await Promise.all([
+      db.supplier.count({ where }),
+      db.supplier.findMany({
+        where,
+        include: { _count: { select: { purchases: true } } },
+        orderBy: [{ name: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
 
-    return NextResponse.json({ success: true, data: suppliers });
+    return NextResponse.json({ success: true, data: suppliers, total, page, pageSize });
   } catch (error) {
     console.error('Error fetching suppliers:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch suppliers' }, { status: 500 });
@@ -53,16 +61,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, phone, address, email, gstNumber, notes } = body;
-
-    if (!name) return NextResponse.json({ success: false, error: 'Supplier name is required' }, { status: 400 });
+    const parsed = SupplierInputSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error.issues[0].message }, { status: 400 });
+    }
 
     const supplier = await db.supplier.create({
-      data: { name, phone: phone || null, address: address || null, email: email || null, gstNumber: gstNumber || null, notes: notes || null, isActive: true },
+      data: { ...parsed.data, isActive: true },
     });
 
     const user = await getAuthenticatedUser(request);
-    await logAudit({ userId: (user as any)?.id, action: 'CREATE_SUPPLIER', entityType: 'Supplier', entityId: supplier.id, details: { name: supplier.name }, ipAddress: getIp(request) });
+    await logAudit({ userId: user?.id, action: 'CREATE_SUPPLIER', entityType: 'Supplier', entityId: supplier.id, details: { name: supplier.name }, ipAddress: getIp(request) });
 
     return NextResponse.json({ success: true, data: supplier, message: 'Supplier created successfully' });
   } catch (error) {
@@ -77,14 +86,19 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, ...data } = body;
+    const { id, ...rest } = body;
 
     if (!id) return NextResponse.json({ success: false, error: 'Supplier ID is required' }, { status: 400 });
 
-    const supplier = await db.supplier.update({ where: { id }, data: { ...data, updatedAt: new Date() } });
+    const parsed = SupplierInputSchema.safeParse(rest);
+    if (!parsed.success) {
+      return NextResponse.json({ success: false, error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const supplier = await db.supplier.update({ where: { id }, data: { ...parsed.data, updatedAt: new Date() } });
 
     const user = await getAuthenticatedUser(request);
-    await logAudit({ userId: (user as any)?.id, action: 'UPDATE_SUPPLIER', entityType: 'Supplier', entityId: supplier.id, details: { name: supplier.name }, ipAddress: getIp(request) });
+    await logAudit({ userId: user?.id, action: 'UPDATE_SUPPLIER', entityType: 'Supplier', entityId: supplier.id, details: { name: supplier.name }, ipAddress: getIp(request) });
 
     return NextResponse.json({ success: true, data: supplier, message: 'Supplier updated successfully' });
   } catch (error) {
@@ -106,7 +120,7 @@ export async function DELETE(request: NextRequest) {
     await db.supplier.update({ where: { id }, data: { isActive: false, updatedAt: new Date() } });
 
     const user = await getAuthenticatedUser(request);
-    await logAudit({ userId: (user as any)?.id, action: 'DELETE_SUPPLIER', entityType: 'Supplier', entityId: id, ipAddress: getIp(request) });
+    await logAudit({ userId: user?.id, action: 'DELETE_SUPPLIER', entityType: 'Supplier', entityId: id, ipAddress: getIp(request) });
 
     return NextResponse.json({ success: true, message: 'Supplier deleted successfully' });
   } catch (error) {
