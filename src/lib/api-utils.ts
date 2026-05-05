@@ -1,3 +1,8 @@
+/** Extract a string message from an unknown catch value */
+export function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Safe API fetch wrapper that handles JSON parsing errors gracefully
  * Prevents "Unexpected token '<'" errors when APIs return HTML error responses

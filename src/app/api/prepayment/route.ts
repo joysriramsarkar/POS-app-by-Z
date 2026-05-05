@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ success: true, data: updatedCustomer });
 
-    } catch (error) {
+    } catch (error: unknown) {
         console.error('Error adding prepayment:', error);
         const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
         const statusCode = errorMessage === 'Customer not found' ? 404 : 500;

@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     return NextResponse.json({ success: true, data: suppliers, total, page, pageSize });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching suppliers:', error);
     return NextResponse.json({ success: false, error: 'Failed to fetch suppliers' }, { status: 500 });
   }
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     await logAudit({ userId: user?.id, action: 'CREATE_SUPPLIER', entityType: 'Supplier', entityId: supplier.id, details: { name: supplier.name }, ipAddress: getIp(request) });
 
     return NextResponse.json({ success: true, data: supplier, message: 'Supplier created successfully' });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating supplier:', error);
     return NextResponse.json({ success: false, error: 'Failed to create supplier' }, { status: 500 });
   }
@@ -101,7 +101,7 @@ export async function PUT(request: NextRequest) {
     await logAudit({ userId: user?.id, action: 'UPDATE_SUPPLIER', entityType: 'Supplier', entityId: supplier.id, details: { name: supplier.name }, ipAddress: getIp(request) });
 
     return NextResponse.json({ success: true, data: supplier, message: 'Supplier updated successfully' });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error updating supplier:', error);
     return NextResponse.json({ success: false, error: 'Failed to update supplier' }, { status: 500 });
   }
@@ -123,7 +123,7 @@ export async function DELETE(request: NextRequest) {
     await logAudit({ userId: user?.id, action: 'DELETE_SUPPLIER', entityType: 'Supplier', entityId: id, ipAddress: getIp(request) });
 
     return NextResponse.json({ success: true, message: 'Supplier deleted successfully' });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error deleting supplier:', error);
     return NextResponse.json({ success: false, error: 'Failed to delete supplier' }, { status: 500 });
   }

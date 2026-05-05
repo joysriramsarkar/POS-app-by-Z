@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: pendingItems,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching sync status:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch sync status" },
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       cached: result.cached,
       message: `${actionType} synced successfully`,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error syncing data:", error);
     return NextResponse.json(
       {
@@ -740,7 +740,7 @@ export async function PUT(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Error updating sync status:", err);
     return NextResponse.json(
       { success: false, error: "Failed to update sync status" },

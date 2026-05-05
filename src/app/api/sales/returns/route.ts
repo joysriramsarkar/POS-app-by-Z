@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ success: true, data: returns });
-  } catch (error) {
+  } catch (error: unknown) {
     return NextResponse.json({ success: false, error: "Failed to fetch returns" }, { status: 500 });
   }
 }
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: saleReturn });
-  } catch (error) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Failed to process return";
     const status = message.includes("not found") ? 404 : 400;
     return NextResponse.json({ success: false, error: message }, { status });

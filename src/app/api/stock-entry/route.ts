@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
       data: transactionResult,
       message: `Stock updated: ${quantity} units added to ${transactionResult.name}`,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating stock entry:', error);
     return NextResponse.json(
       { 

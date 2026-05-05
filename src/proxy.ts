@@ -2,40 +2,81 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// C2 + H5: In-memory rate limiter for auth endpoints
-// For production with multiple instances, replace with @upstash/ratelimit + Redis
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
+// C2 + H5: Rate limiter — Redis (Upstash) if configured, else in-memory fallback
 const RATE_LIMIT_RULES: Record<string, { max: number; windowMs: number }> = {
   "/api/auth/callback/credentials": { max: 10, windowMs: 60_000 },
   "/api/auth/signin":               { max: 10, windowMs: 60_000 },
+  "/api/auth/change-password":      { max: 5,  windowMs: 60_000 },
 };
 
-function rateLimit(ip: string, pathname: string): boolean {
+// --- Redis path (Upstash) ---
+let redisRateLimiters: Map<string, { limit: (id: string) => Promise<{ success: boolean }> }> | null = null;
+
+async function getRedisLimiters() {
+  if (redisRateLimiters) return redisRateLimiters;
+  const url   = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+
+  const { Redis }     = await import("@upstash/redis");
+  const { Ratelimit } = await import("@upstash/ratelimit");
+  const redis = new Redis({ url, token });
+
+  redisRateLimiters = new Map(
+    Object.entries(RATE_LIMIT_RULES).map(([path, rule]) => [
+      path,
+      new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(rule.max, `${rule.windowMs} ms`),
+        prefix:  `rl:${path}`,
+      }),
+    ])
+  );
+  return redisRateLimiters;
+}
+
+// --- In-memory fallback ---
+const memoryMap = new Map<string, { count: number; resetAt: number }>();
+
+function memoryRateLimit(ip: string, pathname: string): boolean {
   const rule = RATE_LIMIT_RULES[pathname];
   if (!rule) return false;
-
-  const key = `${ip}:${pathname}`;
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-
+  const key   = `${ip}:${pathname}`;
+  const now   = Date.now();
+  const entry = memoryMap.get(key);
   if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + rule.windowMs });
+    memoryMap.set(key, { count: 1, resetAt: now + rule.windowMs });
     return false;
   }
-
   entry.count += 1;
   return entry.count > rule.max;
 }
 
+async function isRateLimited(ip: string, pathname: string): Promise<boolean> {
+  if (!RATE_LIMIT_RULES[pathname]) return false;
+  try {
+    const limiters = await getRedisLimiters();
+    if (limiters) {
+      const limiter = limiters.get(pathname);
+      if (limiter) {
+        const { success } = await limiter.limit(ip);
+        return !success;
+      }
+    }
+  } catch {
+    // Redis unavailable — fall through to in-memory
+  }
+  return memoryRateLimit(ip, pathname);
+}
+
 export default withAuth(
-  function middleware(request: NextRequest) {
+  async function middleware(request: NextRequest) {
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
       request.headers.get("x-real-ip") ??
       "unknown";
 
-    if (rateLimit(ip, request.nextUrl.pathname)) {
+    if (await isRateLimited(ip, request.nextUrl.pathname)) {
       return NextResponse.json(
         { error: "Too many requests. Please try again later." },
         { status: 429, headers: { "Retry-After": "60" } }
@@ -54,5 +95,6 @@ export const config = {
     "/((?!api/auth|login|_next/static|_next/image|favicon.ico|logo.svg|manifest.json).*)",
     "/api/auth/callback/credentials",
     "/api/auth/signin",
+    "/api/auth/change-password",
   ],
 };

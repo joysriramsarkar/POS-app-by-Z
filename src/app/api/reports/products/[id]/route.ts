@@ -119,7 +119,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       weeklyPattern,
       topCustomers,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Product detail report error:', error);
     return NextResponse.json({ error: 'Failed to fetch product detail' }, { status: 500 });
   }

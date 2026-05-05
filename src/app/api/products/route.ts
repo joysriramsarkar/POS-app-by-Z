@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
       data: products,
       nextCursor,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching products:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to fetch products' },
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
       data: product,
       message: 'Product created successfully',
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating product:', error);
     
     // Handle specific Prisma errors
@@ -232,7 +232,7 @@ export async function PUT(request: NextRequest) {
       data: product,
       message: 'Product updated successfully',
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error updating product:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to update product' },
@@ -277,7 +277,7 @@ export async function DELETE(request: NextRequest) {
       success: true,
       message: 'Product deleted successfully',
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error deleting product:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to delete product' },

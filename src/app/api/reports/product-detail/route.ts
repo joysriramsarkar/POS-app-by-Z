@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       dailySales,
       hourlySales,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Product stats error:', error);
     return NextResponse.json({ error: 'Failed to fetch product statistics' }, { status: 500 });
   }

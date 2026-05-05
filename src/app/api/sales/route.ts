@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error fetching sales:", error);
     return NextResponse.json(
       { success: false, error: "Failed to fetch sales" },
@@ -365,7 +365,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: sale, message: "Sale completed successfully" });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error creating sale:", error);
 
     let errorMessage = "Failed to create sale";
@@ -533,7 +533,7 @@ export async function PUT(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, data: sale, message: `Sale ${status.toLowerCase()} successfully` });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error updating sale:", error);
     return NextResponse.json({ success: false, error: "Failed to update sale" }, { status: 500 });
   }

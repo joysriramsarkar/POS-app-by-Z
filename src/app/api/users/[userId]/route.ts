@@ -26,7 +26,7 @@ export async function PATCH(
 
     if (!(await requireAdmin(session))) {
       return NextResponse.json(
-        { error: "Only admins can update users" },
+        { success: false, error: "Only admins can update users" },
         { status: 403 }
       );
     }
@@ -41,7 +41,7 @@ export async function PATCH(
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
     }
 
     // Prevent updating the last admin
@@ -51,7 +51,7 @@ export async function PATCH(
       });
       if (adminCount === 1) {
         return NextResponse.json(
-          { error: "Cannot remove the last admin user" },
+          { success: false, error: "Cannot remove the last admin user" },
           { status: 400 }
         );
       }
@@ -67,7 +67,7 @@ export async function PATCH(
       });
       if (existingUser) {
         return NextResponse.json(
-          { error: "Username already exists" },
+          { success: false, error: "Username already exists" },
           { status: 409 }
         );
       }
@@ -82,7 +82,7 @@ export async function PATCH(
       });
       if (existingEmail) {
         return NextResponse.json(
-          { error: "Email already exists" },
+          { success: false, error: "Email already exists" },
           { status: 409 }
         );
       }
@@ -116,11 +116,11 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json(updatedUser);
-  } catch (error) {
+    return NextResponse.json({ success: true, data: updatedUser });
+  } catch (error: unknown) {
     console.error("[USERS_PATCH]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -134,12 +134,12 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
     if (!(await requireAdmin(session))) {
       return NextResponse.json(
-        { error: "Only admins can delete users" },
+        { success: false, error: "Only admins can delete users" },
         { status: 403 }
       );
     }
@@ -183,10 +183,10 @@ export async function DELETE(
     });
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("[USERS_DELETE]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }

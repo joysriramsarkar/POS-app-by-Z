@@ -18,12 +18,12 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
     if (!(await requireAdmin(session))) {
       return NextResponse.json(
-        { error: "Only admins can manage users" },
+        { success: false, error: "Only admins can manage users" },
         { status: 403 }
       );
     }
@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(users);
+    return NextResponse.json({ success: true, data: users });
   } catch (error) {
     console.error("[USERS_GET]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
     if (!(await requireAdmin(session))) {
       return NextResponse.json(
-        { error: "Only admins can create users" },
+        { success: false, error: "Only admins can create users" },
         { status: 403 }
       );
     }
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!username || !name || !password) {
       return NextResponse.json(
-        { error: "Username, name, and password are required" },
+        { success: false, error: "Username, name, and password are required" },
         { status: 400 }
       );
     }
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "Username or email already exists" },
+        { success: false, error: "Username or email already exists" },
         { status: 409 }
       );
     }
@@ -122,11 +122,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(newUser, { status: 201 });
+    return NextResponse.json({ success: true, data: newUser }, { status: 201 });
   } catch (error) {
     console.error("[USERS_POST]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { success: false, error: "Internal server error" },
       { status: 500 }
     );
   }
