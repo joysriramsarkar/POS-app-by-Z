@@ -1,5 +1,7 @@
 import { describe, expect, it, mock, beforeEach } from 'bun:test';
 
+mock.module('@/lib/env', () => ({ env: {} }));
+
 mock.module('next/server', () => ({
   NextResponse: {
     json: (body: any, init?: any) => {

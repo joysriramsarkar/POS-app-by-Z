@@ -3,6 +3,7 @@ import { describe, expect, it, mock, beforeEach } from 'bun:test';
 const mockFindMany = mock(() => Promise.resolve([]));
 const mockCount = mock(() => Promise.resolve(0));
 
+mock.module('@/lib/env', () => ({ env: {} }));
 mock.module('@/lib/db', () => ({
   db: {
     user: { findUnique: mock(() => Promise.resolve(null)) },
@@ -39,7 +40,7 @@ mock.module('@/app/api/auth/[...nextauth]/route', () => ({
   authOptions: {},
 }));
 
-import { GET } from './route';
+const { GET } = await import('./route');
 
 describe('GET /api/products', () => {
   beforeEach(() => {

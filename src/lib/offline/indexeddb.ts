@@ -499,6 +499,6 @@ export function isOnline(): boolean {
 }
 
 // Initialize database on module load
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
   initDatabase().catch(console.error);
 }
