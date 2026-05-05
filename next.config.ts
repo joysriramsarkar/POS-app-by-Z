@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
-// C6: ALLOWED_ORIGINS must be set in production
+// C6: ALLOWED_ORIGINS must be set in production at runtime (not build time)
 const rawOrigins = process.env.ALLOWED_ORIGINS;
-if (process.env.NODE_ENV === "production" && !rawOrigins) {
+const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+if (process.env.NODE_ENV === "production" && !isBuildPhase && !rawOrigins) {
   throw new Error(
     "[STARTUP] ALLOWED_ORIGINS environment variable is not set. " +
     "Set it to a comma-separated list of allowed origins (e.g. https://yourdomain.com)."
