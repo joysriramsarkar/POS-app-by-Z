@@ -62,9 +62,15 @@ export async function GET(request: NextRequest) {
         revenue: existing.revenue + (item.totalPrice ?? 0),
       });
     }
-    const dailySales = Array.from(dailySalesMap.entries())
-      .map(([date, v]) => ({ date, ...v }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    // সব দিন দেখানোর জন্য — বিক্রি না থাকলেও 0 দিয়ে পূর্ণ করা
+    const allDays = Array.from({ length: days }, (_, i) => {
+      const d = subDays(new Date(), days - 1 - i);
+      return format(d, 'yyyy-MM-dd');
+    });
+    const dailySales = allDays.map(date => ({
+      date,
+      ...(dailySalesMap.get(date) ?? { qty: 0, revenue: 0 }),
+    }));
 
     // Hourly sales breakdown
     const hourlySalesMap = new Map<number, number>();

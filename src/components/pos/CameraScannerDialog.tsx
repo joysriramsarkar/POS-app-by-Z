@@ -7,6 +7,11 @@ import { convertBengaliToEnglishNumerals, isValidEanUpcBarcode } from '@/lib/uti
 import { Button } from '@/components/ui/button';
 import { CheckCircle2, X, AlertCircle } from 'lucide-react';
 
+interface ScannedPreviewItem {
+  name: string;
+  qty: number;
+}
+
 interface CameraScannerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -14,7 +19,8 @@ interface CameraScannerDialogProps {
   title?: string;
   description?: string;
   singleScan?: boolean;
-  scannedProductNames?: string[];
+  scannedItems?: ScannedPreviewItem[];
+  liveExternalError?: string | null;
 }
 
 export function CameraScannerDialog({
@@ -22,9 +28,11 @@ export function CameraScannerDialog({
   onOpenChange,
   onBarcodeScanned,
   singleScan = false,
-  scannedProductNames = [],
+  scannedItems = [],
+  liveExternalError = null,
 }: CameraScannerDialogProps) {
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const displayError = liveExternalError || localError;
   const listenerRef = useRef<{ remove: () => Promise<void> } | null>(null);
   const lastScannedRef = useRef<string>('');
   const lastScannedTimeRef = useRef<number>(0);
@@ -45,7 +53,7 @@ export function CameraScannerDialog({
 
   const handleClose = useCallback(async () => {
     await stopScanner();
-    setError(null);
+    setLocalError(null);
     onOpenChange(false);
   }, [stopScanner, onOpenChange]);
 
@@ -55,11 +63,11 @@ export function CameraScannerDialog({
     const startScanner = async () => {
       const { camera } = await BarcodeScanner.requestPermissions();
       if (camera !== 'granted') {
-        setError('ক্যামেরার পারমিশন ছাড়া স্ক্যান সম্ভব নয়!');
+        setLocalError('ক্যামেরার পারমিশন ছাড়া স্ক্যান সম্ভব নয়!');
         return;
       }
 
-      setError(null);
+      setLocalError(null);
 
       listenerRef.current = await BarcodeScanner.addListener(
         'barcodesScanned',
@@ -75,11 +83,12 @@ export function CameraScannerDialog({
           lastScannedTimeRef.current = now;
 
           if (isValidEanUpcBarcode(normalized)) {
+            setLocalError(null);
             onBarcodeScanned(normalized);
             if (navigator?.vibrate) navigator.vibrate(50);
             if (singleScan) stopScanner().then(() => onOpenChange(false));
           } else {
-            setError('অবৈধ বারকোড: ' + normalized);
+            setLocalError('অবৈধ বারকোড: ' + normalized);
           }
         }
       );
@@ -98,7 +107,7 @@ export function CameraScannerDialog({
       });
     };
 
-    startScanner().catch((err) => setError('Scanner error: ' + err?.message));
+    startScanner().catch((err) => setLocalError('Scanner error: ' + err?.message));
 
     return () => { stopScanner(); };
   }, [open]);
@@ -119,21 +128,24 @@ export function CameraScannerDialog({
 
       {/* Bottom panel */}
       <div className="bg-black/70 p-5 flex flex-col gap-3">
-        {error ? (
-          <div className="flex items-center justify-center gap-2 text-red-400 text-sm">
-            <AlertCircle className="w-4 h-4" />
-            {error}
+        {displayError ? (
+          <div className="flex items-center justify-center gap-2 bg-red-500/20 p-2 rounded text-red-400 text-sm animate-pulse">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="text-center">{displayError}</span>
           </div>
         ) : (
           <p className="text-white/70 text-sm text-center">বারকোড ফ্রেমের মধ্যে ধরুন</p>
         )}
 
-        {!singleScan && scannedProductNames.length > 0 && (
+        {!singleScan && scannedItems.length > 0 && (
           <div className="flex flex-col gap-1 max-h-28 overflow-y-auto">
-            {scannedProductNames.map((name, i) => (
-              <div key={i} className="flex items-center gap-2 text-green-400 text-sm">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{name}</span>
+            {scannedItems.map((item, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 text-green-400 text-sm bg-white/5 p-1 rounded">
+                <div className="flex items-center gap-2 truncate">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{item.name}</span>
+                </div>
+                <span className="font-bold shrink-0 bg-green-500/20 px-1.5 py-0.5 rounded text-xs">x{item.qty}</span>
               </div>
             ))}
           </div>
@@ -146,7 +158,7 @@ export function CameraScannerDialog({
             className="w-full bg-white/10 border-white/30 text-white hover:bg-white/20"
           >
             <X className="w-4 h-4 mr-2" />
-            Done ({scannedProductNames.length} scanned)
+            Done ({scannedItems.reduce((s, i) => s + i.qty, 0)} scanned)
           </Button>
         )}
         {singleScan && (

@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useRef, useMemo } from 'react';
 import Papa from 'papaparse';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { ProductsDB, SyncQueueDB } from '@/lib/offline/indexeddb';
 import { v4 as uuidv4 } from 'uuid';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
@@ -119,33 +122,44 @@ export function BulkStockUpdateDialog({ open, onOpenChange }: BulkStockUpdateDia
     });
   };
 
-  const handleDownloadTemplate = () => {
-    // We'll add name and current_stock for user reference
-    const templateData = products.map(p => ({
-      barcode: p.barcode,
-      name: p.name,
-      current_stock: p.currentStock,
-      quantity_to_add: 0 // User will fill this
-    }));
-
-    if (templateData.length === 0) {
-        // Add a dummy row if there are no products, so the user knows the format
-        templateData.push({
-            barcode: '1234567890',
-            name: 'Sample Product Name',
-            current_stock: 15,
-            quantity_to_add: 10
-        });
-    }
+  const handleDownloadTemplate = async () => {
+    const templateData = products.length > 0
+      ? products.map(p => ({ barcode: p.barcode, name: p.name, current_stock: p.currentStock, quantity_to_add: 0 }))
+      : [{ barcode: '1234567890', name: 'Sample Product Name', current_stock: 15, quantity_to_add: 10 }];
 
     const csv = Papa.unparse(templateData);
+    const fileName = 'stock_update_template.csv';
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        // ফাইল Cache ডিরেক্টরিতে সেভ করে Share sheet দিয়ে ডাউনলোড করানো হচ্ছে
+        const { uri } = await Filesystem.writeFile({
+          path: fileName,
+          data: csv,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        });
+        await Share.share({
+          title: fileName,
+          url: uri,
+          dialogTitle: 'CSV টেমপ্লেট সেভ করুন',
+        });
+      } catch (e) {
+        toast({ title: 'ডাউনলোড ব্যর্থ', description: String(e), variant: 'destructive' });
+      }
+      return;
+    }
+
+    // Desktop: Blob URL
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', 'stock_update_template.csv');
+    link.href = url;
+    link.setAttribute('download', fileName);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleSave = async () => {

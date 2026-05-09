@@ -216,7 +216,7 @@ export function CartPanel({ onCheckout, customers = [], onScan }: CartPanelProps
     : customers.slice(0, 20);
 
   const isCartEmpty = items.length === 0;
-  const itemCountDisplay = itemCount === 0 ? 'Empty' : `${itemCount} item${itemCount !== 1 ? 's' : ''}`;
+  const itemCountDisplay = itemCount === 0 ? 'Empty' : `${itemCount} item${itemCount !== 1 ? 's' : ''}`;  // unique SKUs
 
   const isAndroidApp = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform();
 

@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { BulkStockUpdateDialog } from './BulkStockUpdateDialog';
+import { StockAdjustmentDialog } from './StockAdjustmentDialog';
 import {
   Package,
   Plus,
@@ -32,6 +33,7 @@ import {
   X,
   Upload,
   BarChart2,
+  MinusCircle,
 } from 'lucide-react';
 import type { Product } from '@/types/pos';
 import { useProductsStore } from '@/stores/pos-store';
@@ -59,6 +61,7 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [isBulkUpdateOpen, setIsBulkUpdateOpen] = useState(false);
+  const [adjustmentProduct, setAdjustmentProduct] = useState<Product | null>(null);
 
   // Server-side search state
   const [searchResults, setSearchResults] = useState<Product[] | null>(null);
@@ -406,6 +409,15 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          title="স্টক কমান (Adjustment)"
+                          onClick={() => setAdjustmentProduct(product)}
+                        >
+                          <MinusCircle className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-8"
                           onClick={() => onEditProduct?.(product)}
                         >
@@ -465,6 +477,11 @@ export function StockManagement({ onAddProduct, onEditProduct, onAddStock, onDel
       </div>
     </div>
     <BulkStockUpdateDialog open={isBulkUpdateOpen} onOpenChange={setIsBulkUpdateOpen} />
+    <StockAdjustmentDialog
+      product={adjustmentProduct}
+      open={!!adjustmentProduct}
+      onOpenChange={(open) => { if (!open) setAdjustmentProduct(null); }}
+    />
     </>
   );
 }

@@ -34,6 +34,7 @@ export function ProductGrid({
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
+  const [cameraScanError, setCameraScanError] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,25 +74,18 @@ export function ProductGrid({
   // Filter products based on search and category
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      // Skip inactive products
       if (!product.isActive) return false;
-
-      // Category filter
-      if (selectedCategoryId && product.category !== selectedCategoryId) {
-        return false;
-      }
-
-      // Search filter
+      if (selectedCategoryId && product.category !== selectedCategoryId) return false;
       if (searchQuery) {
         const lowerQuery = searchQuery.toLowerCase();
         const normalizedQuery = convertBengaliToEnglishNumerals(searchQuery);
-        const matchesName = product.name.toLowerCase().includes(lowerQuery);
-        const matchesBengaliName = product.nameBn?.includes(searchQuery);
-        const matchesBarcode = product.barcode?.includes(searchQuery);
-        const matchesBarcodeNormalized = convertBengaliToEnglishNumerals(product.barcode || '').includes(normalizedQuery);
-        return matchesName || matchesBengaliName || matchesBarcode || matchesBarcodeNormalized;
+        return (
+          product.name.toLowerCase().includes(lowerQuery) ||
+          product.nameBn?.includes(searchQuery) ||
+          product.barcode?.includes(searchQuery) ||
+          convertBengaliToEnglishNumerals(product.barcode || '').includes(normalizedQuery)
+        );
       }
-
       return true;
     });
   }, [products, searchQuery, selectedCategoryId]);
@@ -100,9 +94,7 @@ export function ProductGrid({
   const productsByCategory = useMemo(() => {
     const grouped: Record<string, Product[]> = {};
     filteredProducts.forEach((product) => {
-      if (!grouped[product.category]) {
-        grouped[product.category] = [];
-      }
+      if (!grouped[product.category]) grouped[product.category] = [];
       grouped[product.category].push(product);
     });
     return grouped;
@@ -111,23 +103,15 @@ export function ProductGrid({
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const query = e.target.value;
-      if (externalProducts) {
-        setLocalSearchQuery(query);
-        return;
-      }
+      if (externalProducts) { setLocalSearchQuery(query); return; }
       setSearchQuery(query);
-      // Server-side search removed from here — local filter is sufficient for loaded products.
-      // API search only triggers on Enter (barcode scan path above).
     },
     [externalProducts, setSearchQuery]
   );
 
   const clearSearch = useCallback(() => {
-    if (externalProducts) {
-      setLocalSearchQuery('');
-    } else {
-      setSearchQuery('');
-    }
+    if (externalProducts) setLocalSearchQuery('');
+    else setSearchQuery('');
   }, [externalProducts, setSearchQuery]);
 
   const handleCameraBarcode = useCallback(
@@ -136,30 +120,15 @@ export function ProductGrid({
       const matchedProduct = barcodeMap.get(normalizedBarcode);
 
       if (matchedProduct) {
-        if (externalProducts) {
-          onProductSelect?.(matchedProduct);
-        } else {
-          addItem(matchedProduct, 1);
-        }
-
-        // Give the user quick feedback without closing the scanner.
-        toast({
-          title: 'Scanned',
-          description: matchedProduct.name,
-        });
+        if (externalProducts) onProductSelect?.(matchedProduct);
+        else addItem(matchedProduct, 1);
+        setCameraScanError(null);
+        toast({ title: 'Scanned', description: matchedProduct.name });
         if (navigator?.vibrate) navigator.vibrate(50);
       } else {
-        // Product not found - show in search to let user know
-        if (externalProducts) {
-          setLocalSearchQuery(barcode);
-        } else {
-          setSearchQuery(barcode);
-        }
-        toast({
-          title: 'আইটেম পাওয়া যায়নি',
-          description: 'এই বারকোডের জন্য কোনো প্রোডাক্ট পাওয়া যায়নি।',
-          variant: 'destructive',
-        });
+        setCameraScanError(`আইটেম পাওয়া যায়নি: ${barcode}`);
+        if (externalProducts) setLocalSearchQuery(barcode);
+        else setSearchQuery(barcode);
       }
     },
     [barcodeMap, externalProducts, onProductSelect, addItem, setSearchQuery, toast]
@@ -184,8 +153,7 @@ export function ProductGrid({
       const res = await fetch(`/api/products?limit=10000&cursor=${nextCursor}`);
       if (res.ok) {
         const { data, nextCursor: newNextCursor } = await res.json();
-        const hasMoreData = !!newNextCursor;
-        appendProducts(data, hasMoreData, newNextCursor);
+        appendProducts(data, !!newNextCursor, newNextCursor);
       }
     } catch (error) {
       console.error('Error loading more products', error);
@@ -199,7 +167,6 @@ export function ProductGrid({
       {/* Search and Filter Controls */}
       {showSearch && (
         <div className="flex flex-col gap-3 p-4 border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-10 shadow-sm">
-          {/* Search Input with Camera Button */}
           <label htmlFor="product-search" className="sr-only">Search products</label>
           <div className="flex gap-2">
             <div className="relative flex-1 group">
@@ -218,39 +185,31 @@ export function ProductGrid({
                     const scannedValue = e.currentTarget.value.trim();
                     const normalizedScanValue = convertBengaliToEnglishNumerals(scannedValue);
                     const matchedProduct = barcodeMap.get(normalizedScanValue);
-                    
                     if (matchedProduct) {
-                      if (externalProducts) {
-                        onProductSelect?.(matchedProduct);
-                      } else {
-                        addItem(matchedProduct, 1);
-                      }
+                      if (externalProducts) onProductSelect?.(matchedProduct);
+                      else addItem(matchedProduct, 1);
                       e.currentTarget.value = '';
-                      if (externalProducts) {
-                        setLocalSearchQuery('');
-                      } else {
-                        setSearchQuery('');
-                      }
+                      if (externalProducts) setLocalSearchQuery('');
+                      else setSearchQuery('');
                       e.currentTarget.focus();
+                    }
                   }
-                }
-              }}
-              className="pl-9 pr-9 h-11 touch-manipulation rounded-xl shadow-xs transition-shadow focus-visible:ring-primary/20"
-              aria-label="Search products"
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute right-2 md:right-1 top-1/2 -translate-y-1/2 h-8 w-8 md:h-7 md:w-7 p-0"
-                onClick={clearSearch}
-                aria-label="Clear search"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
+                }}
+                className="pl-9 pr-9 h-11 touch-manipulation rounded-xl shadow-xs transition-shadow focus-visible:ring-primary/20"
+                aria-label="Search products"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 md:right-1 top-1/2 -translate-y-1/2 h-8 w-8 md:h-7 md:w-7 p-0"
+                  onClick={clearSearch}
+                  aria-label="Clear search"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
             </div>
-            {/* Camera Scanner Button - Android app only */}
             {isAndroidApp && (
               <Button
                 size="sm"
@@ -265,7 +224,6 @@ export function ProductGrid({
             )}
           </div>
 
-          {/* Category Chips */}
           {showCategories && storeCategories.length > 0 && (
             <ScrollArea className="w-full whitespace-nowrap">
               <div className="flex gap-2 pb-2">
@@ -296,7 +254,6 @@ export function ProductGrid({
             </ScrollArea>
           )}
 
-          {/* Active Filters & View Toggle */}
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-2">
               {(searchQuery || selectedCategoryId) && (
@@ -340,16 +297,13 @@ export function ProductGrid({
         </div>
       )}
 
-      {/* Product Grid - Fixed height for proper scrolling */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="p-4 md:p-5">
           {filteredProducts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center bg-card rounded-2xl border border-dashed border-border/60">
               <Package className="w-12 h-12 text-muted-foreground mb-4" />
               <p className="text-lg font-medium text-muted-foreground">No products found</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Try adjusting your search or filters
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Try adjusting your search or filters</p>
               {(searchQuery || selectedCategoryId) && (
                 <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
                   Clear all filters
@@ -357,14 +311,12 @@ export function ProductGrid({
               )}
             </div>
           ) : viewMode === 'grid' ? (
-            // Standard Grid View
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
               {filteredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
           ) : (
-            // Compact View - Grouped by Category
             <div className="space-y-6">
               {Object.entries(productsByCategory).map(([category, categoryProducts]) => (
                 <div key={category}>
@@ -373,11 +325,7 @@ export function ProductGrid({
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {categoryProducts.map((product) => (
-                      <CompactProductCard
-                        key={product.id}
-                        product={product}
-                        onSelect={onProductSelect}
-                      />
+                      <CompactProductCard key={product.id} product={product} onSelect={onProductSelect} />
                     ))}
                   </div>
                 </div>
@@ -386,11 +334,7 @@ export function ProductGrid({
           )}
           {!externalProducts && hasMore && !searchQuery && !selectedCategoryId && (
             <div className="flex justify-center mt-6 mb-4">
-              <Button
-                variant="outline"
-                onClick={loadMoreProducts}
-                disabled={isLoadingMore}
-              >
+              <Button variant="outline" onClick={loadMoreProducts} disabled={isLoadingMore}>
                 {isLoadingMore ? 'Loading...' : 'Load More Products'}
               </Button>
             </div>
@@ -398,19 +342,18 @@ export function ProductGrid({
         </div>
       </div>
 
-      {/* Camera Scanner Dialog */}
       <CameraScannerDialog
         open={isCameraScannerOpen}
-        onOpenChange={setIsCameraScannerOpen}
+        onOpenChange={(open) => { setIsCameraScannerOpen(open); if (!open) setCameraScanError(null); }}
         onBarcodeScanned={handleCameraBarcode}
         title="Scan Barcode"
         description="Position barcode/QR code in the center of the frame"
+        liveExternalError={cameraScanError}
       />
     </div>
   );
 }
 
-// Compact Product Card for dense view
 interface CompactProductCardProps {
   product: Product;
   onSelect?: (product: Product) => void;
@@ -422,21 +365,13 @@ function CompactProductCard({ product, onSelect }: CompactProductCardProps) {
 
   const handleClick = () => {
     if (!isOutOfStock) {
-      if (onSelect) {
-        onSelect(product);
-      } else {
-        addItem(product, 1);
-      }
+      if (onSelect) onSelect(product);
+      else addItem(product, 1);
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(price);
 
   return (
     <button

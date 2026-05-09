@@ -124,7 +124,8 @@ function POSDashboard() {
   const [completedCheckoutSale, setCompletedCheckoutSale] = useState<Sale | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isMobileScannerOpen, setIsMobileScannerOpen] = useState(false);
-  const [scannedProductNames, setScannedProductNames] = useState<string[]>([]);
+  const [scannedItems, setScannedItems] = useState<{ name: string; qty: number }[]>([]);
+  const [liveScanError, setLiveScanError] = useState<string | null>(null);
   const [mobileSearchQuery, setMobileSearchQuery] = useState('');
 
   // Store hooks
@@ -382,21 +383,22 @@ function POSDashboard() {
       lastScannedRef.current = { barcode, time: now };
       const product = getProductByBarcode(barcode);
       if (product) {
+        setLiveScanError(null);
         addItem(product, 1);
         setLastScannedBarcode(barcode);
         if (isMobileScannerOpen) {
-          setScannedProductNames(prev => [product.name, ...prev]);
+          setScannedItems(prev => {
+            const existing = prev.find(i => i.name === product.name);
+            if (existing) return prev.map(i => i.name === product.name ? { ...i, qty: i.qty + 1 } : i);
+            return [{ name: product.name, qty: 1 }, ...prev];
+          });
         }
-        if (currentPage !== 'billing') {
-          setCurrentPage('billing');
-        }
+        if (currentPage !== 'billing') setCurrentPage('billing');
       } else {
-        toast({
-          title: 'Product Not Found',
-          description: `Barcode ${barcode} not found in database.`,
-          variant: 'destructive',
-        });
-        console.log('Product not found for barcode:', barcode);
+        setLiveScanError(`আইটেম পাওয়া যায়নি: ${barcode}`);
+        if (!isMobileScannerOpen) {
+          toast({ title: 'Product Not Found', description: `Barcode ${barcode} not found.`, variant: 'destructive' });
+        }
       }
     },
     [getProductByBarcode, addItem, setLastScannedBarcode, currentPage, isMobileScannerOpen]
@@ -1152,10 +1154,11 @@ function POSDashboard() {
         open={isMobileScannerOpen}
         onOpenChange={(open) => {
           setIsMobileScannerOpen(open);
-          if (!open) setScannedProductNames([]);
+          if (!open) { setScannedItems([]); setLiveScanError(null); }
         }}
         onBarcodeScanned={handleBarcodeDetected}
-        scannedProductNames={scannedProductNames}
+        scannedItems={scannedItems}
+        liveExternalError={liveScanError}
       />
 
       {/* Checkout Dialog */}

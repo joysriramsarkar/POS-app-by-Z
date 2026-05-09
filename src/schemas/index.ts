@@ -64,6 +64,15 @@ export const CustomerInputSchema = z.object({
 
 export type CustomerInput = z.infer<typeof CustomerInputSchema>;
 
+export const StockAdjustmentInputSchema = z.object({
+  productId: z.string().min(1, 'Product ID is required'),
+  quantity: z.coerce.number().positive('Quantity must be positive'),
+  adjustmentType: z.enum(['home_consumption', 'damaged', 'expired', 'other']),
+  reason: z.string().min(1, 'Reason is required'),
+});
+
+export type StockAdjustmentInput = z.infer<typeof StockAdjustmentInputSchema>;
+
 export const StockEntryInputSchema = z.object({
   productId: z.string().min(1, 'Product ID is required'),
   quantity: z.coerce.number().positive('Quantity must be positive'),

@@ -174,7 +174,7 @@ function ProductDetailView({ productId, days, onBack }: { productId: string; day
             </div>
           ) : (
             <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground mb-3">গত {days} দিনের দৈনিক বিক্রয়</p>
+      <p className="text-xs text-muted-foreground mb-3">{days === '1' ? 'আজকের' : `গত ${days} দিনের`} দৈনিক বিক্রয়</p>
               {dailySales.map(d => (
                 <div key={d.date} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-20 shrink-0">
@@ -182,13 +182,17 @@ function ProductDetailView({ productId, days, onBack }: { productId: string; day
                   </span>
                   <div className="flex-1 bg-muted rounded-full h-5 overflow-hidden">
                     <div
-                      className="h-full bg-primary/70 rounded-full flex items-center px-2 transition-all"
-                      style={{ width: `${Math.max(4, (d.qty / maxDailyQty) * 100)}%` }}
+                      className={`h-full rounded-full flex items-center px-2 transition-all ${d.qty > 0 ? 'bg-primary/70' : 'bg-muted-foreground/20'}`}
+                      style={{ width: `${d.qty > 0 ? Math.max(4, (d.qty / maxDailyQty) * 100) : 100}%` }}
                     >
-                      <span className="text-[10px] text-primary-foreground font-medium whitespace-nowrap">{d.qty} {product.unit}</span>
+                      <span className="text-[10px] text-muted-foreground font-medium whitespace-nowrap">
+                        {d.qty > 0 ? `${d.qty} ${product.unit}` : '—'}
+                      </span>
                     </div>
                   </div>
-                  <span className="text-xs font-medium w-16 text-right shrink-0">{fmt(d.revenue)}</span>
+                  <span className="text-xs font-medium w-16 text-right shrink-0">
+                    {d.qty > 0 ? fmt(d.revenue) : ''}
+                  </span>
                 </div>
               ))}
             </div>
@@ -375,6 +379,7 @@ export function ProductStatistics({ onBack }: ProductStatisticsProps) {
           <Select value={days} onValueChange={setDays}>
             <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="1">আজকের</SelectItem>
               <SelectItem value="7">৭ দিন</SelectItem>
               <SelectItem value="30">৩০ দিন</SelectItem>
               <SelectItem value="90">৯০ দিন</SelectItem>
@@ -449,7 +454,7 @@ export function ProductStatistics({ onBack }: ProductStatisticsProps) {
       </div>
 
       <div className="shrink-0 border-t bg-muted/30 p-3 text-sm text-muted-foreground text-center">
-        শীর্ষ {filtered.length} প্রোডাক্ট • গত {days} দিনের বিক্রয় তথ্য
+        শীর্ষ {filtered.length} প্রোডাক্ট • {days === '1' ? 'আজকের' : `গত ${days} দিনের`} বিক্রয় তথ্য
       </div>
     </div>
   );

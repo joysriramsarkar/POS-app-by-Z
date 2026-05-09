@@ -88,7 +88,6 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
   const [isProductDetailLoading, setIsProductDetailLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('sales');
   const [expensesData, setExpensesData] = useState<any[]>([]);
-  const [expensesLoaded, setExpensesLoaded] = useState(false);
   const [expensesLoading, setExpensesLoading] = useState(false);
 
   // Date filter state
@@ -119,14 +118,11 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
         setSummaryData(j.summary);
         setSalesData(j.chartData);
       } else if (tab === 'payment') {
-        // payment data comes from sales summary — reuse if already loaded
-        if (!summaryData) {
-          const res = await fetch(`/api/reports/sales?${params}`);
-          if (!res.ok) throw new Error('Failed to load Payment data');
-          const j = await res.json();
-          setSummaryData(j.summary);
-          setSalesData(j.chartData);
-        }
+        const res = await fetch(`/api/reports/sales?${params}`);
+        if (!res.ok) throw new Error('Failed to load Payment data');
+        const j = await res.json();
+        setSummaryData(j.summary);
+        setSalesData(j.chartData);
       } else if (tab === 'stock') {
         const res = await fetch('/api/reports/stock');
         if (!res.ok) throw new Error('Failed to load Stock data');
@@ -158,32 +154,30 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
     } finally {
       setTabLoading(prev => ({ ...prev, [tab]: false }));
     }
-  }, [summaryData]);
+  }, []);
 
-  // Load sales tab on mount and when dateParams changes
-  useEffect(() => { fetchTab('sales', dateParams); }, [dateParams]);
+  // date filter বদলালে বা tab বদলালে সবসময় re-fetch
+  useEffect(() => {
+    fetchTab('sales', dateParams);
+  }, [dateParams]);
 
-  // Load active tab data when tab changes (if not already loaded or date changed)
-  const fetchedTabs = React.useRef<Set<string>>(new Set());
-  useEffect(() => { fetchedTabs.current.clear(); setExpensesLoaded(false); }, [dateParams]);
   useEffect(() => {
     if (activeTab === 'sales') return;
     if (activeTab === 'expenses') {
-      if (!expensesLoaded) {
-        setExpensesLoading(true);
-        // parse dateParams to get from/to for filtering
-        fetch('/api/expenses')
-          .then(r => r.ok ? r.json() : null)
-          .then(d => { if (d) { setExpensesData(d.data ?? []); setExpensesLoaded(true); } })
-          .catch(console.error)
-          .finally(() => setExpensesLoading(false));
-      }
+      setExpensesLoading(true);
+      fetch('/api/expenses')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d) { setExpensesData(d.data ?? []); } })
+        .catch(console.error)
+        .finally(() => setExpensesLoading(false));
       return;
     }
-    if (fetchedTabs.current.has(activeTab)) return;
-    fetchedTabs.current.add(activeTab);
+    if (activeTab === 'stock' || activeTab === 'dues') {
+      fetchTab(activeTab, dateParams);
+      return;
+    }
     fetchTab(activeTab, dateParams);
-  }, [activeTab, dateParams, fetchTab, expensesLoaded]);
+  }, [activeTab, dateParams]);
 
   const isLoading = tabLoading['sales'] ?? false;
   const errorMessage = tabError[activeTab] ?? null;
@@ -265,46 +259,12 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-muted/20">
-      <div className="shrink-0 border-b bg-background p-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
-            <TrendingUp className="w-6 h-6" />
-            Reports & Analytics
-          </h1>
-          <p className="text-sm text-muted-foreground">Comprehensive business overview</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 border-indigo-200 text-indigo-600 hover:bg-indigo-50"
-            onClick={async () => {
-              if (!summaryData) return;
-              setIsAiDialogOpen(true);
-              setIsAiLoading(true);
-              try {
-                const res = await fetch('/api/ai', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ summary: summaryData }),
-                });
-                const data = await res.json();
-                if (data.success) {
-                  setAiAdvice(data.advice);
-                } else {
-                  setAiAdvice('Sorry, could not fetch AI advice right now.');
-                }
-              } catch (e) {
-                setAiAdvice('Sorry, could not fetch AI advice right now.');
-              } finally {
-                setIsAiLoading(false);
-              }
-            }}
-          >
-            <Lightbulb className="w-4 h-4" />
-            <span className="hidden sm:inline">Ask AI</span>
-          </Button>
-          {DateFilter}
-        </div>
+      <div className="shrink-0 border-b bg-background p-4">
+        <h1 className="text-lg md:text-xl font-bold flex items-center gap-2">
+          <TrendingUp className="w-6 h-6" />
+          Reports & Analytics
+        </h1>
+        <p className="text-sm text-muted-foreground">Comprehensive business overview</p>
       </div>
 
       <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
@@ -409,7 +369,20 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
                   <CardTitle>Sales Trend</CardTitle>
                   <CardDescription>{isToday ? 'Hourly sales for today' : 'Daily sales and profit for selected period'}</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  {DateFilter}
+                  <Button variant="outline" size="sm" className="gap-1 min-h-9 border-indigo-200 text-indigo-600 hover:bg-indigo-50" onClick={async () => {
+                    if (!summaryData) return;
+                    setIsAiDialogOpen(true); setIsAiLoading(true);
+                    try {
+                      const res = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ summary: summaryData }) });
+                      const data = await res.json();
+                      setAiAdvice(data.success ? data.advice : 'Sorry, could not fetch AI advice right now.');
+                    } catch { setAiAdvice('Sorry, could not fetch AI advice right now.'); }
+                    finally { setIsAiLoading(false); }
+                  }}>
+                    <Lightbulb className="w-4 h-4" /><span className="hidden sm:inline">Ask AI</span>
+                  </Button>
                   <Button variant="outline" size="sm" className="gap-1 min-h-9" onClick={handleExportCSV}>
                     <Download className="w-4 h-4" /> CSV
                   </Button>
@@ -460,6 +433,7 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
 
           {/* Payment Breakdown Tab */}
           <TabsContent value="payment">
+            <div className="flex flex-wrap gap-2 mb-3">{DateFilter}</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="rounded-xl">
                 <CardHeader>
@@ -661,10 +635,13 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
                   <CardTitle>Top Selling Products</CardTitle>
                   <CardDescription>Best performing items — click any row for detailed report</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="gap-1" onClick={() => downloadCSV(
-                  [['#','Product','Qty Sold','Revenue','Profit'], ...topProducts.map((p,i) => [i+1, p.name, p.quantity, p.revenue.toFixed(2), p.profit.toFixed(2)])],
-                  'top-products'
-                )}><Download className="w-4 h-4" /> CSV</Button>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {DateFilter}
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => downloadCSV(
+                    [['#','Product','Qty Sold','Revenue','Profit'], ...topProducts.map((p,i) => [i+1, p.name, p.quantity, p.revenue.toFixed(2), p.profit.toFixed(2)])],
+                    'top-products'
+                  )}><Download className="w-4 h-4" /> CSV</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -713,6 +690,7 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
           </TabsContent>
           {/* Categories Tab */}
           <TabsContent value="categories">
+            <div className="flex flex-wrap gap-2 mb-3">{DateFilter}</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="rounded-xl">
                 <CardHeader>
@@ -793,6 +771,7 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
 
           {/* Expenses Tab */}
           <TabsContent value="expenses">
+            <div className="flex flex-wrap gap-2 mb-3">{DateFilter}</div>
             <ExpensesTabContent expenses={expensesData} dateParams={dateParams} onNavigate={onNavigate} isLoading={expensesLoading} />
           </TabsContent>
 
@@ -804,10 +783,13 @@ const Reports: React.FC<{ onNavigate?: (page: string) => void }> = ({ onNavigate
                   <CardTitle>Top Customers</CardTitle>
                   <CardDescription>Highest spending customers for selected period</CardDescription>
                 </div>
-                <Button variant="outline" size="sm" className="gap-1" onClick={() => downloadCSV(
-                  [['#','Customer','Phone','Spent','Orders','AOV'], ...topCustomers.map((c,i) => [i+1, c.name, c.phone||'', c.totalSpent.toFixed(2), c.orderCount, c.aov.toFixed(2)])],
-                  'top-customers'
-                )}><Download className="w-4 h-4" /> CSV</Button>
+                <div className="flex flex-wrap gap-2 items-center">
+                  {DateFilter}
+                  <Button variant="outline" size="sm" className="gap-1" onClick={() => downloadCSV(
+                    [['#','Customer','Phone','Spent','Orders','AOV'], ...topCustomers.map((c,i) => [i+1, c.name, c.phone||'', c.totalSpent.toFixed(2), c.orderCount, c.aov.toFixed(2)])],
+                    'top-customers'
+                  )}><Download className="w-4 h-4" /> CSV</Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -1160,14 +1142,28 @@ function ExpensesTabContent({ expenses, dateParams, onNavigate, isLoading }: {
 
   const pieData = categoryTotals.map(([name, value]) => ({ name, value }));
 
-  const monthlyData = useMemo(() => {
+  const daysDiff = useMemo(() => {
+    const p = new URLSearchParams(dateParams);
+    const from = p.get('from') ? new Date(p.get('from')!) : null;
+    const to = p.get('to') ? new Date(p.get('to')!) : new Date();
+    if (!from) return 30;
+    return Math.round((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  }, [dateParams]);
+
+  const trendData = useMemo(() => {
     const map: Record<string, number> = {};
     filtered.forEach(e => {
-      const k = format(new Date(e.date), 'MMM yy');
+      const k = daysDiff <= 1
+        ? format(new Date(e.date), 'HH:00')
+        : daysDiff <= 60
+        ? format(new Date(e.date), 'dd MMM')
+        : format(new Date(e.date), 'MMM yy');
       map[k] = (map[k] ?? 0) + (e.amount ?? 0);
     });
-    return Object.entries(map).map(([month, amount]) => ({ month, amount }));
-  }, [filtered]);
+    return Object.entries(map).map(([label, amount]) => ({ label, amount }));
+  }, [filtered, daysDiff]);
+
+  const trendTitle = daysDiff <= 1 ? 'ঘণ্টাভিত্তিক খরচ' : daysDiff <= 60 ? 'দৈনিক খরচ' : 'মাসিক খরচ';
 
   const handleDownloadCSV = () => {
     if (!filtered.length) return;
@@ -1212,15 +1208,15 @@ function ExpensesTabContent({ expenses, dateParams, onNavigate, isLoading }: {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card className="rounded-xl">
-          <CardHeader className="pb-2"><CardTitle className="text-sm">মাসিক খরচ</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">{trendTitle}</CardTitle></CardHeader>
           <CardContent>
-            {monthlyData.length === 0 ? (
+            {trendData.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-8">কোনো ডেটা নেই</p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={monthlyData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+                <BarChart data={trendData} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
                   <YAxis tickFormatter={v => `₹${v >= 1000 ? (v/1000).toFixed(1)+'k' : v}`} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={45} />
                   <RechartsTooltip formatter={(v: number) => [fp(v), 'খরচ']} contentStyle={{ borderRadius: '8px', fontSize: '12px' }} />
                   <Bar dataKey="amount" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} />
