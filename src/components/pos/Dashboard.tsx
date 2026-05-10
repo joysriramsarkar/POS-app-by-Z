@@ -19,6 +19,7 @@ import {
   TrendingDown,
   ArrowRight,
   LogOut,
+  Wallet,
 } from 'lucide-react';
 import { useProductsStore, useCartStore } from '@/stores/pos-store';
 import { useSettingsStore } from '@/stores/settings-store';
@@ -67,6 +68,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   });
   const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
   const [breakdown, setBreakdown] = useState<{ upi: number; cash: number; due: number }>({ upi: 0, cash: 0, due: 0 });
+  const [todayExpenses, setTodayExpenses] = useState<number>(0);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [fullTransactions, setFullTransactions] = useState<Transaction[]>([]);
@@ -178,6 +180,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         console.error('Failed to compute payment breakdown:', err);
         setBreakdown({ upi: 0, cash: 0, due: 0 });
       }
+
+      // Fetch today's expenses
+      try {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(todayStart);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const expRes = await fetch(
+          `/api/expenses?dateFrom=${encodeURIComponent(todayStart.toISOString())}&dateTo=${encodeURIComponent(tomorrow.toISOString())}`
+        );
+        if (expRes.ok) {
+          const expData = await expRes.json();
+          const total = (expData.data ?? []).reduce((sum: number, item: { amount: unknown }) => sum + Number(item.amount), 0);
+          setTodayExpenses(total);
+        }
+      } catch (err) {
+        console.error('Failed to fetch today expenses:', err);
+      }
     };
     fetchDashboardData();
   }, []);
@@ -287,7 +307,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="p-4 space-y-6 pb-24">
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Today's Sales */}
             <Card className="bg-linear-to-br from-green-50 to-green-100/50 dark:from-green-950/40 dark:to-green-900/20 border-green-200 dark:border-green-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -355,6 +375,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <CardContent>
                 <div className="text-2xl font-black text-red-700 dark:text-red-400 tracking-tight">{formatPrice(stats.duePayments)}</div>
                 <p className="text-xs text-red-600 dark:text-red-500 mt-1 font-medium">Total pending dues</p>
+              </CardContent>
+            </Card>
+
+            {/* Today's Expenses */}
+            <Card className="bg-linear-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/40 dark:to-rose-900/20 border-rose-200 dark:border-rose-800/50 shadow-md hover:shadow-lg transition-shadow rounded-2xl">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-rose-700 dark:text-rose-400">আজকের খরচ</CardTitle>
+                <div className="w-8 h-8 rounded-full bg-rose-200/50 dark:bg-rose-800/50 flex items-center justify-center">
+                  <Wallet className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-black text-rose-700 dark:text-rose-400 tracking-tight">{formatPrice(todayExpenses)}</div>
+                <p className="text-xs text-rose-600 dark:text-rose-500 mt-1 font-medium">দোকানের মোট খরচ</p>
               </CardContent>
             </Card>
           </div>

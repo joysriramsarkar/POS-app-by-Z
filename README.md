@@ -18,13 +18,14 @@
 - 📶 **Offline-First**: IndexedDB local cache with intelligent sync queue. Sales, stock updates, and customer changes work without internet and sync automatically when back online.
 - 🌍 **Bilingual (EN/BN)**: Full English and Bengali UI via `next-intl`. Integrated Google Input Tools engine for live English-to-Bengali transliteration while typing product names.
 - 📱 **Barcode Scanning**: Global keyboard-wedge scanner support on desktop. Native camera scanning on Android via Capacitor ML Kit.
-- 🛒 **Cart & Checkout**: Multi-tab cart, prepaid balance, partial/due payments, change-as-prepayment, split Cash+UPI payments.
+- 🛒 **Cart & Checkout**: Multi-tab cart with per-tab independent checkout processing, prepaid balance, partial/due payments, change-as-prepayment, split Cash+UPI payments.
 - 🧾 **Invoice & Printing**: Auto-generated invoice numbers, thermal printer support (58mm / 80mm), A4/A5 PDF export.
 - 📦 **Inventory Management**: Product CRUD, weighted average cost (WAC), bulk stock entry, stock history audit trail.
-- 👥 **Parties**: Customer and supplier management with ledger-based due tracking and prepaid balance.
-- 📊 **Dashboard & Reports**: Real-time sales stats, category/product/customer reports, expense tracking.
+- 👥 **Parties**: Customer and supplier management with ledger-based due tracking, prepaid balance top-up, and prepaid cash withdrawal.
+- 📊 **Dashboard & Reports**: Real-time sales stats with daily expense summary, category/product/customer reports, expense tracking.
 - 🛡️ **Audit Logs**: Database-level logging of all critical actions (sales, stock changes, user modifications).
 - 🔐 **Role-Based Access**: Admin / Manager / Cashier / Viewer roles via NextAuth.js with per-permission checks on every API route.
+- ⚡ **Performance**: Composite DB indexes on products table (`isActive`, `category+isActive`, `name`). Sales API uses field-level `select` to minimise data transfer.
 
 ---
 
@@ -90,6 +91,8 @@ Open [http://localhost:3000](http://localhost:3000). Default credentials are cre
 - **Atomic Stock Updates**: Raw SQL `UNNEST` batch updates with conditional `WHERE current_stock >= quantity` prevent overselling under concurrent load.
 - **Prisma Singleton** (`src/lib/db.ts`): Single `PrismaClient` instance cached in `globalThis` to prevent connection pool exhaustion during hot-reloads and serverless invocations.
 - **Permission Middleware** (`src/lib/api-middleware.ts`): Every API route calls `requirePermission()` which validates session + RBAC in one pass — no duplicate session fetches.
+- **Per-Tab Processing** (`src/stores/pos-store.ts`): Checkout processing state is tracked per cart tab via `processingTabIds` in UIStore, so one tab processing a sale never blocks another tab.
+- **Prepayment Withdrawal** (`POST /api/prepayment/withdraw`): Customers can withdraw cash from their prepaid balance. Atomic transaction decrements balance and writes a `withdraw` ledger entry.
 
 ---
 

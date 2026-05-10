@@ -256,6 +256,7 @@ interface UIState {
   selectedCategoryId: string | null;
   printFormat: 'thermal-58' | 'thermal-80' | 'a4' | 'a5';
   currentSale: Sale | null;
+  processingTabIds: Set<string>;
 }
 
 interface UIActions {
@@ -267,10 +268,12 @@ interface UIActions {
   setSelectedCategoryId: (id: string | null) => void;
   setPrintFormat: (format: 'thermal-58' | 'thermal-80' | 'a4' | 'a5') => void;
   setCurrentSale: (sale: Sale | null) => void;
+  setTabProcessing: (tabId: string, processing: boolean) => void;
+  isTabProcessing: (tabId: string) => boolean;
   reset: () => void;
 }
 
-export const useUIStore = create<UIState & UIActions>((set) => ({
+export const useUIStore = create<UIState & UIActions>((set, get) => ({
   isSearchOpen: false,
   isCheckoutOpen: false,
   isPrintDialogOpen: false,
@@ -279,6 +282,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   selectedCategoryId: null,
   printFormat: 'thermal-80',
   currentSale: null,
+  processingTabIds: new Set<string>(),
 
   setSearchOpen: (open) => set({ isSearchOpen: open }),
   setCheckoutOpen: (open) => set({ isCheckoutOpen: open }),
@@ -288,6 +292,12 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
   setSelectedCategoryId: (id) => set({ selectedCategoryId: id }),
   setPrintFormat: (format) => set({ printFormat: format }),
   setCurrentSale: (sale) => set({ currentSale: sale }),
+  setTabProcessing: (tabId, processing) => set((state) => {
+    const next = new Set(state.processingTabIds);
+    if (processing) next.add(tabId); else next.delete(tabId);
+    return { processingTabIds: next };
+  }),
+  isTabProcessing: (tabId) => get().processingTabIds.has(tabId),
   reset: () => set({
     isSearchOpen: false,
     isCheckoutOpen: false,
@@ -297,6 +307,7 @@ export const useUIStore = create<UIState & UIActions>((set) => ({
     selectedCategoryId: null,
     printFormat: 'thermal-80',
     currentSale: null,
+    processingTabIds: new Set<string>(),
   }),
 }));
 

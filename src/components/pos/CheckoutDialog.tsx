@@ -95,6 +95,7 @@ export function CheckoutDialog({
   const clearCart = useCartStore((state) => state.clearCart);
   
   const customer = useCustomersStore((state) => state.customers.find(c => c.id === customerId));
+  const displayedCustomerName = customer?.name || activeTab.customerName;
 
   const products = useProductsStore((state) => state.products);
   const isCheckoutOpen = useUIStore((state) => state.isCheckoutOpen);
@@ -396,10 +397,10 @@ export function CheckoutDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4 space-y-4">
-          {customer && (
-            <div className="flex items-center gap-2 text-sm bg-muted p-2 rounded-lg">
-              <Badge variant="secondary">{customer.name}</Badge>
-              {paymentMethod === 'Due' && <Badge variant="outline" className="text-amber-600">Due Payment</Badge>}
+          {displayedCustomerName && (
+            <div className="flex items-center flex-wrap gap-1.5 text-sm bg-muted p-2 rounded-lg w-full overflow-hidden">
+              <Badge variant="secondary" className="max-w-full truncate">{displayedCustomerName}</Badge>
+              {paymentMethod === 'Due' && <Badge variant="outline" className="text-amber-600 shrink-0">Due Payment</Badge>}
             </div>
           )}
 

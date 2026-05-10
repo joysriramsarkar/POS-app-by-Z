@@ -12,6 +12,8 @@ import { Capacitor } from '@capacitor/core';
 import type { Product } from '@/types/pos';
 import { useProductsStore, useUIStore, useCartStore } from '@/stores/pos-store';
 import { cn, convertBengaliToEnglishNumerals } from '@/lib/utils';
+
+const cleanSearchQuery = (q: string) => q.replace(/rs\.?|₹/gi, '').trim();
 import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = 'grid' | 'compact';
@@ -77,13 +79,15 @@ export function ProductGrid({
       if (!product.isActive) return false;
       if (selectedCategoryId && product.category !== selectedCategoryId) return false;
       if (searchQuery) {
-        const lowerQuery = searchQuery.toLowerCase();
-        const normalizedQuery = convertBengaliToEnglishNumerals(searchQuery);
+        const cleaned = cleanSearchQuery(searchQuery);
+        const lowerQuery = cleaned.toLowerCase();
+        const normalizedQuery = convertBengaliToEnglishNumerals(cleaned);
         return (
           product.name.toLowerCase().includes(lowerQuery) ||
-          product.nameBn?.includes(searchQuery) ||
-          product.barcode?.includes(searchQuery) ||
-          convertBengaliToEnglishNumerals(product.barcode || '').includes(normalizedQuery)
+          product.nameBn?.includes(cleaned) ||
+          product.barcode?.includes(cleaned) ||
+          convertBengaliToEnglishNumerals(product.barcode || '').includes(normalizedQuery) ||
+          product.sellingPrice.toString() === normalizedQuery
         );
       }
       return true;
@@ -104,6 +108,7 @@ export function ProductGrid({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const query = e.target.value;
       if (externalProducts) { setLocalSearchQuery(query); return; }
+      // Store raw value — conversion only happens at barcode match time
       setSearchQuery(query);
     },
     [externalProducts, setSearchQuery]

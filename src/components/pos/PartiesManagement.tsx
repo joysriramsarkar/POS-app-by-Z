@@ -41,7 +41,8 @@ import {
   FileText,
   X,
   Edit,
-  PlusCircle, // Added for Prepayment
+  PlusCircle,
+  ArrowUpFromLine,
 } from 'lucide-react';
 import type { Customer, Supplier, LedgerEntry } from '@/types/pos';
 import { cn } from '@/lib/utils';
@@ -57,9 +58,11 @@ export function PartiesManagement() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [showLedger, setShowLedger] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
-  const [showPrepaymentDialog, setShowPrepaymentDialog] = useState(false); // New state for prepayment
+  const [showPrepaymentDialog, setShowPrepaymentDialog] = useState(false);
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [prepaymentAmount, setPrepaymentAmount] = useState(''); // New state for prepayment amount
+  const [prepaymentAmount, setPrepaymentAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingParty, setEditingParty] = useState<Customer | Supplier | null>(null);
@@ -263,6 +266,38 @@ export function PartiesManagement() {
     setSelectedCustomer(customer);
     setPrepaymentAmount('');
     setShowPrepaymentDialog(true);
+  };
+
+  const handleWithdraw = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setWithdrawAmount('');
+    setShowWithdrawDialog(true);
+  };
+
+  const handleWithdrawSubmit = async () => {
+    if (!selectedCustomer || !withdrawAmount) return;
+    const amount = parseFloat(withdrawAmount);
+    if (amount <= 0 || amount > selectedCustomer.prepaidBalance) {
+      toast({ title: 'Invalid Amount', description: 'Amount exceeds available prepaid balance.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const response = await fetch('/api/prepayment/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customerId: selectedCustomer.id, amount }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to withdraw');
+      }
+      const { data: updated } = await response.json();
+      updateCustomer(selectedCustomer.id, updated);
+      toast({ title: 'Withdrawn', description: `₹${amount} withdrawn from ${selectedCustomer.name}'s prepaid balance.` });
+      setShowWithdrawDialog(false);
+    } catch (error) {
+      toast({ title: 'Withdraw Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+    }
   };
 
   const handleEditParty = (party: Customer | Supplier) => {
@@ -636,6 +671,17 @@ export function PartiesManagement() {
                           <PlusCircle className="w-4 h-4 md:mr-1" />
                           <span className="hidden md:inline">Prepayment</span>
                         </Button>
+                        {customer.prepaidBalance > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-orange-600 hover:bg-orange-100 hover:text-orange-700"
+                            onClick={() => handleWithdraw(customer)}
+                          >
+                            <ArrowUpFromLine className="w-4 h-4 md:mr-1" />
+                            <span className="hidden md:inline">Withdraw</span>
+                          </Button>
+                        )}
                         {customer.totalDue > 0 && (
                           <Button
                             variant="ghost"
@@ -921,6 +967,59 @@ export function PartiesManagement() {
               className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
             >
               Add Prepayment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Dialog */}
+      <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
+        <DialogContent className="sm:max-w-sm w-[95vw] max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Withdraw Prepaid Balance</DialogTitle>
+            <DialogDescription>
+              Withdraw cash from {selectedCustomer?.name}'s prepaid balance
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 bg-muted rounded-lg">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Available Balance</span>
+                <span className="font-bold text-green-600">
+                  {formatPrice(selectedCustomer?.prepaidBalance || 0)}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="withdraw-amount">Amount to Withdraw</Label>
+              <div className="relative">
+                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="withdraw-amount"
+                  type="number"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="0"
+                  className="pl-9"
+                  max={selectedCustomer?.prepaidBalance}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[100, 200, 500, 1000].map((amount) => (
+                <Button key={amount} variant="outline" size="sm" onClick={() => setWithdrawAmount(amount.toString())}>₹{amount}</Button>
+              ))}
+              <Button variant="outline" size="sm" onClick={() => setWithdrawAmount((selectedCustomer?.prepaidBalance || 0).toString())}>Full Balance</Button>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>Cancel</Button>
+            <Button
+              onClick={handleWithdrawSubmit}
+              disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > (selectedCustomer?.prepaidBalance || 0)}
+              className="bg-orange-600 text-white hover:bg-orange-700"
+            >
+              Withdraw
             </Button>
           </DialogFooter>
         </DialogContent>

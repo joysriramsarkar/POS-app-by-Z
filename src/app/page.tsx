@@ -100,7 +100,7 @@ const formatPrice = (price: number) => {
 function POSDashboard() {
   const t = useTranslations('Navigation');
   const [currentPage, setCurrentPage] = useState<PageType>('billing');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  // isProcessingPayment is now per-tab via UIStore
 
   // Auth
   const { data: session } = useSession();
@@ -163,6 +163,10 @@ function POSDashboard() {
   const setPrintDialogOpen = useUIStore((state) => state.setPrintDialogOpen);
   const currentSale = useUIStore((state) => state.currentSale);
   const setCurrentSale = useUIStore((state) => state.setCurrentSale);
+  const setTabProcessing = useUIStore((state) => state.setTabProcessing);
+  const isTabProcessing = useUIStore((state) => state.isTabProcessing);
+  const activeTabId = useCartStore((state) => state.activeTabId);
+  const isProcessingPayment = isTabProcessing(activeTabId);
 
 
   // Filter nav items based on user role
@@ -486,7 +490,8 @@ function POSDashboard() {
   }, [cartItems, session, updateProductStock, updateCustomerDue, setCurrentSale, setCompletedCheckoutSale, clearCart]);
 
   const handleCheckoutComplete = useCallback(async (paymentData: PaymentData) => {
-    setIsProcessingPayment(true);
+    const tabId = activeTabId;
+    setTabProcessing(tabId, true);
     
     const salePayload = {
       items: cartItems.map(item => ({
@@ -600,9 +605,9 @@ function POSDashboard() {
         variant: 'destructive',
       });
     } finally {
-      setIsProcessingPayment(false);
+      setTabProcessing(tabId, false);
     }
-  }, [isOnline, processOfflineSale, clearCart, setCurrentSale, setCompletedCheckoutSale, setCheckoutOpen, toast, cartItems, updateProductStock]);
+  }, [isOnline, processOfflineSale, clearCart, setCurrentSale, setCompletedCheckoutSale, setCheckoutOpen, toast, cartItems, updateProductStock, activeTabId, setTabProcessing]);
 
   const handleOpenCheckout = useCallback(() => {
     setCheckoutOpen(true);
@@ -955,7 +960,7 @@ function POSDashboard() {
                       type="text"
                       placeholder="Search products by name or barcode..."
                       value={mobileSearchQuery}
-                      onChange={(e) => handleMobileSearchChange(convertBengaliToEnglishNumerals(e.target.value))}
+                      onChange={(e) => handleMobileSearchChange(e.target.value)}
                       className="pl-9 h-8 text-sm"
                     />
                     {mobileSearchQuery && (
