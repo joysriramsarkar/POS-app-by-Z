@@ -4,13 +4,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    console.log("🔍 [HEALTH CHECK] Starting database connection check...");
-    console.log("📝 [HEALTH CHECK] NODE_ENV:", process.env.NODE_ENV);
-
     // Try to query the database
     const result = await db.$queryRaw`SELECT 1 as connection_test`;
-
-    console.log("✅ [HEALTH CHECK] Database connection successful!");
 
     return Response.json(
       {
@@ -22,12 +17,6 @@ export async function GET(request: Request) {
       { status: 200 },
     );
   } catch (error: unknown) {
-    console.error(
-      "❌ [HEALTH CHECK] Database connection failed:",
-      (error instanceof Error ? error.message : "Unknown error"),
-    );
-    console.error("❌ [HEALTH CHECK] Full error:", error);
-
     return Response.json(
       {
         status: "error",
