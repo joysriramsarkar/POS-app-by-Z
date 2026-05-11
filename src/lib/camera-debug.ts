@@ -4,8 +4,6 @@
  */
 
 export async function testCameraAccess(): Promise<void> {
-  console.log("====== CAMERA DEBUG TEST ======");
-
   // Test 1: Check if getUserMedia is supported
   console.log("\n1. Testing getUserMedia support...");
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -57,7 +55,10 @@ export async function testCameraAccess(): Promise<void> {
 
     stream.getTracks().forEach((track) => track.stop());
   } catch (error: unknown) {
-    console.error("❌ Back camera access failed:", (error instanceof Error ? error.message : "Unknown error"));
+    console.error(
+      "❌ Back camera access failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 
   // Test 4: Request camera access with front (user) camera
@@ -81,7 +82,10 @@ export async function testCameraAccess(): Promise<void> {
 
     stream.getTracks().forEach((track) => track.stop());
   } catch (error: unknown) {
-    console.error("❌ Front camera access failed:", (error instanceof Error ? error.message : "Unknown error"));
+    console.error(
+      "❌ Front camera access failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 
   // Test 5: Request camera access with no specific constraints
@@ -99,7 +103,10 @@ export async function testCameraAccess(): Promise<void> {
 
     stream.getTracks().forEach((track) => track.stop());
   } catch (error: unknown) {
-    console.error("❌ Generic camera access failed:", (error instanceof Error ? error.message : "Unknown error"));
+    console.error(
+      "❌ Generic camera access failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 
   // Test 6: Check if html5-qrcode is available
@@ -108,7 +115,10 @@ export async function testCameraAccess(): Promise<void> {
     const { Html5Qrcode } = await import("html5-qrcode");
     console.log("✅ html5-qrcode library loaded successfully");
   } catch (error: unknown) {
-    console.error("❌ Failed to load html5-qrcode:", (error instanceof Error ? error.message : "Unknown error"));
+    console.error(
+      "❌ Failed to load html5-qrcode:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 
   // Test 7: Simulate scanner initialization
@@ -162,7 +172,10 @@ export async function testCameraAccess(): Promise<void> {
       console.log("✅ Test video stopped");
     }, 3000);
   } catch (error: unknown) {
-    console.error("❌ Raw video test failed:", (error instanceof Error ? error.message : "Unknown error"));
+    console.error(
+      "❌ Raw video test failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
   }
 
   console.log("\n====== END DEBUG TEST ======\n");
@@ -224,8 +237,11 @@ export async function testHtml5Qrcode(): Promise<void> {
       console.log("✅ Scanner cleared");
     }, 10000);
   } catch (error: unknown) {
-    console.error("❌ Html5QrcodeScanner test failed:", (error instanceof Error ? error.message : "Unknown error"));
-    console.error("Stack:", (error instanceof Error ? error.stack : undefined));
+    console.error(
+      "❌ Html5QrcodeScanner test failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+    console.error("Stack:", error instanceof Error ? error.stack : undefined);
   }
 
   console.log("====== END HTML5-QRCODE TEST ======\n");
