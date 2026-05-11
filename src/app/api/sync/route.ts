@@ -115,9 +115,6 @@ export async function POST(request: NextRequest) {
       });
 
       if (existingSync && existingSync.synced) {
-        console.log(
-          `✅ Idempotency hit: returning cached result for ${idempotencyKey}`,
-        );
         return {
           cached: true,
           data: JSON.parse(existingSync.result as string),
