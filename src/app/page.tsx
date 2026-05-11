@@ -333,10 +333,8 @@ function POSDashboard() {
           clearTimeout(timeoutId);
           
           if (response.ok) {
-            console.log('🟢 Online: Database connection verified');
             setOnline(true);
           } else {
-            console.log('🔴 Offline: API returned error', response.status);
             setOnline(false);
           }
         } catch (fetchErr) {
