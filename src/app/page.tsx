@@ -652,7 +652,6 @@ function POSDashboard() {
 
         const productName = products.find(p => p.id === data.productId)?.name ?? 'পণ্য';
         toast({ title: 'স্টক যোগ সফল', description: `"${productName}" এ ${data.quantity} যোগ হয়েছে।` });
-        console.log('Stock entry successful:', updatedProduct);
       } else {
         // offline: update local store and queue sync
         updateProductStock(data.productId, data.quantity);
