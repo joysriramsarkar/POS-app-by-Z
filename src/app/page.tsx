@@ -313,7 +313,6 @@ function POSDashboard() {
     const checkConnectivity = async () => {
       // First check navigator.onLine
       if (!navigator.onLine) {
-        console.log('🔴 Offline: navigator.onLine = false');
         setOnline(false);
         return;
       }
@@ -332,10 +331,8 @@ function POSDashboard() {
           clearTimeout(timeoutId);
           
           if (response.ok) {
-            console.log('🟢 Online: Database connection verified');
             setOnline(true);
           } else {
-            console.log('🔴 Offline: API returned error', response.status);
             setOnline(false);
           }
         } catch (fetchErr) {
@@ -343,7 +340,6 @@ function POSDashboard() {
           throw fetchErr;
         }
       } catch (error) {
-        console.log('🔴 Offline: API connectivity check failed', error instanceof Error ? error.message : String(error));
         setOnline(false);
       }
     };
@@ -357,7 +353,6 @@ function POSDashboard() {
     // Listen to navigator online/offline events
     const handleOnline = () => checkConnectivity();
     const handleOffline = () => {
-      console.log('🔴 Offline event detected');
       setOnline(false);
     };
 
@@ -657,7 +652,6 @@ function POSDashboard() {
 
         const productName = products.find(p => p.id === data.productId)?.name ?? 'পণ্য';
         toast({ title: 'স্টক যোগ সফল', description: `"${productName}" এ ${data.quantity} যোগ হয়েছে।` });
-        console.log('Stock entry successful:', updatedProduct);
       } else {
         // offline: update local store and queue sync
         updateProductStock(data.productId, data.quantity);
