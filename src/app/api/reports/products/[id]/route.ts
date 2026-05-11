@@ -50,14 +50,61 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 });
 
-    // --- Daily trend (fill gaps with 0) ---
+    // --- Consolidated Iteration for Performance ---
     const dailyMap = new Map<string, { revenue: number; qty: number; profit: number }>();
+    const hourlyMap = new Array(24).fill(0).map(() => ({ qty: 0, revenue: 0 }));
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const weeklyMap = new Array(7).fill(0).map(() => ({ qty: 0, revenue: 0 }));
+    const custMap = new Map<string, { id: string; name: string; phone: string | null; qty: number; revenue: number; orders: Set<string> }>();
+
+    let totalQty = 0;
+    let totalRevenue = 0;
+
     for (const item of saleItems) {
-      const key = format(item.createdAt, 'yyyy-MM-dd');
-      const prev = dailyMap.get(key) ?? { revenue: 0, qty: 0, profit: 0 };
-      const profit = item.totalPrice - product.buyingPrice * item.quantity;
-      dailyMap.set(key, { revenue: prev.revenue + item.totalPrice, qty: prev.qty + item.quantity, profit: prev.profit + profit });
+      const date = item.createdAt;
+      const qty = item.quantity;
+      const revenue = item.totalPrice;
+      const profit = revenue - product.buyingPrice * qty;
+
+      // Daily trend
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const prevD = dailyMap.get(dateKey);
+      if (prevD) {
+        prevD.revenue += revenue;
+        prevD.qty += qty;
+        prevD.profit += profit;
+      } else {
+        dailyMap.set(dateKey, { revenue, qty, profit });
+      }
+
+      // Hourly pattern
+      const h = date.getHours();
+      hourlyMap[h].qty += qty;
+      hourlyMap[h].revenue += revenue;
+
+      // Weekly pattern
+      const d = date.getDay();
+      weeklyMap[d].qty += qty;
+      weeklyMap[d].revenue += revenue;
+
+      // Top customers
+      if (item.sale.customerId && item.sale.customer) {
+        const cid = item.sale.customerId;
+        const prevC = custMap.get(cid);
+        if (prevC) {
+          prevC.qty += qty;
+          prevC.revenue += revenue;
+        } else {
+          custMap.set(cid, { id: cid, name: item.sale.customer.name, phone: item.sale.customer.phone, qty, revenue, orders: new Set() });
+        }
+      }
+
+      // Summary
+      totalQty += qty;
+      totalRevenue += revenue;
     }
+
+    // --- Post-loop Formatting ---
     const allDays = eachDayOfInterval({ start: startDate, end: endDate });
     const dailyTrend = allDays.map((d) => {
       const key = format(d, 'yyyy-MM-dd');
@@ -65,43 +112,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return { date: key, ...v };
     });
 
-    // --- Hourly pattern (0-23) ---
-    const hourlyMap = new Array(24).fill(0).map(() => ({ qty: 0, revenue: 0 }));
-    for (const item of saleItems) {
-      const h = item.createdAt.getHours();
-      hourlyMap[h].qty += item.quantity;
-      hourlyMap[h].revenue += item.totalPrice;
-    }
     const hourlyPattern = hourlyMap.map((v, h) => ({ hour: `${h}:00`, ...v }));
-
-    // --- Weekly pattern (0=Sun … 6=Sat) ---
-    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const weeklyMap = new Array(7).fill(0).map(() => ({ qty: 0, revenue: 0 }));
-    for (const item of saleItems) {
-      const d = item.createdAt.getDay();
-      weeklyMap[d].qty += item.quantity;
-      weeklyMap[d].revenue += item.totalPrice;
-    }
     const weeklyPattern = weeklyMap.map((v, i) => ({ day: DAY_NAMES[i], ...v }));
 
-    // --- Top customers ---
-    const custMap = new Map<string, { id: string; name: string; phone: string | null; qty: number; revenue: number; orders: Set<string> }>();
-    for (const item of saleItems) {
-      if (!item.sale.customerId || !item.sale.customer) continue;
-      const cid = item.sale.customerId;
-      const prev = custMap.get(cid) ?? { id: cid, name: item.sale.customer.name, phone: item.sale.customer.phone, qty: 0, revenue: 0, orders: new Set() };
-      prev.qty += item.quantity;
-      prev.revenue += item.totalPrice;
-      custMap.set(cid, prev);
-    }
     const topCustomers = [...custMap.values()]
       .map(c => ({ id: c.id, name: c.name, phone: c.phone, qty: c.qty, revenue: c.revenue }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
 
-    // --- Summary ---
-    const totalQty = saleItems.reduce((s, i) => s + i.quantity, 0);
-    const totalRevenue = saleItems.reduce((s, i) => s + i.totalPrice, 0);
     const totalProfit = totalRevenue - product.buyingPrice * totalQty;
     const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100).toFixed(1) : '0';
     const totalOrders = saleItems.length;
