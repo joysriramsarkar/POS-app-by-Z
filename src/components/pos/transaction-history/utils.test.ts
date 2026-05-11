@@ -24,6 +24,14 @@ describe('transaction-history utils', () => {
       // 10 lakhs -> 10,00,000
       expect(formatPrice(1000000)).toMatch(/₹\s*10,00,000/);
     });
+
+    test('handles null input gracefully', () => {
+      expect(formatPrice(null)).toMatch(/₹\s*0/);
+    });
+
+    test('handles undefined input gracefully', () => {
+      expect(formatPrice(undefined)).toMatch(/₹\s*0/);
+    });
   });
 
   describe('getPaymentStatusColor', () => {
