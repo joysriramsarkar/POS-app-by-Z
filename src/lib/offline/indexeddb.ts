@@ -604,7 +604,7 @@ export async function updateProductsAndCustomerDue(
   customerUpdate?: { customerId: string; customer: Customer },
 ): Promise<void> {
   const db = await initDatabase();
-  const storeNames = [STORES.PRODUCTS];
+  const storeNames: string[] = [STORES.PRODUCTS];
   if (customerUpdate) storeNames.push(STORES.CUSTOMERS);
   
   const transaction = db.transaction(storeNames, 'readwrite');
