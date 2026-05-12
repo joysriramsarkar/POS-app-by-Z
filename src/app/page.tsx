@@ -55,7 +55,7 @@ import { useSettingsStore } from '@/stores/settings-store';
 import { useSimpleBarcodeScanner } from '@/hooks/use-barcode-scanner';
 import { ProductsDB, SalesDB, SyncQueueDB, CustomersDB, saveSaleWithSyncQueue, updateProductsAndCustomerDue } from '@/lib/offline/indexeddb';
 import { STORE_CONFIG } from '@/types/pos';
-import type { Product, Sale } from '@/types/pos';
+import type { Product, Sale, SyncQueueItem } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 import { toMoneyNumber } from '@/lib/money';
