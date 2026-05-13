@@ -223,7 +223,7 @@ function POSDashboard() {
     setMobileSearchResults(results);
   }, [products]);
 
-  // Hydration tracking to prevent mismatches with store-dependent renders
+  // ✅ HYDRATION TRACKING: Prevent SSR/client mismatch
   useEffect(() => {
     setIsHydrated(true);
   }, []);
@@ -471,7 +471,7 @@ function POSDashboard() {
       offlineSaleId: sale.id, // ট্র্যাকিংয়ের জন্য
     };
 
-    // Create sync queue item FIRST
+    // Create sync queue items - prepare BOTH sale and prepayment before saving
     const syncQueueItem: SyncQueueItem = {
       id: uuidv4(),
       entityType: 'Sale',
@@ -483,8 +483,32 @@ function POSDashboard() {
       createdAt: new Date(),
     };
 
-    // Batch save sale and sync queue in a single atomic transaction
-    await saveSaleWithSyncQueue(sale, syncQueueItem);
+    // Prepare prepayment queue item if applicable
+    const prepaymentQueueItem = (paymentData.addChangeAsPrepayment && paymentData.customerId && paymentData.change > 0) 
+      ? {
+          id: uuidv4(),
+          entityType: 'Prepayment',
+          entityId: uuidv4(),
+          action: 'create',
+          payload: JSON.stringify({ customerId: paymentData.customerId, amount: paymentData.change }),
+          synced: false,
+          retryCount: 0,
+          createdAt: new Date(),
+        } as SyncQueueItem
+      : null;
+
+    // ✅ FIX: Atomize transaction - save sale and prepayment together
+    try {
+      await saveSaleWithSyncQueue(sale, syncQueueItem);
+      
+      // Only save prepayment if main sale succeeded
+      if (prepaymentQueueItem) {
+        await SyncQueueDB.add(prepaymentQueueItem);
+      }
+    } catch (error) {
+      console.error('Failed to save sale with sync queue:', error);
+      throw error;
+    }
 
     cartItems.forEach((item) => {
       updateProductStock(item.productId, -item.quantity);
@@ -497,19 +521,6 @@ function POSDashboard() {
         updateCustomerDue(paymentData.customerId, dueAmount);
         CustomersDB.updateDue(paymentData.customerId, dueAmount).catch(console.error);
       }
-    }
-
-    if (paymentData.addChangeAsPrepayment && paymentData.customerId && paymentData.change > 0) {
-      SyncQueueDB.add({
-        id: uuidv4(),
-        entityType: 'Prepayment',
-        entityId: uuidv4(),
-        action: 'create',
-        payload: JSON.stringify({ customerId: paymentData.customerId, amount: paymentData.change }),
-        synced: false,
-        retryCount: 0,
-        createdAt: new Date(),
-      }).catch(console.error);
     }
 
     setCurrentSale(sale);
@@ -531,34 +542,8 @@ function POSDashboard() {
       const sale = await processOfflineSale(paymentData);
       
       // Try to save sale to server database if online
-      if (isOnline && sale) {
-        const salePayload = {
-          items: cartItems.map(item => ({
-            productId: item.productId,
-            productName: item.productName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            totalPrice: item.totalPrice,
-          })),
-          customerId: paymentData.customerId || undefined,
-          paymentMethod: paymentData.paymentMethod,
-          amountPaid: paymentData.amountPaid,
-          amountReceived: paymentData.amountReceived ?? (paymentData.cashAmount ?? 0) + (paymentData.upiAmount ?? 0),
-          cashAmount: paymentData.cashAmount,
-          upiAmount: paymentData.upiAmount,
-          discount: paymentData.discount,
-          tax: paymentData.tax,
-          usePrepaid: paymentData.usePrepaid,
-          prepaidAmountUsed: paymentData.prepaidAmountUsed,
-          changeAsPrepayment: (paymentData.addChangeAsPrepayment && paymentData.change > 0) ? paymentData.change : 0,
-        };
-
-        fetch('/api/sales', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(salePayload),
-        }).catch(err => console.warn('Background sync to server failed:', err));
-      }
+      // ✅ CRITICAL FIX: Remove direct /api/sales call to prevent race conditions & duplicate syncs
+      // Queue is already created in processOfflineSale - use background sync only
       
       // ২. ইউজারকে সাথে সাথে সাকসেস স্ক্রিন দেখিয়ে দিন, যাতে সে পরবর্তী বিলিং শুরু করতে পারে
       toast({ title: 'সফল', description: 'বিলিং সম্পন্ন হয়েছে।' });
@@ -583,7 +568,7 @@ function POSDashboard() {
     } finally {
       setTabProcessing(tabId, false);
     }
-  }, [isOnline, processOfflineSale, activeTabId, setTabProcessing, toast, setCompletedCheckoutSale, setCheckoutOpen, cartItems]);
+  }, [isOnline, processOfflineSale, activeTabId, setTabProcessing, toast, setCompletedCheckoutSale, setCheckoutOpen]);
 
   const handleOpenCheckout = useCallback(() => {
     setCheckoutOpen(true);
@@ -621,16 +606,10 @@ function POSDashboard() {
 
         const { data: updatedProduct } = await response.json();
 
-        // Update local store with new stock
+        // ✅ FIX: Update local store with new stock from server response
         updateProductStock(data.productId, data.quantity);
-
-        // Refetch all products to sync database changes
-        const productsRes = await fetch('/api/products?limit=10000');
-        if (productsRes.ok) {
-          const { data: refreshedProducts, nextCursor } = await productsRes.json();
-          const hasMore = !!nextCursor;
-          setProducts(refreshedProducts, hasMore, nextCursor);
-        }
+        // Also update IndexedDB with the new product data
+        await ProductsDB.upsert(updatedProduct);
 
         const productName = products.find(p => p.id === data.productId)?.name ?? 'পণ্য';
         toast({ title: 'স্টক যোগ সফল', description: `"${productName}" এ ${data.quantity} যোগ হয়েছে।` });
@@ -751,6 +730,8 @@ function POSDashboard() {
         
         const { data: updatedProduct } = await response.json();
         updateProduct(updatedProduct.id, updatedProduct);
+        // ✅ FIX: Persist updated product to IndexedDB for offline access
+        await ProductsDB.upsert(updatedProduct);
 
       } else {
         // Add new product
@@ -772,6 +753,8 @@ function POSDashboard() {
 
         const { data: newProduct } = await response.json();
         addProduct(newProduct);
+        // ✅ FIX: Persist new product to IndexedDB for offline access after page reload
+        await ProductsDB.upsert(newProduct);
         toast({ title: 'প্রোডাক্ট যোগ হয়েছে', description: `"${newProduct.name}" ইনভেন্টরিতে যোগ করা হয়েছে।` });
         return newProduct;
       }
@@ -1065,6 +1048,11 @@ function POSDashboard() {
         return null;
     }
   };
+
+  // ✅ HYDRATION GUARD: Prevent SSR/client mismatch by not rendering until hydrated
+  if (!isHydrated) {
+    return null;
+  }
 
   return (
     <div className="h-dvh w-full overflow-hidden flex flex-col lg:flex-row bg-slate-100/50 dark:bg-background">
