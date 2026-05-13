@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { useSalesStore } from '@/stores/pos-store';
 import { TransactionFilters } from './TransactionFilters';
 import { TransactionTable } from './TransactionTable';
 import { TransactionDetailsDialog } from './TransactionDetailsDialog';
@@ -21,6 +22,15 @@ export function TransactionHistory() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const { toast } = useToast();
+  
+  // ✅ Watch store sales and refresh when new sales are added
+  const sales = useSalesStore((state) => state.sales);
+  
+  useEffect(() => {
+    // Reset to page 1 and refresh when store sales change (new sale added)
+    setCurrentPage(1);
+    setRefreshKey(prev => prev + 1);
+  }, [sales]);
 
   useEffect(() => {
     const fetchTransactions = async () => {

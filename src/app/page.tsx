@@ -50,12 +50,12 @@ import {
   Banknote,
 } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore } from '@/stores/pos-store';
+import { useCartStore, useProductsStore, useSyncStore, useUIStore, useCustomersStore, useSalesStore } from '@/stores/pos-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { useSimpleBarcodeScanner } from '@/hooks/use-barcode-scanner';
 import { ProductsDB, SalesDB, SyncQueueDB, CustomersDB, saveSaleWithSyncQueue, updateProductsAndCustomerDue } from '@/lib/offline/indexeddb';
 import { STORE_CONFIG } from '@/types/pos';
-import type { Product, Sale } from '@/types/pos';
+import type { Product, Sale, SyncQueueItem } from '@/types/pos';
 import { cn } from '@/lib/utils';
 import { convertBengaliToEnglishNumerals } from '@/lib/utils';
 import { toMoneyNumber } from '@/lib/money';
@@ -515,6 +515,11 @@ function POSDashboard() {
     setCurrentSale(sale);
     setCompletedCheckoutSale(sale);
     clearCart();
+    
+    // ✅ Add sale to Zustand store so Dashboard & TransactionHistory update
+    useSalesStore.setState({ sales: [sale, ...useSalesStore.getState().sales] });
+    
+    return sale; // Return sale so handleCheckoutComplete can use it
   }, [cartItems, session, updateProductStock, updateCustomerDue, setCurrentSale, setCompletedCheckoutSale, clearCart]);
 
   const handleCheckoutComplete = useCallback(async (paymentData: PaymentData) => {
@@ -523,7 +528,37 @@ function POSDashboard() {
 
     try {
       // ১. সব অবস্থাতেই প্রথমে লোকাল ডাটাবেস (IndexedDB) ও UI সাথে সাথে আপডেট করুন (Zero Latency)
-      await processOfflineSale(paymentData);
+      const sale = await processOfflineSale(paymentData);
+      
+      // Try to save sale to server database if online
+      if (isOnline && sale) {
+        const salePayload = {
+          items: cartItems.map(item => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            totalPrice: item.totalPrice,
+          })),
+          customerId: paymentData.customerId || undefined,
+          paymentMethod: paymentData.paymentMethod,
+          amountPaid: paymentData.amountPaid,
+          amountReceived: paymentData.amountReceived ?? (paymentData.cashAmount ?? 0) + (paymentData.upiAmount ?? 0),
+          cashAmount: paymentData.cashAmount,
+          upiAmount: paymentData.upiAmount,
+          discount: paymentData.discount,
+          tax: paymentData.tax,
+          usePrepaid: paymentData.usePrepaid,
+          prepaidAmountUsed: paymentData.prepaidAmountUsed,
+          changeAsPrepayment: (paymentData.addChangeAsPrepayment && paymentData.change > 0) ? paymentData.change : 0,
+        };
+
+        fetch('/api/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(salePayload),
+        }).catch(err => console.warn('Background sync to server failed:', err));
+      }
       
       // ২. ইউজারকে সাথে সাথে সাকসেস স্ক্রিন দেখিয়ে দিন, যাতে সে পরবর্তী বিলিং শুরু করতে পারে
       toast({ title: 'সফল', description: 'বিলিং সম্পন্ন হয়েছে।' });
@@ -548,7 +583,7 @@ function POSDashboard() {
     } finally {
       setTabProcessing(tabId, false);
     }
-  }, [isOnline, processOfflineSale, activeTabId, setTabProcessing, toast, setCompletedCheckoutSale, setCheckoutOpen]);
+  }, [isOnline, processOfflineSale, activeTabId, setTabProcessing, toast, setCompletedCheckoutSale, setCheckoutOpen, cartItems]);
 
   const handleOpenCheckout = useCallback(() => {
     setCheckoutOpen(true);

@@ -49,3 +49,6 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Custom scripts
+merge_prs.sh

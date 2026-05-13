@@ -21,7 +21,7 @@ import {
   LogOut,
   Wallet,
 } from 'lucide-react';
-import { useProductsStore, useCartStore } from '@/stores/pos-store';
+import { useProductsStore, useCartStore, useSalesStore } from '@/stores/pos-store';
 import { useSettingsStore } from '@/stores/settings-store';
 import { STORE_CONFIG, Sale } from '@/types/pos';
 import { cn } from '@/lib/utils';
@@ -74,11 +74,33 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [fullTransactions, setFullTransactions] = useState<Transaction[]>([]);
   
   const products = useProductsStore((state) => state.products);
+  const sales = useSalesStore((state) => state.sales);
   const { settings } = useSettingsStore();
   const storeName = settings.store_name || STORE_CONFIG.name;
   const storeNameBn = settings.store_name_bn || STORE_CONFIG.nameBn;
   const storeLogo = settings.store_logo;
   const lowStockProducts = products.filter(p => p.currentStock <= p.minStockLevel && p.isActive);
+
+  // ✅ Derive recent transactions from store sales (always up-to-date)
+  useEffect(() => {
+    const recentSales = sales.slice(0, 5); // Get 5 most recent
+    const recentTransactions = recentSales.map((sale) => ({
+      id: sale.id ?? '',
+      invoiceNumber: sale.invoiceNumber ?? 'N/A',
+      customerName: sale.customer?.name,
+      totalAmount: Number(sale.totalAmount) || 0,
+      paymentMethod: sale.paymentMethod ?? 'Unknown',
+      createdAt: new Date(sale.createdAt ?? Date.now()),
+    }));
+    
+    const fullTransactionsData = recentSales.map((sale: Sale) => ({
+      ...sale,
+      createdAt: new Date(sale.createdAt ?? Date.now()),
+    } as Transaction));
+    
+    setTransactions(recentTransactions);
+    setFullTransactions(fullTransactionsData);
+  }, [sales]);
 
 
 
