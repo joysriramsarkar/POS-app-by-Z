@@ -67,7 +67,15 @@ DATABASE_URL="postgresql://user:password@host:5432/dbname?schema=public"
 DIRECT_URL="postgresql://user:password@host:5432/dbname?schema=public"
 NEXTAUTH_SECRET="your_secure_random_string"
 NEXTAUTH_URL="http://localhost:3000"
+# Optional: use a stable admin password for seed script
+SEED_ADMIN_PASSWORD="your_admin_password"
 ```
+
+> `NEXTAUTH_SECRET` should be a strong random string, at least 32 characters long.
+> For example:
+> ```bash
+> openssl rand -base64 32
+> ```
 
 **3. Database setup**
 ```bash
@@ -81,7 +89,13 @@ npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Default credentials are created by the seed script.
+Open [http://localhost:3000](http://localhost:3000).
+
+If `SEED_ADMIN_PASSWORD` is set, the admin user will be seeded with:
+- username: `admin`
+- password: the value of `SEED_ADMIN_PASSWORD`
+
+If `SEED_ADMIN_PASSWORD` is not set, the seed script generates a random one-time password and prints it during `npm run db:seed`.
 
 ---
 

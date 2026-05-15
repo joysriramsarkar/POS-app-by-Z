@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import bundleAnalyzer from "@next/bundle-analyzer";
 
 // C6: ALLOWED_ORIGINS must be set in production at runtime (not build time)
 // Check is done in src/lib/env.ts at server startup, not here.
@@ -8,9 +9,21 @@ const allowedOrigins = (rawOrigins ?? "http://localhost:3000")
   .split(",")
   .map((o) => o.trim());
 
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   allowedDevOrigins: ["192.168.1.11"],
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+    ],
+    inlineCss: true,
+  },
+  transpilePackages: [],
   async headers() {
     return [
       {
@@ -39,4 +52,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
+import { useCartStore } from '@/stores/pos-store';
+import { useSettingsStore } from '@/stores/settings-store';
 import { NetworkStatusMonitor, type NetworkStatus } from './network-listener';
 import { getSyncWorker } from './sync-worker';
 import { SyncQueueDB } from './indexeddb';
@@ -103,6 +105,29 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       cleanup();
+    };
+  }, []);
+
+  useEffect(() => {
+    const callback = () => {
+      useCartStore.persist.rehydrate();
+      useSettingsStore.persist.rehydrate();
+    };
+
+    let handle: number;
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      handle = (window as any).requestIdleCallback(callback, { timeout: 2000 });
+    } else {
+      handle = (globalThis as any).setTimeout(callback, 200);
+    }
+
+    return () => {
+      if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(handle);
+      } else {
+        clearTimeout(handle);
+      }
     };
   }, []);
 

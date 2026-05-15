@@ -253,6 +253,7 @@ export const useCartStore = create<CartState & CartActions>()(
     {
       name: 'lakhan-bhandar-cart-v2',
       storage: createJSONStorage(() => localStorage),
+      skipHydration: true,
       partialize: (state) => ({
         tabs: state.tabs,
         activeTabId: state.activeTabId,
