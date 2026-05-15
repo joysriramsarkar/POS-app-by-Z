@@ -220,6 +220,8 @@ export class OfflineSyncWorker {
       if (payload.quantityChange !== undefined) return "product:stock:update";
       return "product:update";
     }
+    if (item.entityType === "Prepayment" && item.action === "create")
+      return "prepayment:create";
 
     return null;
   }

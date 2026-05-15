@@ -188,6 +188,20 @@ export async function POST(request: NextRequest) {
           operationResult = await syncProduct(tx, productResult.data, "update");
           break;
         }
+        case "prepayment:create": {
+          const prepaymentSchema = z.object({
+            customerId: z.string().cuid(),
+            amount: z.number().positive(),
+          });
+          const prepaymentResult = prepaymentSchema.safeParse(payload);
+          if (!prepaymentResult.success)
+            throw new Error(
+              "Invalid Prepayment payload: " + prepaymentResult.error.message,
+            );
+
+          operationResult = await syncPrepayment(tx, prepaymentResult.data);
+          break;
+        }
         default:
           throw new Error(`Unknown action type: ${actionType}`);
       }
@@ -531,6 +545,37 @@ async function syncSale(tx: Prisma.TransactionClient, saleData: z.infer<typeof S
   }
 
   throw new Error(`Unknown action: ${action}`);
+}
+
+// Sync prepayment from offline
+async function syncPrepayment(tx: Prisma.TransactionClient, prepaymentData: { customerId: string; amount: number }) {
+  const customer = await tx.customer.findUnique({
+    where: { id: prepaymentData.customerId },
+  });
+
+  if (!customer) {
+    throw new Error(`Customer ${prepaymentData.customerId} not found during sync validation`);
+  }
+
+  const newPrepaidBalance = addMoney(customer.prepaidBalance, prepaymentData.amount);
+
+  const updatedCustomer = await tx.customer.update({
+    where: { id: prepaymentData.customerId },
+    data: { prepaidBalance: newPrepaidBalance, updatedAt: new Date() },
+  });
+
+  await tx.ledgerEntry.create({
+    data: {
+      customerId: prepaymentData.customerId,
+      entryType: "prepayment-added",
+      amount: prepaymentData.amount,
+      balanceAfter: customer.totalDue,
+      description: "Offline sync prepayment added",
+      referenceId: `PREPAY-${Date.now()}`,
+    },
+  });
+
+  return updatedCustomer;
 }
 
 // Sync customer from offline
