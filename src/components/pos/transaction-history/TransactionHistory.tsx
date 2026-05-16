@@ -38,7 +38,7 @@ export function TransactionHistory() {
       try {
         const params = new URLSearchParams();
         params.append('page', currentPage.toString());
-        params.append('limit', '20');
+        params.append('limit', '100');
 
         if (searchQuery) {
           params.append('invoiceNumber', searchQuery);

@@ -21,6 +21,7 @@ import { Transaction, TransactionItem } from "./types";
 import { useState } from "react";
 import { shareInvoiceAsPdf } from "@/lib/invoicePdf";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useSession } from "next-auth/react";
 
 interface TransactionDetailsDialogProps {
   transaction: Transaction | null;
@@ -37,6 +38,9 @@ export function TransactionDetailsDialog({
 }: TransactionDetailsDialogProps) {
   const [isSharing, setIsSharing] = useState(false);
   const { settings } = useSettingsStore();
+  const { data: session } = useSession();
+  const userRole = (session?.user as { role?: string })?.role;
+  const isAdmin = userRole === "ADMIN";
 
   if (!transaction) return null;
 
@@ -60,7 +64,7 @@ export function TransactionDetailsDialog({
           const quantity = Number(i.quantity ?? 0);
           const unitPrice = Number(i.unitPrice ?? 0);
           const totalPrice = Number(i.totalPrice ?? 0);
-          return `<tr><td>${idx + 1}</td><td>${i.productName}</td><td style="text-align:center">${quantity}</td><td style="text-align:right">₹${unitPrice.toFixed(2)}</td><td style="text-align:right">₹${totalPrice.toFixed(2)}</td></tr>`;
+          return `<tr><td>${idx + 1}</td><td>${i.productName}</td><td style="text-align:center">${quantity}${(i as any).unit || (i as any).product?.unit ? ` ${(i as any).unit || (i as any).product?.unit}` : ''}</td><td style="text-align:right">₹${unitPrice.toFixed(2)}</td><td style="text-align:right">₹${totalPrice.toFixed(2)}</td></tr>`;
         })
         .join("");
       const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
@@ -83,9 +87,9 @@ export function TransactionDetailsDialog({
           <tr><td>Subtotal:</td><td style="text-align:right">₹${(Number(transaction.totalAmount ?? 0) + Number(transaction.discount ?? 0) - Number(transaction.tax ?? 0)).toFixed(2)}</td></tr>
           ${(Number(transaction.discount ?? 0)) > 0 ? `<tr><td style="color:green">Discount:</td><td style="text-align:right;color:green">-₹${Number(transaction.discount ?? 0).toFixed(2)}</td></tr>` : ""}
           ${(Number(transaction.tax ?? 0)) > 0 ? `<tr><td>Tax:</td><td style="text-align:right">₹${Number(transaction.tax ?? 0).toFixed(2)}</td></tr>` : ""}
-          <tr class="total-row"><td>Grand Total:</td><td style="text-align:right">₹${(transaction.totalAmount ?? 0).toFixed(2)}</td></tr>
-          <tr><td>Amount Paid:</td><td style="text-align:right">₹${(transaction.amountPaid ?? 0).toFixed(2)}</td></tr>
-          ${(transaction.totalAmount ?? 0) - (transaction.amountPaid ?? 0) > 0 ? `<tr><td style="color:red">Due:</td><td style="text-align:right;color:red">₹${((transaction.totalAmount ?? 0) - (transaction.amountPaid ?? 0)).toFixed(2)}</td></tr>` : ""}
+          <tr class="total-row"><td>Grand Total:</td><td style="text-align:right">₹${Number(transaction.totalAmount ?? 0).toFixed(2)}</td></tr>
+          <tr><td>Amount Paid:</td><td style="text-align:right">₹${Number(transaction.amountPaid ?? 0).toFixed(2)}</td></tr>
+          ${Number(transaction.totalAmount ?? 0) - Number(transaction.amountPaid ?? 0) > 0 ? `<tr><td style="color:red">Due:</td><td style="text-align:right;color:red">₹${(Number(transaction.totalAmount ?? 0) - Number(transaction.amountPaid ?? 0)).toFixed(2)}</td></tr>` : ""}
         </table></div>
         <p style="margin-top:12px;font-size:13px">Payment: <b>${transaction.paymentMethod}</b> (${transaction.paymentStatus})</p>
         <div class="footer"><p>ধন্যবাদ! Thank you for shopping with us!</p></div>
@@ -95,7 +99,7 @@ export function TransactionDetailsDialog({
         .map((i) => {
           const quantity = Number(i.quantity ?? 0);
           const totalPrice = Number(i.totalPrice ?? 0);
-          return `• ${i.productName} x${quantity} = ₹${totalPrice.toFixed(2)}`;
+          return `• ${i.productName} x${quantity}${(i as any).unit || (i as any).product?.unit ? ` ${(i as any).unit || (i as any).product?.unit}` : ''} = ₹${totalPrice.toFixed(2)}`;
         })
         .join("\n");
       const fallbackText =
@@ -185,7 +189,7 @@ export function TransactionDetailsDialog({
                   <TableRow key={idx}>
                     <TableCell>{item.productName}</TableCell>
                     <TableCell className="text-right">
-                      {item.quantity}
+                      {item.quantity}{(item as any).unit || (item as any).product?.unit ? ` ${(item as any).unit || (item as any).product?.unit}` : ''}
                     </TableCell>
                     <TableCell className="text-right">
                       {formatPrice(item.unitPrice)}
@@ -291,7 +295,7 @@ export function TransactionDetailsDialog({
                 <Share2 className="w-4 h-4" />
                 {isSharing ? "Sharing..." : "Share / WhatsApp"}
               </Button>
-              {transaction.status === "Completed" && (
+              {isAdmin && transaction.status === "Completed" && (
                 <>
                   <Button
                     variant="destructive"

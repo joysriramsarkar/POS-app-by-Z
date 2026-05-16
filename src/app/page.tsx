@@ -477,6 +477,7 @@ function POSDashboard() {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: item.totalPrice,
+        unit: item.unit,
         createdAt: new Date(),
       })),
     } as Sale;

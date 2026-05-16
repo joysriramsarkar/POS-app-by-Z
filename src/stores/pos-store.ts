@@ -134,15 +134,20 @@ export const useCartStore = create<CartState & CartActions>()(
       })),
 
       addItem: (product: Product, quantity: number = 1) => {
+        let actualQuantity = quantity;
+        if (product.currentStock > 0 && product.currentStock < quantity) {
+          actualQuantity = product.currentStock;
+        }
+
         // Validate quantity before adding to cart
-        if (quantity <= 0) {
+        if (actualQuantity <= 0) {
           console.warn('Cannot add item with quantity <= 0');
           return;
         }
         
         // Check if product has enough stock
-        if (product.currentStock < quantity) {
-          console.warn(`Insufficient stock for ${product.name}. Available: ${product.currentStock}, Requested: ${quantity}`);
+        if (product.currentStock < actualQuantity) {
+          console.warn(`Insufficient stock for ${product.name}. Available: ${product.currentStock}, Requested: ${actualQuantity}`);
           return;
         }
         
@@ -155,12 +160,16 @@ export const useCartStore = create<CartState & CartActions>()(
         if (existingItemIndex >= 0) {
           const updatedItems = [...currentItems];
           const existingItem = updatedItems[existingItemIndex];
-          const newQuantity = new Decimal(existingItem.quantity).plus(new Decimal(quantity)).toNumber();
+          let newQuantity = new Decimal(existingItem.quantity).plus(new Decimal(actualQuantity)).toNumber();
 
           // Re-check stock when adding more of existing item
           if (newQuantity > product.currentStock) {
-            console.warn(`Total quantity exceeds available stock for ${product.name}. Available: ${product.currentStock}, Total: ${newQuantity}`);
-            return;
+            if (product.currentStock > existingItem.quantity) {
+              newQuantity = product.currentStock;
+            } else {
+              console.warn(`Total quantity exceeds available stock for ${product.name}. Available: ${product.currentStock}, Total: ${newQuantity}`);
+              return;
+            }
           }
 
           updatedItems[existingItemIndex] = {
@@ -175,9 +184,9 @@ export const useCartStore = create<CartState & CartActions>()(
             productId: product.id,
             productName: product.name,
             barcode: product.barcode || undefined,
-            quantity: quantity,
+            quantity: actualQuantity,
             unitPrice: product.sellingPrice,
-            totalPrice: toMoneyNumber(new Decimal(quantity).times(new Decimal(product.sellingPrice))),
+            totalPrice: toMoneyNumber(new Decimal(actualQuantity).times(new Decimal(product.sellingPrice))),
             unit: product.unit,
             availableStock: product.currentStock,
           };
